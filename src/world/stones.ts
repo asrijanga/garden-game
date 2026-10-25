@@ -192,6 +192,18 @@ export class Stones {
     }
   }
 
+  /** Lift away stones of `kind` within `r` of (x, z) for which `inside(x, z)` is true. */
+  removeIf(x: number, z: number, r: number, kind: StoneKind, inside: (x: number, z: number) => boolean) {
+    for (const s of this.near(x, z, r)) {
+      if (s.removed || s.kind !== kind) continue;
+      if ((s.pos.x - x) ** 2 + (s.pos.z - z) ** 2 > r * r || !inside(s.pos.x, s.pos.z)) continue;
+      s.removed = true;
+      this.m.makeScale(0, 0, 0);
+      s.mesh.setMatrixAt(s.index, this.m);
+      s.mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
   add(kind: StoneKind, x: number, y: number, z: number, scale: THREE.Vector3, yaw: number, r: number, tone: THREE.Color, delay: number, owner = 0) {
     const list = this.meshes.get(kind)!;
     const mesh = list[Math.floor(this.rng() * list.length)];

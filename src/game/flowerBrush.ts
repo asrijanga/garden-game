@@ -13,6 +13,7 @@ const BED_RADIUS = 0.8; // painted soil (visible edge at ~80% of this), mostly h
 const PLANT_RADIUS = 0.62; // flowers scatter this far from the stroke, inside the bed's edge
 const EDGE_RADIUS = 0.67; // natural stone border sits just outside the mulch's visible edge
 const EDGE_SPACING = 0.24; // metres between border stones
+const BLEND = 0.8; // radius of the rounded curve where separate beds meet
 const ROCK_TONES = ['#a39b8f', '#8f877c', '#b3aa9b', '#9b8f80', '#7f786f', '#b8ad9c', '#a8a091'];
 /** Plant scale. Heads are already drawn large (see HEAD); stems stay fairly short so blooms sit over their bed. */
 const FLOWER_SCALE = 1.2;
@@ -29,9 +30,10 @@ export class FlowerBrush {
   private readonly rng = createRng(4321);
   private last: THREE.Vector2 | null = null;
   private strokeTime = 0;
-  /** Every dab of every bed so far (centres), and the dabs of the stroke in progress. */
-  private readonly beds: THREE.Vector2[] = [];
+  /** Every dab of every bed so far (centre + which stroke made it), and the stroke in progress. */
+  private readonly beds: { c: THREE.Vector2; stroke: number }[] = [];
   private stroke: THREE.Vector2[] = [];
+  private strokeId = 0;
 
   constructor(
     private readonly ground: Ground,
@@ -57,6 +59,7 @@ export class FlowerBrush {
     this.last = new THREE.Vector2(p.x, p.z);
     this.strokeTime = 0;
     this.stroke = [];
+    this.strokeId++;
     this.dab(this.last);
   }
 
@@ -79,35 +82,109 @@ export class FlowerBrush {
   }
 
   /**
-   * A hand-laid border of natural stones round the outside of the bed. It follows the outline
-   * of all beds together, so a bed that's extended or joins another gets one border round the
-   * outside; stones that end up inside the bed are lifted away.
+   * Signed distance to the outline of all beds near `p` (negative inside). Beds are blended with
+   * a smooth union, so where two beds meet (or nearly touch) they join in a soft, rounded curve
+   * instead of a sharp notch, the way a gardener would cut the edge.
+   */
+  private bedField(x: number, z: number, near: { c: THREE.Vector2; stroke: number }[]): number {
+    // Each stroke's own outline is exact (a plain union of its dabs)...
+    const perStroke = new Map<number, number>();
+    for (const b of near) {
+      const di = Math.hypot(x - b.c.x, z - b.c.y) - EDGE_RADIUS;
+      perStroke.set(b.stroke, Math.min(perStroke.get(b.stroke) ?? Infinity, di));
+    }
+    // ...and separate beds join with a round fillet of radius BLEND where they meet.
+    let d = Infinity;
+    for (const di of perStroke.values()) {
+      if (d === Infinity) d = di;
+      else d = Math.max(BLEND, Math.min(d, di)) - Math.hypot(Math.max(BLEND - d, 0), Math.max(BLEND - di, 0));
+    }
+    return d;
+  }
+
+  /**
+   * A hand-laid border of natural stones round the outside of the beds, following their smooth
+   * shared outline. Only the area round the new stroke is rebuilt: the curve where beds meet is
+   * filled with mulch (and a little foliage), stones that are now inside are lifted, and new
+   * stones are laid along the outline, settling one after another.
    */
   private layBorder(stroke: THREE.Vector2[]) {
-    for (const c of stroke) this.stones.removeNear(c.x, c.y, EDGE_RADIUS - 0.08, 'rock');
-    const insideAnother = (p: THREE.Vector2, self: THREE.Vector2) => this.beds.some((c) => c !== self && c.distanceTo(p) < EDGE_RADIUS - 0.03);
-    let delay = 0.15;
+    const reach = 1.6;
+    const touches = (x: number, z: number, pad: number) => stroke.some((c) => Math.hypot(x - c.x, z - c.y) < EDGE_RADIUS + pad);
+    // Beds that can influence the outline here.
+    const near = this.beds.filter((b) => stroke.some((c) => b.c.distanceTo(c) < EDGE_RADIUS * 2 + BLEND + reach));
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
     for (const c of stroke) {
-      const steps = Math.ceil((Math.PI * 2 * EDGE_RADIUS) / EDGE_SPACING);
-      const start = this.rng() * Math.PI * 2;
-      for (let i = 0; i < steps; i++) {
-        const a = start + (i / steps) * Math.PI * 2;
-        // Hand-laid: each stone nudged in or out a little and spaced unevenly.
-        const r = EDGE_RADIUS + (this.rng() - 0.5) * 0.05;
-        const p = new THREE.Vector2(c.x + Math.cos(a) * r, c.y + Math.sin(a) * r);
-        if (insideAnother(p, c)) continue;
-        if (this.blocked(p.x, p.y) || this.distanceToPaths(p.x, p.y) < 0.7) continue;
-        const size = lerp(0.2, 0.3, this.rng() ** 1.3);
-        if (this.stones.isOccupied(p.x, p.y, size * 0.42, 'rock')) continue;
-        const tone = new THREE.Color(ROCK_TONES[Math.floor(this.rng() * ROCK_TONES.length)]).multiplyScalar(lerp(0.92, 1.08, this.rng()));
-        const scale = new THREE.Vector3(size, size * lerp(0.8, 1.15, this.rng()), size);
-        // Long side along the edge, with a little twist; set a touch high or low.
-        // (local +x maps to (cos yaw, -sin yaw); the tangent here is (-sin a, cos a))
-        const yaw = Math.atan2(-Math.cos(a), -Math.sin(a)) + (this.rng() - 0.5) * 0.6;
-        const y = this.ground.heightAt(p.x, p.y) - size * lerp(0.06, 0.16, this.rng());
-        this.stones.add('rock', p.x, y, p.y, scale, yaw, size * 0.42, tone, delay);
-        delay += 0.025;
+      minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x);
+      minZ = Math.min(minZ, c.y); maxZ = Math.max(maxZ, c.y);
+    }
+    const field = (x: number, z: number) => this.bedField(x, z, near);
+
+    // Lift stones that the new (blended) outline has swallowed.
+    const mid = new THREE.Vector2((minX + maxX) / 2, (minZ + maxZ) / 2);
+    const span = Math.hypot(maxX - minX, maxZ - minZ) / 2 + EDGE_RADIUS + reach;
+    this.stones.removeIf(mid.x, mid.y, span, 'rock', (x, z) => field(x, z) < -0.07 && touches(x, z, reach));
+
+    // March a grid round the stroke: fill the blended curves with mulch and find the outline.
+    const step = 0.08;
+    const edge: { x: number; z: number; order: number }[] = [];
+    const greens = this.season === 'autumn' ? FOLIAGE_AUTUMN : this.season === 'winter' ? FOLIAGE_WINTER : FOLIAGE_GREEN;
+    for (let x = minX - EDGE_RADIUS - reach; x <= maxX + EDGE_RADIUS + reach; x += step) {
+      for (let z = minZ - EDGE_RADIUS - reach; z <= maxZ + EDGE_RADIUS + reach; z += step) {
+        if (!touches(x, z, reach)) continue;
+        const f = field(x, z);
+        if (f < 0) {
+          // In a blended curve (inside the outline, outside every round dab): mulch it in.
+          const plain = Math.min(...near.map((b) => Math.hypot(x - b.c.x, z - b.c.y))) - EDGE_RADIUS;
+          if (plain > -0.06 && !this.blocked(x, z) && this.distanceToPaths(x, z) > 0.75) {
+            this.paint.bed(x, z, 0.32);
+            if (this.rng() < 0.08) {
+              const green = new THREE.Color(greens[Math.floor(this.rng() * greens.length)]);
+              this.flowers.plantFoliage(x, this.ground.heightAt(x, z) - 0.02, z, this.rng() * 6.28, lerp(0.9, 1.3, this.rng()), 0.2 + this.rng() * 0.4, green);
+            }
+          }
+          continue;
+        }
+        // Outline cells: outside, with an inside neighbour.
+        if (field(x + step, z) < 0 || field(x - step, z) < 0 || field(x, z + step) < 0 || field(x, z - step) < 0) {
+          let order = 0;
+          let best = Infinity;
+          stroke.forEach((c, i) => {
+            const d = Math.hypot(x - c.x, z - c.y);
+            if (d < best) {
+              best = d;
+              order = i + Math.atan2(z - c.y, x - c.x) / (Math.PI * 2);
+            }
+          });
+          edge.push({ x, z, order });
+        }
       }
+    }
+
+    // Lay stones along the outline, in stroke order so they settle like someone working round.
+    edge.sort((a, b) => a.order - b.order);
+    let delay = 0.15;
+    for (const e of edge) {
+      if (this.blocked(e.x, e.z) || this.distanceToPaths(e.x, e.z) < 0.7) continue;
+      if (this.stones.isOccupied(e.x, e.z, EDGE_SPACING * 0.5, 'rock')) continue;
+      const size = lerp(0.2, 0.3, this.rng() ** 1.3);
+      // Tangent from the field's gradient, so stones run along the curve.
+      const gx = field(e.x + 0.02, e.z) - field(e.x - 0.02, e.z);
+      const gz = field(e.x, e.z + 0.02) - field(e.x, e.z - 0.02);
+      const tx = -gz;
+      const tz = gx;
+      // Hand-laid: nudged in or out, a little twist, set a touch high or low.
+      const nudge = (this.rng() - 0.5) * 0.05;
+      const gl = Math.hypot(gx, gz) || 1;
+      const x = e.x + (gx / gl) * nudge;
+      const z = e.z + (gz / gl) * nudge;
+      const tone = new THREE.Color(ROCK_TONES[Math.floor(this.rng() * ROCK_TONES.length)]).multiplyScalar(lerp(0.92, 1.08, this.rng()));
+      const scale = new THREE.Vector3(size, size * lerp(0.8, 1.15, this.rng()), size);
+      // (local +x maps to (cos yaw, -sin yaw); we want it along the tangent)
+      const yaw = Math.atan2(-tz, tx) + (this.rng() - 0.5) * 0.6;
+      const y = this.ground.heightAt(x, z) - size * lerp(0.06, 0.16, this.rng());
+      this.stones.add('rock', x, y, z, scale, yaw, size * 0.42, tone, delay);
+      delay += 0.025;
     }
   }
 
@@ -122,7 +199,7 @@ export class FlowerBrush {
     if (this.blocked(c.x, c.y) || this.distanceToPaths(c.x, c.y) < 0.7) return;
     this.paint.bed(c.x, c.y, BED_RADIUS);
     const centre = c.clone();
-    this.beds.push(centre);
+    this.beds.push({ c: centre, stroke: this.strokeId });
     this.stroke.push(centre);
     this.wildflowers.clearNear(c.x, c.y, BED_RADIUS);
     // Leafy foliage first: the bed fills with green, then the flowers rise out of it.
