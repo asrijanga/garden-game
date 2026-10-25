@@ -412,7 +412,9 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number): THREE.BufferGeo
       m.addGeometry(g, WHITE, true, attach);
     }
   }
-  return m.build();
+  const geo = m.build();
+  geo.userData.headY = top.y; // where the bloom sits (bees land here)
+  return geo;
 }
 
 interface Pending {
@@ -431,6 +433,7 @@ export class Flowers {
   private readonly uniforms = { uFlowerTime: { value: 0 } };
   private readonly grid = new Map<string, { x: number; z: number; r: number }[]>();
   private readonly blooms: Pending[] = [];
+  private readonly heads: { pos: THREE.Vector3; openAt: number }[] = [];
   private time = 0;
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
@@ -568,7 +571,18 @@ export class Flowers {
     const key = `${Math.floor(x)},${Math.floor(z)}`;
     if (!this.grid.has(key)) this.grid.set(key, []);
     this.grid.get(key)!.push({ x, z, r: sp.spacing });
-    if (bloomMax > 0.5) this.blooms.push({ at: birth + BLOOM_START + 0.6, pos: new THREE.Vector3(x, y, z) });
+    if (bloomMax > 0.5) {
+      this.blooms.push({ at: birth + BLOOM_START + 0.6, pos: new THREE.Vector3(x, y, z) });
+      const headY = (mesh.geometry.userData.headY as number) ?? 0.4;
+      this.heads.push({ pos: new THREE.Vector3(x, y + headY * scale + 0.03, z), openAt: birth + BLOOM_END });
+    }
+  }
+
+  /** Open blooms bees can visit (in-season flowers that have finished unfurling). */
+  openBlooms(): THREE.Vector3[] {
+    const out: THREE.Vector3[] = [];
+    for (const h of this.heads) if (this.time >= h.openAt) out.push(h.pos);
+    return out;
   }
 
   update(dt: number) {

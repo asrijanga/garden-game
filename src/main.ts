@@ -14,6 +14,7 @@ import { FlowerBrush } from './game/flowerBrush';
 import { Flowers } from './world/flowers';
 import { SPECIES } from './world/flowerSpecies';
 import { FlowerPicker } from './ui/flowerPicker';
+import { Bees } from './world/bees';
 import { createMotes } from './world/motes';
 import { FlyingBirds } from './world/flyingBirds';
 import { currentSeason, PALETTES } from './world/season';
@@ -140,6 +141,17 @@ scene.add(edgePlants.group);
 const paths = new PathBuilder(ground, paint, stones, edgePlants, wildflowers, (x, z) => cottage.contains(x, z, 0.1) || ground.forestness(x, z) > 0.45);
 
 const flowers = new Flowers(SPECIES, () => ambience.bloom());
+// Bees arrive from (and leave into) the woods round the clearing.
+const bees = new Bees(
+  () => flowers.openBlooms(),
+  (angle) => {
+    const r = ground.clearingRadius(angle) + 2;
+    const x = Math.cos(angle) * r;
+    const z = Math.sin(angle) * r;
+    return new THREE.Vector3(x, ground.heightAt(x, z) + 1.5, z);
+  },
+);
+scene.add(bees.group);
 scene.add(flowers.group);
 const flowerBrush = new FlowerBrush(
   ground,
@@ -160,7 +172,7 @@ const picker = new FlowerPicker(flowerBrush.ordered(), (sp) => flowerBrush.inSea
   ambience.tap(1.3);
   toolbar.showLabel(label, 1800);
 });
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig });
 tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker, paths, flowerBrush, (tool) => {
   picker.setVisible(tool === 'flowers');
   document.body.classList.toggle('picking', tool === 'flowers');
@@ -206,12 +218,15 @@ function frame(time: number) {
   stones.update(dt);
   edgePlants.update(dt);
   flowers.update(dt);
+  bees.update(dt);
   wildflowers.update(dt);
   dust.update(dt);
   paint.update();
   (motes.material as THREE.ShaderMaterial).uniforms.uTime.value = elapsed;
   rig.update(dt);
   ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));
+  const buzz = bees.buzzNear(camera.position);
+  ambience.buzz(buzz.level, buzz.pitch);
   post.render(dt);
 }
 

@@ -176,6 +176,45 @@ export class Ambience {
     osc.stop(t + 0.2);
   }
 
+  private buzzOsc: OscillatorNode | null = null;
+  private buzzGain: GainNode | null = null;
+
+  /**
+   * A faint, soft bee buzz, only audible when zoomed in close to a bee. `level` 0..1 is set
+   * every frame from the nearest bee; changes are smoothed so it fades in and out gently.
+   */
+  buzz(level: number, pitch: number) {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || ctx.state !== 'running') return;
+    if (!this.buzzOsc) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = 200;
+      // A quick wobble in loudness gives the wingbeat texture.
+      const trem = ctx.createOscillator();
+      trem.frequency.value = 23;
+      const tremDepth = ctx.createGain();
+      tremDepth.gain.value = 0.35;
+      const amp = ctx.createGain();
+      amp.gain.value = 0.65;
+      trem.connect(tremDepth).connect(amp.gain);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 700;
+      lp.Q.value = 0.7;
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      osc.connect(amp).connect(lp).connect(g).connect(this.master);
+      osc.start();
+      trem.start();
+      this.buzzOsc = osc;
+      this.buzzGain = g;
+    }
+    const now = ctx.currentTime;
+    this.buzzGain!.gain.setTargetAtTime(level * 0.05, now, 0.35);
+    this.buzzOsc.frequency.setTargetAtTime(190 * pitch + Math.sin(now * 3.1) * 6, now, 0.2);
+  }
+
   private lastBloom = 0;
 
   /** A tiny, soft pentatonic "pling" as a flower opens. Rate-limited so a bed shimmers, not chatters. */

@@ -31,6 +31,7 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **Bees (requested during 1.6, pulled from 3.3):** honeybees, round fuzzy bumblebees (white tail) and small dark mason bees. They only visit open, in-season blooms; bob and wander between nearby flowers; hover a few seconds; sometimes fly off into the woods while new ones arrive. About 1 bee per 25 open blooms, up to 8. Storybook scale (5.5×). A faint, soft buzz only when the camera is close to a bee.
 - **iPad review:** *Feedback:* Sound isn't working on iPad; there are some bugs with sound; the flower menu is aligned left on bigger screens. *Changes:*
   - Audio session set to "playback" (Safari 16.4+) so Silent Mode doesn't mute the garden. Trade-off: like a video, it may pause other apps' music.
   - Every touch, click or key (not just the first) now wakes audio that iOS paused (app switch, lock screen, calls).
