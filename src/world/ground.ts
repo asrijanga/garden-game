@@ -135,7 +135,7 @@ function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
         vec3 soil = mix(vec3(0.24, 0.16, 0.09), vec3(0.34, 0.24, 0.14), grain);
         // Gravel: pale grit speckled with darker and lighter pebbles.
         float speck = lawnNoise(vWorld.xz * 38.0);
-        vec3 gravel = mix(vec3(0.42, 0.37, 0.29), vec3(0.56, 0.5, 0.4), grain);
+        vec3 gravel = mix(vec3(0.3, 0.28, 0.24), vec3(0.42, 0.39, 0.33), grain);
         gravel *= 1.0 - smoothstep(0.72, 0.9, speck) * 0.3 + smoothstep(0.25, 0.08, speck) * 0.15;
         soil = mix(soil, gravel, sandy);
         soil *= 1.0 - lip * 0.2;
