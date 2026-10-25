@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 
 export type StoneKind = 'curb' | 'step';
-const SHAPES: Record<StoneKind, number> = { curb: 3, step: 3 };
+const SHAPES: Record<StoneKind, number> = { curb: 3, step: 8 };
 const CAPACITY = 2000; // per shape
 const CELL = 0.5; // spatial hash cell, metres
 
@@ -17,14 +18,49 @@ function curbGeometry(seed: number): THREE.BufferGeometry {
   return g;
 }
 
-/** A rounded-square stepping stone, slightly different proportions per variant. */
+/**
+ * A hand-dressed stepping stone: a rounded-square outline (superellipse) whose corners are each
+ * rounded a little differently, with gently wobbling sides and softly bevelled top edges.
+ */
 function stepGeometry(seed: number): THREE.BufferGeometry {
   const rng = createRng(seed);
-  const g = new RoundedBoxGeometry(lerp(0.4, 0.46, rng()), 0.08, lerp(0.38, 0.44, rng()), 3, lerp(0.03, 0.06, rng()));
-  g.translate(0, 0.03, 0);
+  const hx = lerp(0.19, 0.23, rng());
+  const hz = lerp(0.18, 0.22, rng());
+  const cornerRound = [0, 1, 2, 3].map(() => lerp(3.8, 6.0, rng())); // lower = rounder corner
+  const wobble = [0, 1, 2].map(() => rng() * Math.PI * 2);
+  const shape = new THREE.Shape();
+  const N = 40;
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    // Blend the corner roundness of whichever quadrant we're in.
+    const q = Math.floor(((a + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 2));
+    const n = cornerRound[q];
+    const r = 1 / Math.pow(Math.pow(Math.abs(c), n) + Math.pow(Math.abs(s), n), 1 / n);
+    const w = 1 + Math.sin(a * 3 + wobble[0]) * 0.025 + Math.sin(a * 5 + wobble[1]) * 0.015 + Math.sin(a * 2 + wobble[2]) * 0.02;
+    const x = c * r * hx * w;
+    const z = s * r * hz * w;
+    if (i === 0) shape.moveTo(x, z);
+    else shape.lineTo(x, z);
+  }
+  shape.closePath();
+  const g = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.05,
+    bevelEnabled: true,
+    bevelThickness: 0.02,
+    bevelSize: 0.022,
+    bevelSegments: 3,
+    curveSegments: 1,
+  });
+  g.rotateX(Math.PI / 2); // extrude downward: the shape's y becomes world z
+  g.translate(0, 0.07, 0);
   g.deleteAttribute('uv');
-  colorByHeight(g, -0.01, 0.07);
-  return g;
+  g.deleteAttribute('normal');
+  const merged = mergeVertices(g, 1e-4);
+  colorByHeight(merged, 0.0, 0.09);
+  merged.computeVertexNormals();
+  return merged;
 }
 
 /** Lighter, sun-bleached top faces; darker sides. */

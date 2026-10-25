@@ -99,8 +99,10 @@ export class PathBuilder {
       this.sinceStone = 0;
       if (!this.stones.isOccupied(w.x, w.y, 0.18, 'step')) {
         const tone = new THREE.Color(STONE_TONES[Math.floor(this.rng() * STONE_TONES.length)]).multiplyScalar(lerp(0.96, 1.04, this.rng()));
-        const yaw = Math.atan2(this.heading.x, this.heading.y) + (this.rng() - 0.5) * 0.12;
-        const scale = new THREE.Vector3(1, 1, 1).multiplyScalar(lerp(0.95, 1.05, this.rng()));
+        // Each stone sits a touch differently: a little twist, slightly different proportions.
+        const yaw = Math.atan2(this.heading.x, this.heading.y) + (this.rng() - 0.5) * 0.3 + (this.rng() < 0.5 ? 0 : Math.PI / 2);
+        const k = lerp(0.92, 1.08, this.rng());
+        const scale = new THREE.Vector3(k * lerp(0.94, 1.06, this.rng()), lerp(0.85, 1.1, this.rng()), k * lerp(0.94, 1.06, this.rng()));
         this.stones.add('step', w.x, this.ground.heightAt(w.x, w.y) - 0.03, w.y, scale, yaw, 0.2, tone, 0.05, this.pathId);
       }
     }
