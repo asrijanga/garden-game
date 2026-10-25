@@ -133,13 +133,12 @@ function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
         float rim = smoothstep(0.1, 0.38, wear) * (1.0 - earth);
         diffuseColor.rgb *= 1.0 - rim * 0.12;
         vec3 soil = mix(vec3(0.24, 0.16, 0.09), vec3(0.34, 0.24, 0.14), grain);
-        // Gravel paths: pale, sandy grit.
-        soil = mix(soil, mix(vec3(0.45, 0.38, 0.27), vec3(0.6, 0.52, 0.39), grain), sandy);
-        soil *= 1.0 - lip * 0.28;
-        // Moss creeping into the joints between flagstones, in random soft patches.
-        float mossN = lawnNoise(vWorld.xz * 1.6 + 4.2) * 0.6 + lawnNoise(vWorld.xz * 6.0) * 0.4;
-        float moss = smoothstep(0.5, 0.66, mossN) * (1.0 - sandy);
-        soil = mix(soil, mix(vec3(0.1, 0.17, 0.05), vec3(0.17, 0.25, 0.08), grain), moss);
+        // Gravel: pale grit speckled with darker and lighter pebbles.
+        float speck = lawnNoise(vWorld.xz * 38.0);
+        vec3 gravel = mix(vec3(0.42, 0.37, 0.29), vec3(0.56, 0.5, 0.4), grain);
+        gravel *= 1.0 - smoothstep(0.72, 0.9, speck) * 0.3 + smoothstep(0.25, 0.08, speck) * 0.15;
+        soil = mix(soil, gravel, sandy);
+        soil *= 1.0 - lip * 0.2;
         diffuseColor.rgb = mix(diffuseColor.rgb, soil, earth);
         // Gust sheen: the meadow brightens softly as wind passes, like grass bowing in waves.
         float gust = windAt(vWorld.xz, 0.0);

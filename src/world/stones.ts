@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createRng, lerp } from '../core/random';
 
-export type StoneKind = 'curb';
-const SHAPES: Record<StoneKind, number> = { curb: 3 };
+export type StoneKind = 'curb' | 'step';
+const SHAPES: Record<StoneKind, number> = { curb: 3, step: 3 };
 const CAPACITY = 2000; // per shape
 const CELL = 0.5; // spatial hash cell, metres
 
@@ -14,6 +14,16 @@ function curbGeometry(seed: number): THREE.BufferGeometry {
   g.translate(0, 0.05, 0);
   g.deleteAttribute('uv');
   colorByHeight(g, -0.02, 0.12);
+  return g;
+}
+
+/** A rounded-square stepping stone, slightly different proportions per variant. */
+function stepGeometry(seed: number): THREE.BufferGeometry {
+  const rng = createRng(seed);
+  const g = new RoundedBoxGeometry(lerp(0.4, 0.46, rng()), 0.08, lerp(0.38, 0.44, rng()), 3, lerp(0.03, 0.06, rng()));
+  g.translate(0, 0.03, 0);
+  g.deleteAttribute('uv');
+  colorByHeight(g, -0.01, 0.07);
   return g;
 }
 
@@ -49,7 +59,7 @@ interface Falling {
 }
 
 /**
- * Edging stones that drop into place with a soft squash and bounce.
+ * Path stones (stepping stones and edging) that drop into place with a soft squash and bounce.
  * All stones of a shape share one InstancedMesh; only those still settling update each frame.
  */
 export class Stones {
@@ -69,7 +79,7 @@ export class Stones {
     (Object.keys(SHAPES) as StoneKind[]).forEach((kind, ki) => {
       const list: THREE.InstancedMesh[] = [];
       for (let k = 0; k < SHAPES[kind]; k++) {
-        const geo = curbGeometry(300 + ki * 50 + k * 11);
+        const geo = kind === 'curb' ? curbGeometry(300 + k * 11) : stepGeometry(500 + ki * 50 + k * 13);
         const mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
         mesh.count = 0;
         mesh.castShadow = true;

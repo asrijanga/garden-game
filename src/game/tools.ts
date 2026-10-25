@@ -90,6 +90,6 @@ export class ToolController {
     if (!this.stroking) return;
     this.stroking = false;
     this.marker.up();
-    this.paths.end(false);
+    this.paths.end();
   }
 }
