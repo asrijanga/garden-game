@@ -314,6 +314,26 @@ Demo script: draw a pond next to the path and wait for the first fish to jump.
 
 Demo script: zoom in near the forest edge and wait for a bunny family; watch the babies bounce after their parent, then plant flowers nearby and watch them hop aside.
 
+### Story 3.6 — Ducks and ducklings on the pond (M) — *requested by the player*
+**As a** player, **I want** a mother duck and her fluffy ducklings paddling around my pond, **so that** the water feels alive and I smile every time I look at it.
+
+- **A duck family:** grown-up ducks (mallard drakes with glossy green heads, brown speckled hens, and the odd white farmyard duck) and tiny, round, fluffy yellow-and-brown ducklings. Sizes, markings and tones vary a little, so no two look alike.
+- **Paddling in a line:** the ducklings follow their mother in a wobbly little line, falling behind and hurrying to catch up. A soft V-shaped wake and small ripples spread behind each one, drawn on the existing pond water (and following the same gusts).
+- **Calm duck behaviours:**
+  - dabbling tail-up to feed;
+  - preening;
+  - a flap-and-shake that sends up a few droplets;
+  - drifting with the breeze;
+  - tucking their heads in to doze by the reeds.
+- **Ducklings being ducklings:** quick little paddles, the odd bob under the water and pop back up, chasing a fly, huddling under the mother.
+- **On the bank:** now and then the family waddles out to sit on the grass by the shore, then waddles back and plops into the water with a small splash.
+- **Living in the world:** a family appears when a pond is big enough (at least about 6 m²). It arrives by flying in low over the trees (the ducklings walk in from the woods' edge) and leaves the same way. At most one family per pond. Ducks keep clear of lily pads and steer round rocks, and fish carry on underneath.
+- **Gentle with the player:** digging or building right next to them makes them paddle calmly away. Tapping a duck gives a soft quack, and the ducklings answer with tiny peeps.
+- **Soft sound:** occasional distant, gentle quacks and peeps, only when zoomed in near the pond, and never chattering.
+- **Performance:** a few simple procedural meshes with GPU-friendly animation, cheap on iPhone.
+
+Demo script: dig a large pond, wait for the duck family to fly in, then watch the ducklings follow their mother round the lily pads.
+
 ---
 
 ## Milestone 4 — A world of flowers, through the real seasons
@@ -340,6 +360,27 @@ Demo script: zoom in near the forest edge and wait for a bunny family; watch the
 - **Living details:** petals occasionally drop and drift on the breeze; bees love them.
 
 Demo script: plant a bed of mixed-colour roses beside a path, zoom in on a single bloom, then try each rose type.
+
+### Story 4.1c — Water flowers: lotus and friends (M) — *requested by the player*
+**As a** player, **I want** to plant lotus and other water flowers in my ponds, **so that** the water blooms as beautifully as my beds.
+
+- **Plant in water:** with the Flowers tool, painting over a pond plants water flowers instead of a bed (there is no mulch on water). Water flowers get their own group of chips in the flower picker, and a "water mix". They only grow where the water is deep enough for each kind, and they start exactly under your finger like every other tool.
+- **Lotus:** big, round, blue-green leaves, some floating and some held up on stalks above the water, with water drops that roll on them. Tall stems carry large cupped blooms that unfurl petal by petal (pink, white, blush with pink tips), with a golden seed-pod heart. Later, seed pods that nod in the breeze.
+- **Other water flowers**, each with its own silhouette:
+  - **Water lilies** in more colours (white, pink, red, yellow, peach), on top of the lily pads from 1.7.
+  - **Water iris:** tall sword leaves with purple, blue or yellow flag flowers at the edge.
+  - **Marsh marigold:** golden cups in the shallows.
+  - **Pickerelweed:** spikes of soft violet-blue.
+  - **Water forget-me-not:** tiny sky-blue clouds along the bank.
+  - **Floating water hyacinth:** pale lavender flowers on glossy rosettes.
+  - **Arrowhead:** white three-petalled flowers above arrow-shaped leaves.
+- **Where they grow:** each kind has a home zone: deep-water floaters (lotus, lilies, hyacinth), shallow-water marginals (iris, marigold, pickerelweed, arrowhead) and the damp bank (forget-me-not). Painting across a pond fills each zone naturally, in soft drifts, with no perfect rings.
+- **Growth and bloom:** pads unfurl on the surface, stalks rise, buds swell and open through the existing GPU growth system, with a soft chime. Floating leaves bob gently on the wind-driven ripples.
+- **Seasons:** each flower blooms in its real season (lotus and lilies in summer, marsh marigold in spring, iris early summer). In autumn the leaves turn bronze and seed pods remain. In winter only a few dark pads stay on the water.
+- **Living details:** dragonflies and bees visit the open blooms, fish glide beneath the leaves, and the occasional petal drifts across the water.
+- **Performance:** instanced like the bed flowers, cheap on iPhone.
+
+Demo script: dig a pond, choose the water mix, and paint across it. Watch lotus pads unfurl in the deep middle, irises rise at the edges, and blooms open in a wave.
 
 ### Story 4.2 — Real seasons, beautifully (L)
 - Seasons already follow the real date (from 1.1). Add the full feel: **spring** cherry blossoms and drifting petals, **summer** lush and buzzing, **autumn** amber leaves falling and gathering, **winter** quiet snowfall, frosted hedges and snow on the roof, with glowing windows.
