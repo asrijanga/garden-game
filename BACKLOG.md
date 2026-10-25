@@ -31,6 +31,7 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **Grass review 3:** *Feedback:* Even thinner or smaller: individual blades should not be visible from the default height. *Changes:* Blade width 10 → 4.4 cm, height 0.22–0.4 → 0.12–0.24 m, 4 blades per tighter tuft. Reads as a smooth velvet lawn when zoomed out, with soft blades only up close.
 - **1.2 review 3:** "This is beautiful sound." 1.2 done. *Request:* random birds flying in and out of frame, very rare: small beautiful birds or a flock. → Built as 1.2b (`FlyingBirds`): a songbird, a pair, or a 5–9 bird loose V-flock on a curved path at 14–28 m, flap/glide cycles, banking, soft shadows, storybook scale (2.1×), every 30–75 s (first after about 15 s).
 - **Grass review 2 (real iPhone screenshot):**
   - *Feedback:* No blades, but the grass looks honestly horrible (on device, thin blades aliased into scratchy hatching and the meadow looked blotchy).

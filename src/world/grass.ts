@@ -3,7 +3,7 @@ import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
 import type { Ground } from './ground';
 
-const BLADES_PER_TUFT = 3;
+const BLADES_PER_TUFT = 4;
 
 /**
  * A small tuft of fine, soft blades (1 unit tall, ~0.1 m across). Tufts rather than single
@@ -17,8 +17,8 @@ function tuftGeometry(): THREE.BufferGeometry {
   const n = new THREE.Vector3(0, 1, 0.2).normalize();
   for (let b = 0; b < BLADES_PER_TUFT; b++) {
     const a = (b / BLADES_PER_TUFT) * Math.PI * 2 + b * 0.7;
-    const ox = Math.cos(a) * 0.06 * (b === 0 ? 0 : 1);
-    const oz = Math.sin(a) * 0.06 * (b === 0 ? 0 : 1);
+    const ox = Math.cos(a) * 0.04 * (b === 0 ? 0 : 1);
+    const oz = Math.sin(a) * 0.04 * (b === 0 ? 0 : 1);
     const yaw = a * 1.7;
     const cy = Math.cos(yaw);
     const sy = Math.sin(yaw);
@@ -28,7 +28,7 @@ function tuftGeometry(): THREE.BufferGeometry {
     for (let i = 0; i < segments; i++) {
       const v = i / segments;
       // Soft taper: stays full most of the way, then rounds off (no needle points).
-      const w = 0.05 * (1 - Math.pow(v, 2.4));
+      const w = 0.022 * (1 - Math.pow(v, 2.4));
       const curl = v * v * lean;
       for (const side of [-1, 1]) {
         const lx = side * w;
@@ -99,7 +99,7 @@ export function createGrass(ground: Ground, count: number, seed: number, blocked
     const f = ground.forestness(x, z);
     if (rng() < f * 1.15 || blocked(x, z)) continue;
 
-    const height = lerp(0.22, 0.4, rng() * rng()) * lerp(1, 0.75, f);
+    const height = lerp(0.12, 0.24, rng() * rng()) * lerp(1, 0.75, f);
     const spread = lerp(0.85, 1.25, rng());
 
     p.set(x, ground.heightAt(x, z) - 0.02, z);
