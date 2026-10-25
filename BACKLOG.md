@@ -10,12 +10,12 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current story:** 1.1 — A tiny world on my phone (not started)
-**Preview URL:** _not deployed yet_
+**Current story:** 1.1 — A tiny world on my phone (built, awaiting feedback)
+**Preview URL:** https://asrijanga.github.io/garden-game/
 
 | Story | Status | Notes / feedback |
 |---|---|---|
-| 1.1 A tiny world on my phone | ⬜ Not started | |
+| 1.1 A tiny world on my phone | 👀 Awaiting feedback | Island + grass + wildflowers + motes, golden light, tilt-shift, bloom, grade. Slow auto-drift camera until 1.2. |
 | 1.2 Hold the world in my hand | ⬜ Not started | |
 | 1.3 Thumb-reach toolbar | ⬜ Not started | |
 | 1.4 Draw a winding path | ⬜ Not started | |
