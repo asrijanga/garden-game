@@ -490,7 +490,7 @@ export class Flowers {
             '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * 0.24 * vGlow;',
           );
       },
-      0.5,
+      0.17, // flowers sway very gently
     );
 
     for (let v = 0; v < FOLIAGE_VARIANTS; v++) {

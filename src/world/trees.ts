@@ -354,7 +354,7 @@ function foliageMaterial(map: THREE.Texture): THREE.MeshLambertMaterial {
         /* glsl */ `#include <begin_vertex>
         // Leaves shimmer on their own, more as the wind picks up.
         float leafPhase = position.x * 2.3 + position.z * 1.9 + position.y * 1.3;
-        transformed += objectNormal * sin(uWindTime * 5.5 + leafPhase) * 0.05 * (0.35 + uWindEnvelope);`,
+        transformed += objectNormal * sin(uWindTime * 3.0 + leafPhase) * 0.035 * (0.35 + uWindEnvelope);`,
       );
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <normal_fragment_begin>',
