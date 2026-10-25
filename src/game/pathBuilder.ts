@@ -7,23 +7,34 @@ import type { EdgePlants } from '../world/edgePlants';
 import type { Wildflowers } from '../world/wildflowers';
 
 const STEP = 0.12; // metres the path advances per smoothing step
-const STONE_SPACING = 0.58; // centre stones
+const STONE_SPACING = 0.8; // centre stones
 const GRAVEL_RADIUS = 0.9; // painted gravel; its edge sits under the edging
 const CURB_OFFSET = 0.62; // centre line → edging stone centre
-const CURB_LENGTH = 0.4;
+const INSIDE = CURB_OFFSET - 0.1; // closer than this to a centre line = inside that path
+const CELL = 1; // spatial hash for path centre lines
 
 const STONE_TONES = ['#d6cfc3', '#cdc5b7', '#dcd4c6', '#c8c1b5', '#d2c8b6'];
-const CURB_TONES = ['#b4ab9d', '#aaa294', '#bab1a2', '#a59d91'];
+const CURB_TONES = ['#b4ab9d', '#aaa294', '#bab1a2', '#a59d91', '#bdb6a8', '#9f988c'];
 
 export interface PathRecord {
   seed: number;
   points: { x: number; z: number }[];
 }
 
+interface LinePoint {
+  x: number;
+  z: number;
+  id: number;
+}
+
 /**
- * A simple, tidy garden path: rounded-square stones down the middle, pale gravel either side,
- * and neat cut-stone edging. It starts exactly where you touch and follows just behind your
- * finger, with light smoothing so wobbles become gentle curves.
+ * A simple, tidy garden path: rounded stones down the middle, gravel either side, and low,
+ * hand-laid edging. It starts exactly where you touch and follows just behind your finger,
+ * with light smoothing so wobbles become gentle curves.
+ *
+ * Paths merge: where a new path runs into or over an existing one, it stops laying its own
+ * stones and edging inside the old path, and lifts the old path's edging out of its way, so
+ * the two join into one gravel area edged only around the outside.
  */
 export class PathBuilder {
   readonly records: PathRecord[] = [];
@@ -32,9 +43,11 @@ export class PathBuilder {
   private heading = new THREE.Vector2();
   private sinceStone = 0;
   private lastCurb: (THREE.Vector2 | null)[] = [null, null];
+  private curbTarget = [0.36, 0.36];
   private active: PathRecord | null = null;
   private pathId = 0;
   private started = false;
+  private readonly lines = new Map<string, LinePoint[]>();
 
   constructor(
     private readonly ground: Ground,
@@ -90,14 +103,19 @@ export class PathBuilder {
       return;
     }
     this.active?.points.push({ x: w.x, z: w.y });
+    this.addLinePoint(w.x, w.y);
     this.paint.wear(w.x, w.y, GRAVEL_RADIUS, 1, 1);
     this.wildflowers.clearNear(w.x, w.y, 1.1);
 
-    // Centre stones.
+    // Merging: the old path's edging that now sits inside our gravel is lifted away.
+    this.stones.removeNear(w.x, w.y, INSIDE, 'curb', this.pathId);
+
+    // Centre stones, unless we're running through another path (its stones carry on there).
+    const insideOther = this.distanceTo(w.x, w.y, true) < INSIDE;
     this.sinceStone += first ? 0 : STEP;
-    if (first || this.sinceStone >= STONE_SPACING) {
+    if ((first || this.sinceStone >= STONE_SPACING) && !insideOther) {
       this.sinceStone = 0;
-      if (!this.stones.isOccupied(w.x, w.y, 0.18, 'step')) {
+      if (!this.stones.isOccupied(w.x, w.y, 0.3, 'step')) {
         const tone = new THREE.Color(STONE_TONES[Math.floor(this.rng() * STONE_TONES.length)]).multiplyScalar(lerp(0.96, 1.04, this.rng()));
         // Each stone sits a touch differently: a little twist, slightly different proportions.
         const yaw = Math.atan2(this.heading.x, this.heading.y) + (this.rng() - 0.5) * 0.3 + (this.rng() < 0.5 ? 0 : Math.PI / 2);
@@ -107,7 +125,8 @@ export class PathBuilder {
       }
     }
 
-    // Edging: each side measures its own distance, so blocks stay evenly spaced round curves.
+    // Edging: low, hand-laid blocks of varied length. Each side measures its own distance,
+    // so blocks stay evenly spaced round curves.
     const perp = new THREE.Vector2(-this.heading.y, this.heading.x);
     [-1, 1].forEach((side, i) => {
       const at = w.clone().addScaledVector(perp, side * CURB_OFFSET);
@@ -117,21 +136,27 @@ export class PathBuilder {
         return;
       }
       const span = at.distanceTo(last);
-      if (span > CURB_LENGTH * 2) {
+      if (span > 0.9) {
         // A sharp swing moved this edge a long way: restart it rather than bridging the path.
         this.lastCurb[i] = at;
         return;
       }
-      if (span < CURB_LENGTH + 0.015) return;
+      if (span < this.curbTarget[i]) return;
       const mid = at.clone().add(last).multiplyScalar(0.5);
       const dir = at.clone().sub(last).normalize();
       this.lastCurb[i] = at;
-      // Never let edging land inside a path (this one on a tight bend, or another one).
-      if (this.distanceToPath(mid) < CURB_OFFSET - 0.12 || this.stones.isOccupied(mid.x, mid.y, 0.1)) return;
-      if (this.blocked(mid.x, mid.y)) return;
-      const tone = new THREE.Color(CURB_TONES[Math.floor(this.rng() * CURB_TONES.length)]).multiplyScalar(lerp(0.96, 1.04, this.rng()));
-      const scale = new THREE.Vector3(1, lerp(0.95, 1.05, this.rng()), Math.min(1.15, Math.max(0.85, span / CURB_LENGTH)));
-      this.stones.add('curb', mid.x, this.ground.heightAt(mid.x, mid.y) - 0.03, mid.y, scale, Math.atan2(dir.x, dir.y), 0.12, tone, 0.1, this.pathId);
+      this.curbTarget[i] = lerp(0.26, 0.46, this.rng());
+      // Never inside a path (this one on a tight bend, or another we're merging with).
+      if (this.distanceTo(mid.x, mid.y, false) < INSIDE || this.blocked(mid.x, mid.y)) return;
+      if (this.rng() < 0.05) return; // the odd missing block, as in any hand-laid edge
+      // Hand-laid: nudged in or out, a little twisted, set slightly high or low.
+      const nudge = (this.rng() - 0.5) * 0.05;
+      const x = mid.x + perp.x * side * nudge;
+      const z = mid.y + perp.y * side * nudge;
+      const tone = new THREE.Color(CURB_TONES[Math.floor(this.rng() * CURB_TONES.length)]).multiplyScalar(lerp(0.92, 1.06, this.rng()));
+      const scale = new THREE.Vector3(lerp(0.85, 1.1, this.rng()), lerp(0.8, 1.15, this.rng()), (span - 0.025) / 0.4);
+      const y = this.ground.heightAt(x, z) - lerp(0.035, 0.06, this.rng());
+      this.stones.add('curb', x, y, z, scale, Math.atan2(dir.x, dir.y) + (this.rng() - 0.5) * 0.12, 0.1, tone, 0.1, this.pathId);
     });
 
     // Clover and tiny flowers grow along the outside of the edging a moment later.
@@ -140,17 +165,30 @@ export class PathBuilder {
       const o = lerp(0.82, 1.0, this.rng());
       const ex = w.x + perp.x * s * o + (this.rng() - 0.5) * 0.2;
       const ez = w.y + perp.y * s * o + (this.rng() - 0.5) * 0.2;
-      if (!this.blocked(ex, ez) && this.distanceToPath(new THREE.Vector2(ex, ez)) > 0.78 && !this.stones.isOccupied(ex, ez, 0.12)) {
+      if (!this.blocked(ex, ez) && this.distanceTo(ex, ez, false) > 0.78 && !this.stones.isOccupied(ex, ez, 0.12)) {
         this.edges.add(ex, this.ground.heightAt(ex, ez), ez, lerp(0.7, 1.6, this.rng()));
       }
     }
   }
 
-  /** Distance from p to the nearest centre-line point of any path drawn so far. */
-  private distanceToPath(p: THREE.Vector2): number {
+  private addLinePoint(x: number, z: number) {
+    const key = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+    if (!this.lines.has(key)) this.lines.set(key, []);
+    this.lines.get(key)!.push({ x, z, id: this.pathId });
+  }
+
+  /** Distance to the nearest path centre line (optionally ignoring the path being drawn). */
+  private distanceTo(x: number, z: number, othersOnly: boolean): number {
     let best = Infinity;
-    for (const r of this.records) {
-      for (const q of r.points) best = Math.min(best, (q.x - p.x) ** 2 + (q.z - p.y) ** 2);
+    const cx = Math.floor(x / CELL);
+    const cz = Math.floor(z / CELL);
+    for (let i = cx - 1; i <= cx + 1; i++) {
+      for (let j = cz - 1; j <= cz + 1; j++) {
+        for (const p of this.lines.get(`${i},${j}`) ?? []) {
+          if (othersOnly && p.id === this.pathId) continue;
+          best = Math.min(best, (p.x - x) ** 2 + (p.z - z) ** 2);
+        }
+      }
     }
     return Math.sqrt(best);
   }

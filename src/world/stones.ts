@@ -4,15 +4,15 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 
 export type StoneKind = 'curb' | 'step';
-const SHAPES: Record<StoneKind, number> = { curb: 3, step: 8 };
+const SHAPES: Record<StoneKind, number> = { curb: 5, step: 8 };
 const CAPACITY = 2000; // per shape
 const CELL = 0.5; // spatial hash cell, metres
 
-/** A neatly cut edging stone with softly rounded arrises, long along z. */
+/** A low, hand-cut edging stone with softly worn arrises, 0.4 m long along z. */
 function curbGeometry(seed: number): THREE.BufferGeometry {
   const rng = createRng(seed);
-  const g = new RoundedBoxGeometry(0.15, 0.14, lerp(0.36, 0.42, rng()), 2, 0.025);
-  g.translate(0, 0.05, 0);
+  const g = new RoundedBoxGeometry(lerp(0.09, 0.12, rng()), lerp(0.09, 0.11, rng()), 0.4, 2, lerp(0.025, 0.04, rng()));
+  g.translate(0, 0.045, 0);
   g.deleteAttribute('uv');
   colorByHeight(g, -0.02, 0.12);
   return g;
