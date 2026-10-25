@@ -320,6 +320,25 @@ Demo script: zoom in near the forest edge and wait for a bunny family; watch the
 - Grow the collection to **50+ species**, with a data-driven species definition (shape generator, palettes, height, bloom seasons). No vegetables or utility plants.
 - A beautiful **flower book** to browse and pick species, sorted by "blooming now".
 
+### Story 4.1b — A rose garden: roses of every colour (L) — *requested by the player*
+**As a** player, **I want** many kinds of roses in every colour, **so that** I can grow a romantic rose garden among my flower beds.
+
+- **A new rose shape:** a real rose built procedurally, with a spiral of overlapping, cupped petals that wrap tightly at the heart and open and curl back toward the outside, on thorny stems with glossy, toothed leaves in groups of five. No two blooms alike.
+- **Several types of rose,** each with its own silhouette:
+  - **Hybrid tea:** a single elegant, high-centred bloom on a tall stem.
+  - **Floribunda:** clusters of several medium blooms per stem.
+  - **English / cabbage rose:** a big, round, many-petalled, cupped "old rose".
+  - **Climbing rose:** blooms scattered along long canes (ready for fences and the cottage wall in Story 3.4).
+  - **Shrub / wild rose:** simple, open 5-petal blooms with golden stamens, in loose sprays.
+  - **Miniature / patio rose:** a compact bush covered in small blooms.
+- **Roses of all colours:** classic red, crimson, deep burgundy, blush and hot pink, coral, peach, apricot, sunshine yellow, cream, pure white, lavender and mauve, plus bicolour and blended roses (yellow fading to pink at the edges, white edged in red), with tones varying from bloom to bloom.
+- **Growth and bloom:** sprout → tight spiral bud → bloom unfurling petal by petal, through the existing GPU growth system. Bushes carry a mix of buds, half-open and fully open blooms.
+- **Seasons:** roses flower from late spring through autumn (with a few late blooms and rose hips in autumn). In winter they rest as bare canes with a few red hips.
+- **In the catalog:** a "Roses" group in the flower picker, with a chip for each type and a colour choice (or a "mixed colours" option), and roses blend into the seasonal mix when in bloom.
+- **Living details:** petals occasionally drop and drift on the breeze; bees love them.
+
+Demo script: plant a bed of mixed-colour roses beside a path, zoom in on a single bloom, then try each rose type.
+
 ### Story 4.2 — Real seasons, beautifully (L)
 - Seasons already follow the real date (from 1.1). Add the full feel: **spring** cherry blossoms and drifting petals, **summer** lush and buzzing, **autumn** amber leaves falling and gathering, **winter** quiet snowfall, frosted hedges and snow on the roof, with glowing windows.
 - Flowers change with the season: some bloom, some fade to seed heads, some rest.
