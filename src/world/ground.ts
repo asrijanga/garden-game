@@ -125,7 +125,7 @@ function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
         float sandy = clamp(paintTex.g / max(paintTex.r, 0.02), 0.0, 1.0);
         // Ragged edge: three octaves of noise nibble the boundary into tufts and bare bites.
         float rough = lawnNoise(vWorld.xz * 0.9 + 2.1) * 0.35 + lawnNoise(vWorld.xz * 2.2) * 0.3 + lawnNoise(vWorld.xz * 5.5 + 7.3) * 0.22 + lawnNoise(vWorld.xz * 13.0 - 3.1) * 0.13;
-        float ragged = (rough - 0.5) * 0.75;
+        float ragged = (rough - 0.5) * 0.3;
         float edgeField = wear + ragged;
         float earth = smoothstep(0.4, 0.5, edgeField);
         // Trodden, slightly damp soil where the earth meets the turf.
@@ -136,6 +136,10 @@ function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
         // Gravel paths: pale, sandy grit.
         soil = mix(soil, mix(vec3(0.45, 0.38, 0.27), vec3(0.6, 0.52, 0.39), grain), sandy);
         soil *= 1.0 - lip * 0.28;
+        // Moss creeping into the joints between flagstones, in random soft patches.
+        float mossN = lawnNoise(vWorld.xz * 1.6 + 4.2) * 0.6 + lawnNoise(vWorld.xz * 6.0) * 0.4;
+        float moss = smoothstep(0.5, 0.66, mossN) * (1.0 - sandy);
+        soil = mix(soil, mix(vec3(0.1, 0.17, 0.05), vec3(0.17, 0.25, 0.08), grain), moss);
         diffuseColor.rgb = mix(diffuseColor.rgb, soil, earth);
         // Gust sheen: the meadow brightens softly as wind passes, like grass bowing in waves.
         float gust = windAt(vWorld.xz, 0.0);

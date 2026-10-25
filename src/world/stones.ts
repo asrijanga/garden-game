@@ -1,51 +1,85 @@
 import * as THREE from 'three';
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { createNoise2D } from '../core/noise';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createRng, lerp } from '../core/random';
 
-export type StoneFamily = 'flat' | 'pebble' | 'angular';
-const SHAPES_PER_FAMILY = 5;
-const CAPACITY = 1500; // per shape
+export type StoneKind = 'slab' | 'curb';
+const SHAPES: Record<StoneKind, number> = { slab: 6, curb: 3 };
+const CAPACITY = 2000; // per shape
 const CELL = 0.5; // spatial hash cell, metres
 
-/** Procedural stone shapes. Every family has several hand-picked variations. */
-function stoneGeometry(family: StoneFamily, seed: number): THREE.BufferGeometry {
-  let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(1, family === 'angular' ? 1 : 2);
-  g.deleteAttribute('normal');
-  g.deleteAttribute('uv');
-  g = mergeVertices(g);
-  const noise = createNoise2D(seed);
+/**
+ * A hand-cut flagstone: an irregular polygon filling a unit cell (x across, z along the path),
+ * a few millimetres short of the edges, with softened, bevelled edges.
+ */
+function slabGeometry(seed: number): THREE.BufferGeometry {
   const rng = createRng(seed);
-  const sx = lerp(0.8, 1.2, rng());
-  const sz = lerp(0.7, 1.0, rng());
-  const pos = g.attributes.position as THREE.BufferAttribute;
-  const col = new Float32Array(pos.count * 3);
-  const v = new THREE.Vector3();
-  const top = family === 'flat' ? 0.3 : family === 'pebble' ? 0.55 : 0.5;
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    const a = Math.atan2(v.z, v.x);
-    let lump = 1 + noise(Math.cos(a) * 1.3, Math.sin(a) * 1.3) * (family === 'pebble' ? 0.08 : 0.16);
-    if (family === 'angular') lump += (rng() - 0.5) * 0.28; // chipped, faceted rock
-    v.x *= sx * lump;
-    v.z *= sz * lump;
-    v.y = v.y > 0 ? Math.pow(v.y, family === 'flat' ? 1.6 : 1.1) * top * lump : v.y * 0.25;
-    pos.setXYZ(i, v.x, v.y, v.z);
-    // Lighter, sun-bleached top; darker, earthy underside.
-    const shade = v.y > 0 ? lerp(0.9, 1.06, Math.min(1, v.y / top)) : 0.7;
-    col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = shade;
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const shape = new THREE.Shape();
+  const j = () => lerp(0, 0.07, rng());
+  // Walk round the cell, sometimes chamfering a corner or nudging an edge midpoint.
+  const pts: [number, number][] = [];
+  const corners: [number, number][] = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]];
+  corners.forEach(([cx, cz], i) => {
+    const sx = -Math.sign(cx);
+    const sz = -Math.sign(cz);
+    if (rng() < 0.45) {
+      const c = lerp(0.08, 0.16, rng());
+      // chamfered corner: two points
+      const first = i % 2 === 0 ? [cx + sx * j(), cz + sz * c] : [cx + sx * c, cz + sz * j()];
+      const second = i % 2 === 0 ? [cx + sx * c, cz + sz * j()] : [cx + sx * j(), cz + sz * c];
+      pts.push(first as [number, number], second as [number, number]);
+    } else {
+      pts.push([cx + sx * j(), cz + sz * j()]);
+    }
+    const [nx, nz] = corners[(i + 1) % 4];
+    if (rng() < 0.5) pts.push([(cx + nx) / 2 + (rng() - 0.5) * 0.05, (cz + nz) / 2 + (rng() - 0.5) * 0.05]);
+  });
+  shape.moveTo(pts[0][0], pts[0][1]);
+  for (const [x, z] of pts.slice(1)) shape.lineTo(x, z);
+  shape.closePath();
+
+  const g = new THREE.ExtrudeGeometry(shape, { depth: 0.06, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 1 });
+  g.rotateX(Math.PI / 2); // extrude downward; the shape's y becomes world z
+  g.translate(0, 0.06, 0);
+  g.deleteAttribute('uv');
+  colorByHeight(g, 0.03, 0.06);
   g.computeVertexNormals();
   return g;
 }
 
-interface Falling {
+/** A neatly cut edging stone with softly rounded arrises, long along z. */
+function curbGeometry(seed: number): THREE.BufferGeometry {
+  const rng = createRng(seed);
+  const g = new RoundedBoxGeometry(0.15, 0.14, lerp(0.36, 0.42, rng()), 2, 0.025);
+  g.translate(0, 0.05, 0);
+  g.deleteAttribute('uv');
+  colorByHeight(g, -0.02, 0.12);
+  return g;
+}
+
+/** Lighter, sun-bleached top faces; darker sides. */
+function colorByHeight(g: THREE.BufferGeometry, lo: number, hi: number) {
+  const pos = g.attributes.position;
+  const col = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const v = lerp(0.72, 1.04, Math.min(1, Math.max(0, (pos.getY(i) - lo) / (hi - lo))));
+    col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+}
+
+interface Placed {
+  kind: StoneKind;
   mesh: THREE.InstancedMesh;
   index: number;
   pos: THREE.Vector3;
+  scale: THREE.Vector3;
   yaw: number;
-  size: number;
+  r: number;
+  removed?: boolean;
+}
+
+interface Falling {
+  stone: Placed;
   /** Seconds until it starts falling (stones settle one after another). */
   delay: number;
   t: number;
@@ -53,109 +87,124 @@ interface Falling {
 }
 
 /**
- * Path stones that drop into place with a soft squash and bounce. All stones of a shape share
- * one InstancedMesh; only the ones still settling are updated each frame.
+ * Path stones (flagstones and edging) that drop into place with a soft squash and bounce.
+ * All stones of a shape share one InstancedMesh; only those still settling update each frame.
  */
 export class Stones {
   readonly group = new THREE.Group();
-  private readonly families = new Map<StoneFamily, THREE.InstancedMesh[]>();
+  private readonly meshes = new Map<StoneKind, THREE.InstancedMesh[]>();
   private readonly falling: Falling[] = [];
-  private readonly grid = new Map<string, { x: number; z: number; r: number }[]>();
+  private readonly grid = new Map<string, Placed[]>();
   private readonly rng = createRng(31);
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly s = new THREE.Vector3();
   private readonly e = new THREE.Euler();
+  private readonly p = new THREE.Vector3();
 
-  constructor(private readonly onLand: (p: THREE.Vector3, size: number) => void) {
-    const smooth = new THREE.MeshLambertMaterial({ vertexColors: true });
-    const faceted = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    (['flat', 'pebble', 'angular'] as StoneFamily[]).forEach((family, fi) => {
-      const meshes: THREE.InstancedMesh[] = [];
-      for (let k = 0; k < SHAPES_PER_FAMILY; k++) {
-        const mesh = new THREE.InstancedMesh(stoneGeometry(family, 100 + fi * 50 + k * 7), family === 'angular' ? faceted : smooth, CAPACITY);
+  constructor(private readonly onLand: (p: THREE.Vector3, size: number, kind: StoneKind) => void) {
+    const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    (Object.keys(SHAPES) as StoneKind[]).forEach((kind, ki) => {
+      const list: THREE.InstancedMesh[] = [];
+      for (let k = 0; k < SHAPES[kind]; k++) {
+        const geo = kind === 'slab' ? slabGeometry(200 + ki * 50 + k * 7) : curbGeometry(300 + k * 11);
+        const mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
         mesh.count = 0;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.frustumCulled = false;
-        meshes.push(mesh);
+        list.push(mesh);
         this.group.add(mesh);
       }
-      this.families.set(family, meshes);
+      this.meshes.set(kind, list);
     });
   }
 
-  private key(x: number, z: number) {
-    return `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
-  }
-
-  /** Would a stone of radius `r` at (x, z) overlap an existing one? Keeps paths from piling up. */
-  isOccupied(x: number, z: number, r: number): boolean {
+  private *near(x: number, z: number, r: number): Generator<Placed> {
     const cx = Math.floor(x / CELL);
     const cz = Math.floor(z / CELL);
-    const reach = Math.ceil((r + 0.4) / CELL);
+    const reach = Math.ceil((r + 0.5) / CELL);
     for (let i = cx - reach; i <= cx + reach; i++) {
       for (let j = cz - reach; j <= cz + reach; j++) {
         const cell = this.grid.get(`${i},${j}`);
-        if (!cell) continue;
-        for (const s of cell) {
-          const min = r + s.r;
-          if ((s.x - x) ** 2 + (s.z - z) ** 2 < min * min) return true;
-        }
+        if (cell) yield* cell;
       }
+    }
+  }
+
+  /** Would a stone of radius `r` at (x, z) overlap an existing one? */
+  isOccupied(x: number, z: number, r: number, kind?: StoneKind): boolean {
+    for (const s of this.near(x, z, r)) {
+      if (s.removed || (kind && s.kind !== kind)) continue;
+      const min = r + s.r;
+      if ((s.pos.x - x) ** 2 + (s.pos.z - z) ** 2 < min * min) return true;
     }
     return false;
   }
 
-  add(family: StoneFamily, x: number, y: number, z: number, size: number, tone: THREE.Color, delay: number) {
-    const meshes = this.families.get(family)!;
-    const mesh = meshes[Math.floor(this.rng() * meshes.length)];
+  /** Lift away stones of `kind` within `r` (e.g. edging where a new path crosses). */
+  removeNear(x: number, z: number, r: number, kind: StoneKind) {
+    for (const s of this.near(x, z, r)) {
+      if (s.removed || s.kind !== kind) continue;
+      if ((s.pos.x - x) ** 2 + (s.pos.z - z) ** 2 < (r + s.r * 0.5) ** 2) {
+        s.removed = true;
+        this.m.makeScale(0, 0, 0);
+        s.mesh.setMatrixAt(s.index, this.m);
+        s.mesh.instanceMatrix.needsUpdate = true;
+      }
+    }
+  }
+
+  add(kind: StoneKind, x: number, y: number, z: number, scale: THREE.Vector3, yaw: number, r: number, tone: THREE.Color, delay: number) {
+    const list = this.meshes.get(kind)!;
+    const mesh = list[Math.floor(this.rng() * list.length)];
     if (mesh.count >= CAPACITY) return;
     const index = mesh.count++;
     mesh.setColorAt(index, tone);
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    const f: Falling = { mesh, index, pos: new THREE.Vector3(x, y, z), yaw: this.rng() * Math.PI * 2, size, delay, t: 0, landed: false };
-    const k = this.key(x, z);
+    const stone: Placed = { kind, mesh, index, pos: new THREE.Vector3(x, y, z), scale: scale.clone(), yaw, r };
+    const k = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
     if (!this.grid.has(k)) this.grid.set(k, []);
-    this.grid.get(k)!.push({ x, z, r: size * 0.85 });
-    this.falling.push(f);
-    this.write(f, 0, 0.0001); // hidden until its turn
+    this.grid.get(k)!.push(stone);
+    this.falling.push({ stone, delay, t: 0, landed: false });
+    this.write(stone, 0, 0.0001);
   }
 
-  private write(f: Falling, lift: number, scale: number, squash = 0) {
-    this.e.set(0, f.yaw, 0);
+  private write(st: Placed, lift: number, k: number, squash = 0) {
+    if (st.removed) return;
+    this.e.set(0, st.yaw, 0);
     this.q.setFromEuler(this.e);
-    this.s.set(f.size * scale * (1 + squash * 0.5), f.size * scale * (1 - squash), f.size * scale * (1 + squash * 0.5));
-    this.m.compose(new THREE.Vector3(f.pos.x, f.pos.y + lift, f.pos.z), this.q, this.s);
-    f.mesh.setMatrixAt(f.index, this.m);
-    f.mesh.instanceMatrix.needsUpdate = true;
+    this.s.set(st.scale.x * k * (1 + squash * 0.4), st.scale.y * k * (1 - squash), st.scale.z * k * (1 + squash * 0.4));
+    this.m.compose(this.p.set(st.pos.x, st.pos.y + lift, st.pos.z), this.q, this.s);
+    st.mesh.setMatrixAt(st.index, this.m);
+    st.mesh.instanceMatrix.needsUpdate = true;
   }
 
   update(dt: number) {
     for (let i = this.falling.length - 1; i >= 0; i--) {
       const f = this.falling[i];
+      const st = f.stone;
       if (f.delay > 0) {
         f.delay -= dt;
         continue;
       }
       f.t += dt;
-      const fallTime = 0.3;
-      const drop = 0.4 + f.size * 2.2; // small pebbles drop from lower down
+      const fallTime = 0.28;
       if (f.t < fallTime) {
         const k = f.t / fallTime;
-        this.write(f, (1 - k * k) * drop, lerp(0.6, 1, k));
+        this.write(st, (1 - k * k) * 0.7, lerp(0.7, 1, k));
       } else {
         if (!f.landed) {
           f.landed = true;
-          this.onLand(f.pos, f.size);
+          this.onLand(st.pos, st.r, st.kind);
         }
-        // Damped squash-and-stretch as it settles into the soil.
+        // Damped squash-and-stretch as it beds into the soil.
         const s = f.t - fallTime;
-        const squash = Math.exp(-s * 9) * Math.cos(s * 26) * 0.3;
-        const hop = Math.max(0, Math.exp(-s * 10) * Math.sin(s * 20)) * f.size * 0.18;
-        this.write(f, hop, 1, squash);
-        if (s > 0.7) {
-          this.write(f, 0, 1, 0);
+        const squash = Math.exp(-s * 10) * Math.cos(s * 28) * 0.28;
+        const hop = Math.max(0, Math.exp(-s * 11) * Math.sin(s * 22)) * 0.025;
+        this.write(st, hop, 1, squash);
+        if (s > 0.6) {
+          this.write(st, 0, 1, 0);
           this.falling.splice(i, 1);
         }
       }

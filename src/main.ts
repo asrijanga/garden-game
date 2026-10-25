@@ -120,9 +120,9 @@ const TOOL_PITCH = { move: 1, path: 0.9, flowers: 1.2, pond: 0.8, erase: 1.05 };
 let tools: ToolController | null = null;
 const dust = new Dust();
 scene.add(dust.points);
-const stones = new Stones((p, size) => {
-  if (size > 0.09) dust.puff(p, Math.round(4 + size * 12), size * 1.4);
-  ambience.stone(size);
+const stones = new Stones((p, size, kind) => {
+  if (kind === 'slab') dust.puff(p, 5, size * 1.6);
+  ambience.stone(kind === 'slab' ? 0.3 : 0.18);
 });
 scene.add(stones.group);
 const edgePlants = new EdgePlants(palette.wildflowers);

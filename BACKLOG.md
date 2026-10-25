@@ -19,7 +19,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 1.2 Hear the wind | ✅ Done | Procedural Web Audio: air bed, gust whoosh, canopy rush, leaf flurries, all driven by the wind field at the view centre. A whisper (calm about −40 dBFS) plus rare distant synthesised birdsong, seasonal pace. Limiter, 4 s fade-in. Sound toggle top-right (remembered) and a one-time hint. |
 | 1.3 Hold the world in my hand | ✅ Done | Pulled forward (player asked to zoom). Pinch zoom, drag pan, twist rotate, inertia; camera lowers as you zoom in. |
 | 1.4 Thumb-reach toolbar | ✅ Done | Frosted tray with 5 illustrated tactile buttons (Look around, Path, Flowers, Pond, Tidy up), squash/bounce and lift/glow, floating label, soft wooden tap sound. Build tools: one finger touches the lawn (glowing ring, ripple on release), two fingers move the camera. Unbuilt tools say "coming soon". |
-| 1.5 Draw a winding path | 👀 Awaiting feedback | Smoothed "walker" follows the finger. 7 procedural stone shapes drop in with squash/bounce, dust puff and a soft stone "tok". Worn earth painted into a ground texture with breathing width and scuffs. Clover and daisies grow along the edges, and wildflowers shrink aside. No stone overlap where paths cross. Paths stay in the meadow, and paths near the cottage finish at the doorstep. |
+| 1.5 Draw a winding path | 👀 Awaiting feedback | Flagstone paths: fitted hand-cut slabs, moss in the joints, cut-stone edging following curves, end caps; crossings join up; settle animation + soft sound; clover along the outside; finishes at the cottage door. |
 | 1.6 Plant flowers that bloom fast | ⬜ Not started | |
 | 1.7 A cozy garden pond | ⬜ Not started | |
 | 1.8 Gently erase | ⬜ Not started | |
@@ -31,6 +31,7 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **1.5 review 3:** *Feedback:* Random styles are confusing. Use one pathway type, flagstones, with moss growing in between at random places to look neat, and a border of neatly cut stones. Additional styles that blend procedurally come later. *Changes:* Single flagstone style: rows of 2–3 hand-cut bevelled slabs (6 irregular polygon shapes, some moss-tinted) fitted across the path; moss patches in the joints (shader); rounded cut-stone edging on both sides, spaced per side so it follows curves; neat end caps; crossing paths lift the other path's edging so the paving joins. Grass meets the edging (low edge raggedness). Random styles removed (parked).
 - **1.5 review 2:** *Feedback:* Stones in the pathway are too big; wants more variety of stones and pathways, random. *Changes:* Each new path randomly picks a style: **stepping stones** (smaller flat stones), **cobbles** (packed small pebbles), **flagstones** (slate slabs in pairs), **gravel trail** (sandy soil + tiny pebbles), **mossy stones** (angular, green-grey). Three stone families (flat, pebble, angular/faceted), 5 shapes each. Spatial-hash overlap checks. Sandy soil via the paint G channel. Pebble sounds softer and rate-limited.
 - **1.5 review:** *Feedback:* Path edges look too clean; make the outline rough so it looks realistic. *Changes:* Lighter, gradually accumulating paint dabs give a gentle edge ramp. The lawn shader displaces the boundary with four octaves of procedural noise (outline wobble down to fine nibbles), adds a darker trodden-soil lip at the turf line, and paints extra scuffs along both edges.
 - **1.4 review 2:** "That looks awesome." 1.4 done.
@@ -323,6 +324,7 @@ Demo script: draw a pond next to the path and wait for the first fish to jump.
 ---
 
 ## Parking lot (ideas to revisit)
+- **More path styles that blend procedurally** (stepping stones, cobbles, gravel, mossy stones were prototyped in 1.5 and parked; future: styles that transition smoothly into each other).
 - Haptics (iOS Safari has limited vibration support).
 - Photo mode with filters and a frame.
 - Expandable clearing (push the forest back as the garden grows).
