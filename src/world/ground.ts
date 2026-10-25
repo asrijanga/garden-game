@@ -47,10 +47,11 @@ export class Ground {
   }
 
   meadowColor(x: number, z: number, out: THREE.Color): THREE.Color {
-    const a = this.colorNoise(x * 0.09, z * 0.09) * 0.5 + 0.5;
-    const b = this.colorNoise(x * 0.25 + 30, z * 0.25) * 0.5 + 0.5;
-    out.copy(this.meadow[0]).lerp(this.meadow[1], smoothstep(0.15, 0.7, a));
-    return out.lerp(this.meadow[2], smoothstep(0.6, 1.0, b) * 0.35);
+    // Broad, gentle drifts of colour only: painterly, never blotchy.
+    const a = this.colorNoise(x * 0.045, z * 0.045) * 0.5 + 0.5;
+    const b = this.colorNoise(x * 0.08 + 30, z * 0.08) * 0.5 + 0.5;
+    out.copy(this.meadow[0]).lerp(this.meadow[1], smoothstep(0.2, 0.8, a));
+    return out.lerp(this.meadow[2], smoothstep(0.55, 1.0, b) * 0.3);
   }
 
   private buildMesh(): THREE.Mesh {
@@ -66,8 +67,8 @@ export class Ground {
       const z = pos.getZ(i);
       pos.setY(i, this.heightAt(x, z));
       const f = this.forestness(x, z);
-      // Soil between the blades sits a little darker, so the grass reads as fine texture.
-      this.meadowColor(x, z, c).multiplyScalar(0.82);
+      // The ground carries the lawn's colour, so blades blend in softly instead of drawing lines.
+      this.meadowColor(x, z, c).multiplyScalar(0.95);
       // Forest floor is darker and leaf-littered, with a soft shaded fringe at the treeline.
       shade.copy(this.floor).multiplyScalar(0.75 + this.colorNoise(x * 0.3, z * 0.3) * 0.15);
       c.lerp(shade, f);

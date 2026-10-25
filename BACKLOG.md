@@ -31,6 +31,10 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **Grass review 2 (real iPhone screenshot):**
+  - *Feedback:* No blades, but the grass looks honestly horrible (on device, thin blades aliased into scratchy hatching and the meadow looked blotchy).
+  - *Changes:* Painterly lawn. Ground carries the lawn colour (no dark soil showing). Blade colour is within ±6% of the ground, with only slightly lighter, warmer tips. Tufts of 3 broader, soft blades (no shimmering lines). Broad, gentle colour drifts only. Fresher seasonal meadow greens. Softer wind sheen.
+  - *Lesson:* Judge grass at real phone resolution. Low blade-to-ground contrast matters more than blade count.
 - **1.2 review 2 (sound):**
   - *Feedback:* Even calmer: "so calm I should hear the birds chirping once in a while". Right now it makes me tense; it should be absolutely relaxing.
   - *Changes:* Wind reduced to a whisper (calm about −40 dBFS, gust about −38 dBFS, about 2–3 dB swell; leaf hiss effectively removed; slower 3 s smoothing). Added rare, distant, synthesised **birdsong** (two-note whistle, warble, trill, chirps) with a per-bird voice, random position, a soft forest reverb and occasional answering birds. Paced by the real audio clock: every 7–17 s in spring, 11–27 s in autumn, rarer in winter.

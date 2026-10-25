@@ -3,7 +3,7 @@ import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
 import type { Ground } from './ground';
 
-const BLADES_PER_TUFT = 5;
+const BLADES_PER_TUFT = 3;
 
 /**
  * A small tuft of fine, soft blades (1 unit tall, ~0.1 m across). Tufts rather than single
@@ -28,7 +28,7 @@ function tuftGeometry(): THREE.BufferGeometry {
     for (let i = 0; i < segments; i++) {
       const v = i / segments;
       // Soft taper: stays full most of the way, then rounds off (no needle points).
-      const w = 0.03 * (1 - Math.pow(v, 2.2));
+      const w = 0.05 * (1 - Math.pow(v, 2.4));
       const curl = v * v * lean;
       for (const side of [-1, 1]) {
         const lx = side * w;
@@ -69,10 +69,11 @@ export function createGrass(ground: Ground, count: number, seed: number, blocked
         '#include <color_fragment>',
         /* glsl */ `#include <color_fragment>
         // Dark, cool roots rising to warm, sunlit tips.
-        diffuseColor.rgb *= mix(0.72, 1.12, smoothstep(0.0, 1.0, vBladeH));
-        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.12, 1.07, 0.82), smoothstep(0.6, 1.0, vBladeH) * 0.45);
+        // Barely-there gradient: roots match the ground, tips a touch lighter and warmer.
+        diffuseColor.rgb *= mix(0.95, 1.07, smoothstep(0.0, 1.0, vBladeH));
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.05, 1.04, 0.92), smoothstep(0.7, 1.0, vBladeH) * 0.4);
         // Bent blades show their paler sides: this is what makes a gust visible as it rolls by.
-        diffuseColor.rgb *= 1.0 + smoothstep(0.45, 1.1, vWindAmt) * 0.22 * vBladeH;`,
+        diffuseColor.rgb *= 1.0 + smoothstep(0.45, 1.1, vWindAmt) * 0.12 * vBladeH;`,
       );
   });
 
@@ -98,7 +99,7 @@ export function createGrass(ground: Ground, count: number, seed: number, blocked
     const f = ground.forestness(x, z);
     if (rng() < f * 1.15 || blocked(x, z)) continue;
 
-    const height = lerp(0.2, 0.38, rng() * rng()) * lerp(1, 0.75, f);
+    const height = lerp(0.22, 0.4, rng() * rng()) * lerp(1, 0.75, f);
     const spread = lerp(0.85, 1.25, rng());
 
     p.set(x, ground.heightAt(x, z) - 0.02, z);
@@ -110,7 +111,7 @@ export function createGrass(ground: Ground, count: number, seed: number, blocked
 
     ground.meadowColor(x, z, color);
     tint.setHSL(0.22 + rng() * 0.08, 0.5, 0.5);
-    color.lerp(tint, 0.08).multiplyScalar(lerp(0.93, 1.07, rng()));
+    color.lerp(tint, 0.04).multiplyScalar(lerp(0.97, 1.03, rng()));
     mesh.setColorAt(placed, color);
     placed++;
   }

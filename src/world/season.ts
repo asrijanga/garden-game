@@ -41,7 +41,7 @@ export const PALETTES: Record<Season, SeasonPalette> = {
   spring: {
     canopy: ['#8dbb5a', '#a3c86a', '#7aad4e', '#f2b8cb', '#f6d3df', '#9cc463'],
     pine: ['#4a7347', '#557f4f'],
-    meadow: ['#5f9a42', '#86bb52', '#b8d06a'],
+    meadow: ['#6ea446', '#82b24f', '#a6c45e'],
     forestFloor: '#4f6e36',
     wildflowers: ['#fff6e8', '#f6b3c8', '#c9b8f0', '#ffe27a', '#ffffff'],
     sun: '#ffe6bf',
@@ -51,7 +51,7 @@ export const PALETTES: Record<Season, SeasonPalette> = {
   summer: {
     canopy: ['#5e9440', '#6fa34a', '#4f8236', '#7fae4f', '#588c3a'],
     pine: ['#3e6640', '#4a7347'],
-    meadow: ['#4f8a36', '#78ad46', '#a9c25a'],
+    meadow: ['#5f9a3e', '#73a845', '#97b853'],
     forestFloor: '#3f5f2c',
     wildflowers: ['#ffffff', '#ffe27a', '#f28fa7', '#8fb2f0', '#ff9b5e'],
     sun: '#fff0d0',
@@ -61,7 +61,7 @@ export const PALETTES: Record<Season, SeasonPalette> = {
   autumn: {
     canopy: ['#c98236', '#b25a3a', '#d8a948', '#a8703f', '#cf9440', '#9c4a33', '#8f9748', '#71883f', '#c9a04a'],
     pine: ['#3f5f3c', '#4a6b44'],
-    meadow: ['#6b8a3a', '#93a548', '#c2b45a'],
+    meadow: ['#729c40', '#86a947', '#a9b553'],
     forestFloor: '#5f6a36',
     wildflowers: ['#a98ad8', '#f2c94c', '#ffffff', '#e0a1c9', '#f0e6d2'],
     sun: '#ffcf96',
