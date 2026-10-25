@@ -3,8 +3,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 
-export type StoneKind = 'curb' | 'step' | 'rock';
-const SHAPES: Record<StoneKind, number> = { curb: 5, step: 8, rock: 7 };
+export type StoneKind = 'curb' | 'step' | 'rock' | 'shore';
+const SHAPES: Record<StoneKind, number> = { curb: 5, step: 8, rock: 7, shore: 7 };
 const CAPACITY = 2000; // per shape
 const CELL = 0.5; // spatial hash cell, metres
 
@@ -92,6 +92,27 @@ function rockGeometry(seed: number): THREE.BufferGeometry {
   return g;
 }
 
+/** A pond-side rock: the same weathered field stone, with soft moss on its upper faces. */
+function shoreGeometry(seed: number): THREE.BufferGeometry {
+  const g = rockGeometry(seed);
+  const rng = createRng(seed + 5);
+  const pos = g.attributes.position;
+  const nrm = g.attributes.normal;
+  const col = g.attributes.color as THREE.BufferAttribute;
+  const phase = [rng() * 6.28, rng() * 6.28];
+  const amount = lerp(0.6, 1.0, rng());
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    // Moss gathers on the tops, in soft patches rather than an even cap.
+    const patch = 0.5 + 0.3 * Math.sin(x * 9 + phase[0]) * Math.cos(z * 8 + phase[1]) + 0.2 * Math.sin((x + z) * 17);
+    const m = Math.min(1, Math.max(0, (nrm.getY(i) - 0.45) / 0.35)) * Math.min(1, Math.max(0, (patch - 0.35) / 0.3)) * amount;
+    const grey = col.getX(i);
+    col.setXYZ(i, lerp(grey, 0.66, m), lerp(grey, 0.86, m), lerp(grey, 0.42, m));
+  }
+  return g;
+}
+
 /** Lighter, sun-bleached top faces; darker sides. */
 function colorByHeight(g: THREE.BufferGeometry, lo: number, hi: number) {
   const pos = g.attributes.position;
@@ -124,7 +145,7 @@ interface Falling {
 }
 
 /**
- * Path stones (stepping stones and edging) that drop into place with a soft squash and bounce.
+ * Stones (stepping stones, edging, bed borders and pond rocks) that drop into place with a soft squash and bounce.
  * All stones of a shape share one InstancedMesh; only those still settling update each frame.
  */
 export class Stones {
@@ -144,7 +165,11 @@ export class Stones {
     (Object.keys(SHAPES) as StoneKind[]).forEach((kind, ki) => {
       const list: THREE.InstancedMesh[] = [];
       for (let k = 0; k < SHAPES[kind]; k++) {
-        const geo = kind === 'curb' ? curbGeometry(300 + k * 11) : kind === 'rock' ? rockGeometry(700 + k * 17) : stepGeometry(500 + ki * 50 + k * 13);
+        const geo =
+          kind === 'curb' ? curbGeometry(300 + k * 11)
+          : kind === 'rock' ? rockGeometry(700 + k * 17)
+          : kind === 'shore' ? shoreGeometry(900 + k * 23)
+          : stepGeometry(500 + ki * 50 + k * 13);
         const mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
         mesh.count = 0;
         mesh.castShadow = true;

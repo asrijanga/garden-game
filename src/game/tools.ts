@@ -5,6 +5,7 @@ import type { Toolbar, Tool } from '../ui/toolbar';
 import type { TouchMarker } from '../world/touchMarker';
 import type { PathBuilder } from './pathBuilder';
 import type { FlowerBrush } from './flowerBrush';
+import type { PondBrush } from './pondBrush';
 
 const MARKER_COLORS: Record<Tool, string> = {
   move: '#fff2cf',
@@ -15,7 +16,6 @@ const MARKER_COLORS: Record<Tool, string> = {
 };
 
 const COMING_SOON: Partial<Record<Tool, string>> = {
-  pond: 'The pond is coming soon',
   erase: 'Tidying up comes later',
 };
 
@@ -36,6 +36,7 @@ export class ToolController {
     private readonly marker: TouchMarker,
     private readonly paths: PathBuilder,
     private readonly flowers: FlowerBrush,
+    private readonly ponds: PondBrush,
     private readonly onToolChange: (tool: Tool) => void = () => {},
   ) {
     el.addEventListener('pointerdown', this.onDown);
@@ -70,6 +71,7 @@ export class ToolController {
     this.marker.down(hit);
     if (this.tool === 'path') this.paths.begin(hit);
     if (this.tool === 'flowers') this.flowers.begin(hit);
+    if (this.tool === 'pond') this.ponds.begin(hit);
   };
 
   private onMove = (e: PointerEvent) => {
@@ -79,6 +81,7 @@ export class ToolController {
     this.marker.move(hit);
     if (this.tool === 'path') this.paths.extend(hit);
     if (this.tool === 'flowers') this.flowers.extend(hit);
+    if (this.tool === 'pond') this.ponds.extend(hit);
   };
 
   private onUp = (e: PointerEvent) => {
@@ -88,6 +91,7 @@ export class ToolController {
     this.marker.up();
     if (this.tool === 'path') this.paths.end();
     if (this.tool === 'flowers') this.flowers.end();
+    if (this.tool === 'pond') this.ponds.end();
     const soon = COMING_SOON[this.tool];
     if (soon) this.toolbar.showLabel(soon, 2200);
   };
@@ -98,5 +102,6 @@ export class ToolController {
     this.marker.up();
     this.paths.end();
     this.flowers.end();
+    this.ponds.end();
   }
 }

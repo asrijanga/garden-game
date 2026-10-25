@@ -81,6 +81,13 @@ export class FlowerBrush {
     this.last = null;
   }
 
+  /** Rough distance from (x, z) to the edge of the nearest flower bed (negative inside). */
+  distanceToBeds(x: number, z: number): number {
+    let d = Infinity;
+    for (const b of this.beds) d = Math.min(d, Math.hypot(x - b.c.x, z - b.c.y) - EDGE_RADIUS);
+    return d;
+  }
+
   /**
    * Signed distance to the outline of all beds near `p` (negative inside). Beds are blended with
    * a smooth union, so where two beds meet (or nearly touch) they join in a soft, rounded curve

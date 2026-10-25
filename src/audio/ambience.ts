@@ -283,6 +283,81 @@ export class Ambience {
     click.stop(t + 0.05);
   }
 
+  private noiseBuf: AudioBuffer | null = null;
+
+  private noise(ctx: AudioContext): AudioBuffer {
+    if (!this.noiseBuf) {
+      const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      this.noiseBuf = buf;
+    }
+    return this.noiseBuf;
+  }
+
+  /** One small water "bloop": a rising bubble note, `at` seconds from now. */
+  private bubble(ctx: AudioContext, at: number, pitch: number, vol: number) {
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(240 * pitch, at);
+    osc.frequency.exponentialRampToValueAtTime(560 * pitch, at + 0.07);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, at);
+    env.gain.linearRampToValueAtTime(vol, at + 0.008);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + 0.13);
+    osc.connect(env).connect(this.master!);
+    osc.start(at);
+    osc.stop(at + 0.15);
+  }
+
+  private lastSplash = 0;
+
+  /** A fish breaking the surface: a soft plop with a little spray. */
+  splash(size = 1) {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    if (t - this.lastSplash < 0.1) return;
+    this.lastSplash = t;
+    this.bubble(ctx, t, (0.85 + Math.random() * 0.3) / Math.sqrt(size), 0.16 * Math.min(1, size));
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise(ctx);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1800 + Math.random() * 600;
+    bp.Q.value = 0.8;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.05 * size, t + 0.01);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+    src.connect(bp).connect(env).connect(this.master);
+    src.start(t, Math.random());
+    src.stop(t + 0.3);
+  }
+
+  /** Water welling up into a new pond: a soft, low trickle with the odd bubble, over a few seconds. */
+  fill(seconds = 3.5) {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime + 0.6;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise(ctx);
+    src.loop = true;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(380, t);
+    lp.frequency.linearRampToValueAtTime(700, t + seconds);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.09, t + 0.8);
+    env.gain.setValueAtTime(0.09, t + seconds * 0.6);
+    env.gain.linearRampToValueAtTime(0, t + seconds);
+    src.connect(lp).connect(env).connect(this.master);
+    src.start(t);
+    src.stop(t + seconds + 0.1);
+    for (let i = 0; i < 7; i++) this.bubble(ctx, t + 0.3 + Math.random() * seconds * 0.8, 0.8 + Math.random() * 0.8, 0.05);
+  }
+
   suspend() {
     void this.ctx?.suspend();
   }

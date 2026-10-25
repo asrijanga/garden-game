@@ -15,6 +15,11 @@ import { Flowers } from './world/flowers';
 import { SPECIES } from './world/flowerSpecies';
 import { FlowerPicker } from './ui/flowerPicker';
 import { Bees } from './world/bees';
+import { Ponds, createPondTexture } from './world/pond';
+import { PondPlants } from './world/pondPlants';
+import { Fish } from './world/fish';
+import { Splash } from './world/splash';
+import { PondBrush } from './game/pondBrush';
 import { createMotes } from './world/motes';
 import { FlyingBirds } from './world/flyingBirds';
 import { currentSeason, PALETTES } from './world/season';
@@ -86,7 +91,8 @@ sun.shadow.radius = 4;
 scene.add(sun);
 
 const paint = new GroundPaint();
-const ground = new Ground(WORLD_SEED, palette, paint.texture);
+const pondTexture = createPondTexture();
+const ground = new Ground(WORLD_SEED, palette, paint.texture, pondTexture);
 scene.add(ground.mesh);
 
 // The cottage sits at the back of the clearing, tucked against the trees, facing the player.
@@ -131,14 +137,30 @@ const TOOL_PITCH = { move: 1, path: 0.9, flowers: 1.2, pond: 0.8, erase: 1.05 };
 let tools: ToolController | null = null;
 const dust = new Dust();
 scene.add(dust.points);
+// Ponds come first: paths and beds steer round them.
+const ponds = new Ponds(ground, pondTexture, palette, () => ambience.fill());
+scene.add(ponds.group);
+const pondPlants = new PondPlants();
+scene.add(pondPlants.group);
+const splash = new Splash();
+scene.add(splash.points);
+const fish = new Fish(ponds, splash, (size) => ambience.splash(size));
+scene.add(fish.group);
 const stones = new Stones((p, r, kind) => {
   if (kind === 'step') dust.puff(p, 4, r * 1.2);
-  ambience.stone(kind === 'step' ? 0.3 : kind === 'rock' ? 0.14 : 0.18);
+  ambience.stone(kind === 'step' ? 0.3 : kind === 'rock' ? 0.14 : kind === 'shore' ? Math.min(0.3, r * 0.9) : 0.18);
 });
 scene.add(stones.group);
 const edgePlants = new EdgePlants(palette.wildflowers);
 scene.add(edgePlants.group);
-const paths = new PathBuilder(ground, paint, stones, edgePlants, wildflowers, (x, z) => cottage.contains(x, z, 0.1) || ground.forestness(x, z) > 0.45);
+const paths = new PathBuilder(
+  ground,
+  paint,
+  stones,
+  edgePlants,
+  wildflowers,
+  (x, z) => cottage.contains(x, z, 0.1) || ground.forestness(x, z) > 0.45 || ponds.contains(x, z, 1.0),
+);
 
 const flowers = new Flowers(SPECIES, () => ambience.bloom());
 // Bees arrive from (and leave into) the woods round the clearing.
@@ -159,9 +181,20 @@ const flowerBrush = new FlowerBrush(
   flowers,
   wildflowers,
   season,
-  (x, z) => cottage.contains(x, z, 0.3) || ground.forestness(x, z) > 0.4,
+  (x, z) => cottage.contains(x, z, 0.3) || ground.forestness(x, z) > 0.4 || ponds.contains(x, z, 0.9),
   (x, z) => paths.distanceToPaths(x, z),
   stones,
+);
+const pondBrush = new PondBrush(
+  ponds,
+  pondPlants,
+  fish,
+  stones,
+  wildflowers,
+  dust,
+  season,
+  (x, z) =>
+    cottage.contains(x, z, 0.4) || ground.forestness(x, z) > 0.3 || paths.distanceToPaths(x, z) < 1.0 || flowerBrush.distanceToBeds(x, z) < 0.3,
 );
 
 const toolbar = new Toolbar((tool) => {
@@ -173,8 +206,8 @@ const picker = new FlowerPicker(flowerBrush.ordered(), (sp) => flowerBrush.inSea
   ambience.tap(1.3);
   toolbar.showLabel(label, 1800);
 });
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones });
-tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker, paths, flowerBrush, (tool) => {
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash });
+tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker, paths, flowerBrush, pondBrush, (tool) => {
   picker.setVisible(tool === 'flowers');
   document.body.classList.toggle('picking', tool === 'flowers');
 });
@@ -198,6 +231,7 @@ function resize() {
   (motes.material as THREE.ShaderMaterial).uniforms.uPixelRatio.value = pixelRatio();
   cottage.setPixelRatio(pixelRatio());
   dust.setPixelRatio(pixelRatio(), h);
+  splash.setPixelRatio(pixelRatio(), h);
 }
 window.addEventListener('resize', resize);
 resize();
@@ -220,6 +254,10 @@ function frame(time: number) {
   edgePlants.update(dt);
   flowers.update(dt);
   bees.update(dt);
+  ponds.update(dt);
+  fish.update(dt);
+  pondPlants.update(dt);
+  splash.update(dt);
   wildflowers.update(dt);
   dust.update(dt);
   paint.update();

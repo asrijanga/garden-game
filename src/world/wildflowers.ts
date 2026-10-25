@@ -37,6 +37,15 @@ export class Wildflowers {
     }
   }
 
+  /** Flowers wherever `inside(x, z)` is true shrink away into the lawn. */
+  clearIf(inside: (x: number, z: number) => boolean) {
+    for (let i = 0; i < this.positions.length; i++) {
+      if (this.target[i] === 0 || !inside(this.positions[i].x, this.positions[i].y)) continue;
+      this.target[i] = 0;
+      this.shrinking.add(i);
+    }
+  }
+
   update(dt: number) {
     if (!this.shrinking.size) return;
     const m = new THREE.Matrix4();

@@ -3,6 +3,7 @@ import { createNoise2D } from '../core/noise';
 import { createRng, smoothstep } from '../core/random';
 import { uniforms as windUniforms, windSampleGLSL } from '../render/wind';
 import { paintUvGLSL } from './groundPaint';
+import { pondUvGLSL, POND_WATERLINE_RANGE } from './pond';
 import type { SeasonPalette } from './season';
 
 /** Radius of the open meadow in the middle of the forest: the player's garden. */
@@ -16,14 +17,17 @@ export class Ground {
   private readonly meadow: THREE.Color[];
   private readonly floor: THREE.Color;
   readonly mesh: THREE.Mesh;
+  /** The same lawn, for the finer meshes dug into ponds. */
+  readonly basinMaterial: THREE.MeshLambertMaterial;
 
-  constructor(seed: number, palette: SeasonPalette, private readonly paint: THREE.Texture) {
+  constructor(seed: number, palette: SeasonPalette, private readonly paint: THREE.Texture, private readonly pond: THREE.Texture) {
     this.hNoise = createNoise2D(seed);
     this.edgeNoise = createNoise2D(seed + 1);
     this.colorNoise = createNoise2D(seed + 2);
     this.meadow = palette.meadow.map((c) => new THREE.Color(c));
     this.floor = new THREE.Color(palette.forestFloor);
     this.mesh = this.buildMesh();
+    this.basinMaterial = lawnMaterial(paint, pond, true);
   }
 
   /** Organic outline of the clearing at angle `theta`. */
@@ -56,6 +60,16 @@ export class Ground {
     return out.lerp(this.meadow[2], smoothstep(0.55, 1.0, b) * 0.3);
   }
 
+  /** The lawn's base colour at (x, z) (meadow fading into forest floor); returns how meadowy it is. */
+  vertexColor(x: number, z: number, out: THREE.Color): number {
+    const f = this.forestness(x, z);
+    this.meadowColor(x, z, out);
+    // Forest floor is darker and leaf-littered, with a soft shaded fringe at the treeline.
+    const shade = this.floor.clone().multiplyScalar(0.75 + this.colorNoise(x * 0.3, z * 0.3) * 0.15);
+    out.lerp(shade, f);
+    return 1 - f;
+  }
+
   private buildMesh(): THREE.Mesh {
     const segs = 220;
     const geo = new THREE.PlaneGeometry(WORLD_HALF * 2, WORLD_HALF * 2, segs, segs);
@@ -64,17 +78,11 @@ export class Ground {
     const colors = new Float32Array(pos.count * 3);
     const meadowMask = new Float32Array(pos.count);
     const c = new THREE.Color();
-    const shade = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
       pos.setY(i, this.heightAt(x, z));
-      const f = this.forestness(x, z);
-      this.meadowColor(x, z, c);
-      // Forest floor is darker and leaf-littered, with a soft shaded fringe at the treeline.
-      shade.copy(this.floor).multiplyScalar(0.75 + this.colorNoise(x * 0.3, z * 0.3) * 0.15);
-      c.lerp(shade, f);
-      meadowMask[i] = 1 - f;
+      meadowMask[i] = this.vertexColor(x, z, c);
       colors[i * 3] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;
@@ -82,7 +90,7 @@ export class Ground {
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.setAttribute('aMeadow', new THREE.BufferAttribute(meadowMask, 1));
     geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, lawnMaterial(this.paint));
+    const mesh = new THREE.Mesh(geo, lawnMaterial(this.paint, this.pond, false));
     mesh.receiveShadow = true;
     return mesh;
   }
@@ -97,22 +105,66 @@ float lawnNoise(vec2 p) {
 }
 `;
 
+/** Rounded pebbles of mixed size and tone, half sunk in silt (Voronoi cells ~15 cm across). */
+const pebblesGLSL = /* glsl */ `
+vec3 pebbles(vec2 p) {
+  p = vec2(p.x * 0.8 - p.y * 0.6, p.x * 0.6 + p.y * 0.8) * 6.5;
+  vec2 i = floor(p), f = fract(p);
+  float d1 = 8.0, d2 = 8.0;
+  vec2 id = vec2(0.0);
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 g = vec2(float(x), float(y));
+      vec2 o = vec2(lawnHash(i + g), lawnHash(i + g + 17.3)) * 0.9 + 0.05;
+      float d = length(g + o - f);
+      if (d < d1) { d2 = d1; d1 = d; id = i + g; } else if (d < d2) { d2 = d; }
+    }
+  }
+  float tone = lawnHash(id + 3.1);
+  vec3 silt = vec3(0.3, 0.27, 0.19);
+  vec3 col = mix(vec3(0.38, 0.36, 0.31), vec3(0.56, 0.51, 0.43), tone);
+  col = mix(col, vec3(0.42, 0.35, 0.26), step(0.72, lawnHash(id + 9.7)));
+  col *= 0.85 + 0.2 * (1.0 - d1); // domed
+  // Some cells are just silt, so the pebbles lie scattered rather than paved.
+  col = mix(silt, col, step(0.35, lawnHash(id + 5.9)));
+  return mix(silt * 0.7, col, smoothstep(0.0, 0.14, d2 - d1));
+}
+`;
+
 /**
  * The lawn is painted, not modelled: a soft, fine grain (mip-mapped, so it melts into smooth
  * colour from afar and never shimmers) plus a gentle sheen where gusts roll across the meadow,
  * driven by the same wind field as everything else.
  */
-function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
-  const grain = grainTexture(256, 1234);
+let sharedGrain: THREE.DataTexture | null = null;
+
+/**
+ * `basin`: the variant for meshes dug into ponds. The main lawn steps down out of sight round
+ * ponds (its vertices are a metre apart, far too coarse to dig into) and the basin takes over;
+ * it is drawn a hair nearer the camera so the two never flicker where they overlap.
+ */
+function lawnMaterial(paint: THREE.Texture, pond: THREE.Texture, basin: boolean): THREE.MeshLambertMaterial {
+  const grain = (sharedGrain ??= grainTexture(256, 1234));
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
-  mat.customProgramCacheKey = () => 'lawn';
+  if (basin) {
+    mat.polygonOffset = true;
+    mat.polygonOffsetFactor = -1;
+    mat.polygonOffsetUnits = -4;
+  }
+  mat.customProgramCacheKey = () => (basin ? 'lawn-basin' : 'lawn');
   mat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, windUniforms, { uGrain: { value: grain }, uPaint: { value: paint } });
+    Object.assign(shader.uniforms, windUniforms, { uGrain: { value: grain }, uPaint: { value: paint }, uPond: { value: pond } });
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float aMeadow;\nvarying float vMeadow;\nvarying vec3 vWorld;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMeadow = aMeadow;\nvWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      .replace('#include <common>', `#include <common>\nattribute float aMeadow;\nvarying float vMeadow;\nvarying vec3 vWorld;\nuniform sampler2D uPond;\n${pondUvGLSL}`)
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        ${basin ? '' : 'transformed.y -= step(0.004, texture2D(uPond, pondUv(transformed.xz)).g) * 2.5;'}
+        vMeadow = aMeadow;
+        vWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
+      );
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nuniform sampler2D uGrain;\nuniform sampler2D uPaint;\nvarying float vMeadow;\nvarying vec3 vWorld;\n${windSampleGLSL}\n${paintUvGLSL}\n${lawnNoiseGLSL}`)
+      .replace('#include <common>', `#include <common>\nuniform sampler2D uGrain;\nuniform sampler2D uPaint;\nuniform sampler2D uPond;\nvarying float vMeadow;\nvarying vec3 vWorld;\n${windSampleGLSL}\n${paintUvGLSL}\n${pondUvGLSL}\n${lawnNoiseGLSL}\n${pebblesGLSL}`)
       .replace(
         '#include <color_fragment>',
         /* glsl */ `#include <color_fragment>
@@ -154,9 +206,24 @@ function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
         bedSoil *= 1.0 - (1.0 - smoothstep(0.46, 0.62, bedField)) * 0.2; // tucked-in edge
         diffuseColor.rgb = mix(diffuseColor.rgb, soil, earth);
         diffuseColor.rgb = mix(diffuseColor.rgb, bedSoil, bed);
+        // Ponds: damp, darker grass running down the banks, a narrow band of wet mud at the
+        // waterline, pebbles in the shallows and dark silt in the deep.
+        vec3 pondTex = texture2D(uPond, pondUv(vWorld.xz)).rgb;
+        float mud = 0.0;
+        if (pondTex.g > 0.0) {
+          float aboveWater = (pondTex.b - 0.5) * ${(POND_WATERLINE_RANGE * 2).toFixed(2)};
+          float dug = step(0.002, pondTex.r);
+          diffuseColor.rgb *= 1.0 - pondTex.g * 0.14;
+          mud = smoothstep(0.1, 0.045, aboveWater + ragged * 0.12) * dug;
+          vec3 bank = mix(vec3(0.2, 0.15, 0.09), vec3(0.27, 0.21, 0.13), grain);
+          bank = mix(bank, vec3(0.2, 0.25, 0.1), smoothstep(0.55, 0.75, lawnNoise(vWorld.xz * 2.7 + 4.0)) * 0.6); // moss
+          vec3 floorCol = mix(bank, pebbles(vWorld.xz), smoothstep(0.02, -0.03, aboveWater));
+          floorCol = mix(floorCol, vec3(0.15, 0.14, 0.085) * (0.85 + grain * 0.3), smoothstep(-0.2, -0.38, aboveWater));
+          diffuseColor.rgb = mix(diffuseColor.rgb, floorCol, mud);
+        }
         // Gust sheen: the meadow brightens softly as wind passes, like grass bowing in waves.
         float gust = windAt(vWorld.xz, 0.0);
-        diffuseColor.rgb *= 1.0 + smoothstep(0.45, 1.1, gust) * 0.085 * vMeadow * (1.0 - earth) * (1.0 - bed);`,
+        diffuseColor.rgb *= 1.0 + smoothstep(0.45, 1.1, gust) * 0.085 * vMeadow * (1.0 - earth) * (1.0 - bed) * (1.0 - mud);`,
       );
   };
   return mat;

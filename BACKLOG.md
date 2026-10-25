@@ -10,7 +10,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current story:** 1.6 — Plant flowers that bloom fast (built, awaiting review). Next: 1.7 pond.
+**Current story:** 1.7 — A cozy garden pond (built, awaiting review). Next: 1.8 gently erase.
 **Preview URL:** https://asrijanga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
@@ -20,8 +20,8 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 1.3 Hold the world in my hand | ✅ Done | Pulled forward (player asked to zoom). Pinch zoom, drag pan, twist rotate, inertia; camera lowers as you zoom in. |
 | 1.4 Thumb-reach toolbar | ✅ Done | Frosted tray with 5 illustrated tactile buttons (Look around, Path, Flowers, Pond, Tidy up), squash/bounce and lift/glow, floating label, soft wooden tap sound. Build tools: one finger touches the lawn (glowing ring, ripple on release), two fingers move the camera. Unbuilt tools say "coming soon". |
 | 1.5 Draw a winding path | ✅ Done | Back to basics: rounded-square stones down the middle, pale gravel on both sides, simple cut-stone edging. Starts exactly where you touch, with light smoothing. Settle animation + soft sound; clover along the outside. |
-| 1.6 Plant flowers that bloom fast | 👀 Awaiting feedback | Paint beds of soil; flowers sprout, bud and unfurl in a wave (GPU-animated, ~3 s) with a soft pentatonic chime. 14 species with distinct silhouettes (pom-poms, dahlias, pansy faces, cone-centred black-eyed Susans, sedum domes, anemones, spikes, daisies…) × 5 shape variants, per-plant colour/size/yaw. Real seasons: in-season species bloom, others stay in bud. Picker chips above the toolbar (seasonal mix first, green badge = blooming now). Beds avoid paths; wildflowers step aside. |
-| 1.7 A cozy garden pond | ⬜ Not started | |
+| 1.6 Plant flowers that bloom fast | ✅ Done | Paint beds of soil; flowers sprout, bud and unfurl in a wave (GPU-animated, ~3 s) with a soft pentatonic chime. 14 species with distinct silhouettes (pom-poms, dahlias, pansy faces, cone-centred black-eyed Susans, sedum domes, anemones, spikes, daisies…) × 5 shape variants, per-plant colour/size/yaw. Real seasons: in-season species bloom, others stay in bud. Picker chips above the toolbar (seasonal mix first, green badge = blooming now). Beds avoid paths; wildflowers step aside. |
+| 1.7 A cozy garden pond | 👀 Awaiting feedback | Pond tool: drag to dig a pond along your finger, tap for a round pool, or draw a loop to fill the shape. The ground sinks into a soft basin, then water wells up (with a gentle trickle). On slopes the bed is levelled so water reaches the far bank. Stylized water: clear shallows to teal deep, sky and treeline reflection, gust-driven wavelets, sun glints, soft foam at the shore. Mossy rocks gather in groups at the waterline, with reeds and bulrushes in the gaps. Lily pads (flowering in spring/summer) and koi/goldfish arrive over the next seconds. Fish glide, pause, kiss the surface, and leap with a splash, rings and a plop. Ponds join with soft curves and avoid paths, beds and the cottage. |
 | 1.8 Gently erase | ⬜ Not started | |
 | 1.9 Autosave + seed sprouting | ⬜ Not started | |
 | 2.x – 6.x | ⬜ Not started | See milestones below |
@@ -31,6 +31,7 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **1.6 → 1.7:** *Feedback:* "Okay build next story" (flowers, beds and bees accepted). *Changes:* Story 1.7 built.
 - **1.6 review 5:** *Feedback:* Handle two beds meeting with natural curves. *Changes:* Bed outlines come from a distance field: each stroke's own outline is exact, and separate beds join with a round fillet (radius 0.8 m) where they meet or nearly touch. Around a new stroke, a grid march fills the fillet curves with mulch (plus a little foliage), lifts border stones now inside, and lays new stones along the blended outline (oriented by the field gradient, in stroke order). Tested: crossing beds (plus shape), a bend from one bed's end, and two parallel beds with a small gap (merged into one wide bed with a single border).
 - **1.6 review 4:** *Request:* natural stone edging for flower beds. *Changes:* 7 lumpy, rounded field-stone shapes in warm greys and beige, laid round the outside of each bed when the stroke ends, settling one after another. Hand-laid variation in size, spacing, in/out nudge, twist and set height. The border follows the union of all beds: extending or joining beds lifts stones now inside and keeps one border round the outside. It skips paths and blocked spots. Plants now stay inside the edge (plant radius 0.8 → 0.62 m).
 - **1.6 review 3:** *Feedback:* Flowers reflect a lot of light; add black-brown mulch to beds instead of brown ground. *Changes:* Petal glow 0.24 → 0.07 (foliage 0.25 → 0.1). Petal tip brightness capped (1.12 → 0.98), so nothing trips the bloom pass. Petals read matte. Beds are now black-brown bark mulch: rotated, stretched shreds, scattered lighter bark chips, fine crumbs, and a tucked-in edge.
@@ -152,6 +153,7 @@ _Feedback from each review, newest first, and what we changed because of it._
 | Look | Soft Lambert lighting, neutral tone mapping, bloom, warm grade. **No blur effects** (player feedback) | Storybook diorama feel, crisp everywhere. |
 | Audio | Web Audio API, procedural (filtered noise for wind and leaves; synthesized chimes later) | Nothing to download. Unlocks on the first touch. Driven by `WindField`. |
 | Ground paint | `GroundPaint`: a 512² canvas texture over the clearing (R = worn path earth; G = sandiness relative to R; B reserved for flower beds) read by the lawn shader | Cheap live painting with organic edges, and one texture for every ground change. |
+| Ponds | `Ponds`: a 256² signed "inside distance" field over the clearing (strokes merge with a smooth union) gives depth, levelling and banks. The coarse lawn mesh steps down out of sight near ponds and fine chunked basin meshes (same lawn shader, polygon offset) sink into shape. Flat water per connected body, with level = lowest bank − 7 cm. A pond texture (R depth, G shore halo, B height above the waterline) colours banks, pebbles and silt | Smooth organic shapes at any size, live digging, and no holes or seams, without re-meshing the whole lawn. |
 | Persistence | `localStorage`/IndexedDB with a **versioned, compact save format** | The share link (later) is the same data, compressed. |
 
 ---
