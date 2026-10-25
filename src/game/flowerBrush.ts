@@ -99,7 +99,8 @@ export class FlowerBrush {
         this.rng() * Math.PI * 2,
         FLOWER_SCALE * lerp(0.85, 1.15, this.rng()),
         delay,
-        this.inSeason(sp) ? lerp(0.9, 1, this.rng()) : 0.08,
+        // Out of season: plump, half-open buds in their colour, so the bed clearly looks planted.
+        this.inSeason(sp) ? lerp(0.9, 1, this.rng()) : lerp(0.3, 0.4, this.rng()),
         color,
       );
     }
