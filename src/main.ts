@@ -12,6 +12,10 @@ import { WindField, bindWind } from './render/wind';
 import { PostFX } from './render/post';
 import { Ambience } from './audio/ambience';
 import { mountSoundControls } from './ui/soundButton';
+import { Toolbar } from './ui/toolbar';
+import { GroundPicker } from './core/groundPicker';
+import { TouchMarker } from './world/touchMarker';
+import { ToolController } from './game/tools';
 
 const WORLD_SEED = 20261025;
 
@@ -102,6 +106,17 @@ const ambience = new Ambience(season);
 mountSoundControls(ambience);
 if (debug) Object.assign(window, { ambience, wind, flyingBirds });
 
+// --- Tools: what your finger does -----------------------------------------------------------
+const marker = new TouchMarker();
+scene.add(marker.mesh);
+const TOOL_PITCH = { move: 1, path: 0.9, flowers: 1.2, pond: 0.8, erase: 1.05 };
+let tools: ToolController | null = null;
+const toolbar = new Toolbar((tool) => {
+  ambience.tap(TOOL_PITCH[tool]);
+  tools?.setTool(tool);
+});
+tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker);
+
 // --- Post-processing ----------------------------------------------------------------------
 const post = new PostFX(renderer, scene, camera);
 
@@ -137,6 +152,7 @@ function frame(time: number) {
   wind.update(dt);
   cottage.update(dt, wind);
   flyingBirds.update(dt);
+  marker.update(dt, rig.distance);
   (motes.material as THREE.ShaderMaterial).uniforms.uTime.value = elapsed;
   rig.update(dt);
   ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));

@@ -70,7 +70,7 @@ body {
 .sound-hint {
   position: fixed;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 150px);
   transform: translate(-50%, 8px);
   padding: 10px 18px;
   border-radius: 999px;
@@ -88,6 +88,105 @@ body {
   transition: opacity 1.2s ease 1.5s, transform 1.2s ease 1.5s;
 }
 .sound-hint.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* --- Toolbar --------------------------------------------------------------------------------- */
+.toolbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 34px;
+  background: rgba(255, 244, 226, 0.34);
+  -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  backdrop-filter: blur(14px) saturate(1.25);
+  border: 1px solid rgba(255, 250, 240, 0.55);
+  box-shadow: 0 10px 30px rgba(50, 32, 14, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  z-index: 10;
+}
+
+.tool {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform 0.35s cubic-bezier(0.3, 1.7, 0.5, 1);
+}
+.tool-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #fffdf7 0%, #f6ead4 55%, #e7d3b1 100%);
+  box-shadow:
+    0 4px 0 #cdb38b,
+    0 7px 12px rgba(60, 40, 18, 0.28),
+    inset 0 -3px 6px rgba(160, 120, 70, 0.18),
+    inset 0 2px 2px rgba(255, 255, 255, 0.9);
+  transition: box-shadow 0.25s ease, background 0.25s ease;
+}
+.tool svg {
+  width: 42px;
+  height: 42px;
+  display: block;
+  filter: drop-shadow(0 1px 0.5px rgba(70, 45, 20, 0.25));
+}
+.tool.active {
+  transform: translateY(-7px) scale(1.07);
+}
+.tool.active .tool-face {
+  background: radial-gradient(circle at 35% 28%, #fffef9 0%, #fff0cf 50%, #f5d39a 100%);
+  box-shadow:
+    0 4px 0 #d8a85c,
+    0 10px 18px rgba(80, 50, 15, 0.32),
+    0 0 0 3px rgba(255, 236, 190, 0.9),
+    0 0 22px 4px rgba(255, 214, 140, 0.55),
+    inset 0 -3px 6px rgba(190, 130, 50, 0.2),
+    inset 0 2px 2px rgba(255, 255, 255, 0.95);
+}
+.tool.bounce .tool-face {
+  animation: tool-squash 0.42s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes tool-squash {
+  0% { transform: scale(1); }
+  25% { transform: scale(0.84, 0.8); }
+  60% { transform: scale(1.08, 1.1); }
+  100% { transform: scale(1); }
+}
+
+.tool-label {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+  transform: translate(-50%, 6px);
+  padding: 7px 15px;
+  border-radius: 999px;
+  background: rgba(255, 246, 230, 0.4);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 250, 240, 0.55);
+  color: #fffaf0;
+  font: 600 15px/1.2 -apple-system, BlinkMacSystemFont, 'SF Pro Rounded', 'Segoe UI', sans-serif;
+  text-shadow: 0 1px 2px rgba(50, 30, 10, 0.45);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  z-index: 10;
+}
+.tool-label.show {
   opacity: 1;
   transform: translate(-50%, 0);
 }

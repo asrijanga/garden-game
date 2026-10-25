@@ -145,6 +145,27 @@ export class Ambience {
     this.master.gain.linearRampToValueAtTime(this.muted ? 0 : MASTER_VOLUME, now + seconds);
   }
 
+  /** A soft wooden "tock" for UI presses: quiet, warm, never clicky. */
+  tap(pitch = 1) {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(420 * pitch, t);
+    osc.frequency.exponentialRampToValueAtTime(260 * pitch, t + 0.09);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.32, t + 0.006);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1400;
+    osc.connect(env).connect(lp).connect(this.master);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  }
+
   suspend() {
     void this.ctx?.suspend();
   }
