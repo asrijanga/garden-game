@@ -15,7 +15,7 @@ const TiltShiftShader = {
     uDir: { value: new THREE.Vector2(1, 0) },
     uFocus: { value: 0.45 },
     uBand: { value: 0.12 },
-    uAmount: { value: 3.0 },
+    uAmount: { value: 1.6 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -29,11 +29,14 @@ const TiltShiftShader = {
       float d = abs(vUv.y - uFocus);
       float blur = smoothstep(uBand, uBand + 0.35, d) * uAmount;
       vec2 step = uDir * blur;
-      vec4 sum = texture2D(tDiffuse, vUv) * 0.2270270270;
-      sum += texture2D(tDiffuse, vUv + step * 1.3846153846) * 0.3162162162;
-      sum += texture2D(tDiffuse, vUv - step * 1.3846153846) * 0.3162162162;
-      sum += texture2D(tDiffuse, vUv + step * 3.2307692308) * 0.0702702703;
-      sum += texture2D(tDiffuse, vUv - step * 3.2307692308) * 0.0702702703;
+      // 9-tap gaussian, sampling between texels so it stays smooth (no blocky ghosts).
+      vec4 sum = texture2D(tDiffuse, vUv) * 0.1964825501;
+      sum += texture2D(tDiffuse, vUv + step * 1.4117647059) * 0.2969069646;
+      sum += texture2D(tDiffuse, vUv - step * 1.4117647059) * 0.2969069646;
+      sum += texture2D(tDiffuse, vUv + step * 3.2941176471) * 0.0944703978;
+      sum += texture2D(tDiffuse, vUv - step * 3.2941176471) * 0.0944703978;
+      sum += texture2D(tDiffuse, vUv + step * 5.1764705882) * 0.0103813624;
+      sum += texture2D(tDiffuse, vUv - step * 5.1764705882) * 0.0103813624;
       gl_FragColor = sum;
     }`,
 };

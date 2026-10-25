@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import './style.css';
-import { Terrain, ISLAND_RADIUS, createCliffStones } from './world/terrain';
+import { Ground, CLEARING_RADIUS } from './world/ground';
+import { createForest } from './world/forest';
+import { Cottage } from './world/cottage';
 import { createGrass, createWildflowers } from './world/grass';
-import { createBackdrop } from './world/sky';
 import { createMotes } from './world/motes';
-import { windUniforms } from './render/wind';
+import { currentSeason, PALETTES } from './world/season';
+import { WindField, bindWind } from './render/wind';
 import { PostFX } from './render/post';
 
 const WORLD_SEED = 20261025;
@@ -29,62 +31,72 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 const maxPixelRatio = 1.75;
 const pixelRatio = () => Math.min(window.devicePixelRatio || 1, maxPixelRatio);
 
-// --- Scene ------------------------------------------------------------------------------
+// --- World ------------------------------------------------------------------------------
+const season = currentSeason();
+const palette = PALETTES[season];
+document.documentElement.dataset.season = season;
+
 const scene = new THREE.Scene();
-const haze = new THREE.Color('#f0d2b4');
-scene.fog = new THREE.Fog(haze, 60, 160);
+const haze = new THREE.Color(palette.fog);
+scene.background = haze;
 
-const backdrop = createBackdrop();
-scene.add(backdrop);
-const backdropUniforms = (backdrop.material as THREE.ShaderMaterial).uniforms;
+const wind = new WindField(WORLD_SEED + 20);
+bindWind(wind);
 
-// Low, warm sun from the upper left so the cliff face catches the light.
-const sunDir = new THREE.Vector3(-0.8, 0.5, 0.3).normalize();
-
-const hemi = new THREE.HemisphereLight('#cfe0f0', '#8a6a48', 1.5);
-scene.add(hemi);
-
-const sun = new THREE.DirectionalLight('#ffcf9a', 3.0);
-sun.position.copy(sunDir).multiplyScalar(40);
+// Warm, low afternoon sun from the front left, so the cottage glows and shadows fall behind.
+const sunDir = new THREE.Vector3(-0.62, 0.62, 0.48).normalize();
+scene.add(new THREE.HemisphereLight(palette.sky, '#6b5a3a', 1.35));
+const sun = new THREE.DirectionalLight(palette.sun, 3.0);
+sun.position.copy(sunDir).multiplyScalar(60);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -14;
-sun.shadow.camera.right = 14;
-sun.shadow.camera.top = 14;
-sun.shadow.camera.bottom = -14;
-sun.shadow.camera.near = 1;
-sun.shadow.camera.far = 90;
+const sc = sun.shadow.camera;
+sc.left = sc.bottom = -24;
+sc.right = sc.top = 24;
+sc.near = 5;
+sc.far = 140;
 sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.03;
 sun.shadow.radius = 4;
 scene.add(sun);
 
-const terrain = new Terrain(WORLD_SEED);
-scene.add(terrain.mesh);
-scene.add(createCliffStones(terrain, 140, WORLD_SEED + 13));
+const ground = new Ground(WORLD_SEED, palette);
+scene.add(ground.mesh);
+
+// The cottage sits at the back of the clearing, tucked against the trees, facing the player.
+const cottagePos = new THREE.Vector3(1.0, 0, -CLEARING_RADIUS + 5.2);
+cottagePos.y = ground.heightAt(cottagePos.x, cottagePos.z) - 0.05;
+const cottage = new Cottage(cottagePos, -0.18, palette, WORLD_SEED + 30);
+scene.add(cottage.group);
+scene.add(cottage.smokePoints);
+
+scene.add(createForest(ground, palette, WORLD_SEED + 40, (x, z) => cottage.contains(x, z, 1.2)));
 
 const isSmallGpu = Math.min(screen.width, screen.height) * (window.devicePixelRatio || 1) < 900;
-scene.add(createGrass(terrain, isSmallGpu ? 22000 : 34000, WORLD_SEED + 10));
-scene.add(createWildflowers(terrain, 700, WORLD_SEED + 11));
+const blocked = (x: number, z: number) => cottage.contains(x, z, -0.3);
+scene.add(createGrass(ground, isSmallGpu ? 28000 : 42000, WORLD_SEED + 10, blocked));
+scene.add(createWildflowers(ground, palette.wildflowers, 900, WORLD_SEED + 11, (x, z) => cottage.contains(x, z, 0.4)));
 
-const motes = createMotes(160, WORLD_SEED + 12);
+const motes = createMotes(140, WORLD_SEED + 12);
 scene.add(motes);
 
-// --- Camera: a diorama view that fits the island on any screen --------------------------
-const camera = new THREE.PerspectiveCamera(26, 1, 1, 1000);
-const target = new THREE.Vector3(0, -0.8, 0);
-const pitch = THREE.MathUtils.degToRad(40);
-let distance = 60;
-let azimuth = THREE.MathUtils.degToRad(20);
+// --- Camera: looking down into the clearing like a diorama ------------------------------
+const camera = new THREE.PerspectiveCamera(30, 1, 1, 400);
+const target = new THREE.Vector3(0, 0.6, -1.2);
+const pitch = THREE.MathUtils.degToRad(57);
+let distance = 40;
+const baseAzimuth = THREE.MathUtils.degToRad(8);
 
 function fitDistance(aspect: number): number {
-  const fitRadius = ISLAND_RADIUS * 1.08;
+  const fitHalfWidth = CLEARING_RADIUS * 0.98;
   const vHalf = THREE.MathUtils.degToRad(camera.fov / 2);
   const hHalf = Math.atan(Math.tan(vHalf) * aspect);
-  return Math.max(fitRadius / Math.tan(hHalf), (fitRadius * 0.85) / Math.tan(vHalf));
+  return Math.max(fitHalfWidth / Math.tan(hHalf), (fitHalfWidth * 0.9) / Math.tan(vHalf));
 }
 
-function placeCamera() {
+function placeCamera(time: number) {
+  // A slow, breathing sway so the scene feels alive (real camera controls arrive in Story 1.2).
+  const azimuth = baseAzimuth + Math.sin(time * 0.045) * 0.12;
   camera.position.set(
     target.x + Math.sin(azimuth) * Math.cos(pitch) * distance,
     target.y + Math.sin(pitch) * distance,
@@ -104,11 +116,11 @@ function resize() {
   camera.aspect = w / h;
   distance = fitDistance(camera.aspect);
   camera.updateProjectionMatrix();
-  scene.fog = new THREE.Fog(haze, distance * 0.9, distance * 2.2);
+  scene.fog = new THREE.Fog(haze, distance * 0.95, distance * 2.3);
   post.setSize(w, h, pixelRatio());
-  post.setFocus(0.5);
-  backdropUniforms.uAspect.value = camera.aspect;
+  post.setFocus(0.48);
   (motes.material as THREE.ShaderMaterial).uniforms.uPixelRatio.value = pixelRatio();
+  cottage.setPixelRatio(pixelRatio());
 }
 window.addEventListener('resize', resize);
 resize();
@@ -122,17 +134,13 @@ function frame(time: number) {
   const dt = Math.min(timer.getDelta(), 1 / 20);
   elapsed += dt;
 
-  windUniforms.uTime.value = elapsed;
-  backdropUniforms.uTime.value = elapsed;
+  wind.update(dt);
+  cottage.update(dt, wind);
   (motes.material as THREE.ShaderMaterial).uniforms.uTime.value = elapsed;
-
-  // A slow, breathing drift so the diorama feels alive (camera controls arrive in Story 1.2).
-  azimuth += dt * 0.025;
-  placeCamera();
-
+  placeCamera(elapsed);
   post.render(dt);
 }
 
-placeCamera();
+placeCamera(0);
 renderer.setAnimationLoop(frame);
 requestAnimationFrame(() => canvas.classList.add('ready'));

@@ -1,6 +1,6 @@
 # Garden Game — Product Backlog
 
-A cozy, painterly, procedural garden builder for iPhone browsers, inspired by Tiny Glade.
+A cozy, painterly, procedural **flower garden** for iPhone browsers, inspired by Tiny Glade.
 
 This backlog breaks the vision into **small, demoable stories**. Each one ends with something you can open on your phone and react to. After each story: build → deploy → you review on device → feedback gets folded into the next story (or a polish story) before moving on.
 
@@ -10,34 +10,50 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current story:** 1.1 — A tiny world on my phone (built, awaiting feedback)
-**Preview URL:** https://asrijanga.github.io/garden-game/
+**Current story:** 1.1 — A cozy clearing in the forest (rebuilt after feedback, awaiting review)
+**Preview URL:** https://asrijanga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
 |---|---|---|
-| 1.1 A tiny world on my phone | 👀 Awaiting feedback | Island + grass + wildflowers + motes, golden light, tilt-shift, bloom, grade. Slow auto-drift camera until 1.2. |
+| 1.1 A cozy clearing in the forest | 👀 Awaiting feedback | v2: dense seasonal forest around a meadow clearing, cottage with chimney smoke, gust-field wind, seasonal wildflowers. (v1 floating island was replaced, see feedback log.) |
 | 1.2 Hold the world in my hand | ⬜ Not started | |
 | 1.3 Thumb-reach toolbar | ⬜ Not started | |
 | 1.4 Draw a winding path | ⬜ Not started | |
-| 1.5 Plant a tree | ⬜ Not started | |
-| 1.6 Paint a blooming flower bed | ⬜ Not started | |
+| 1.5 Plant flowers that bloom fast | ⬜ Not started | |
+| 1.6 A cozy garden pond | ⬜ Not started | |
 | 1.7 Gently erase | ⬜ Not started | |
 | 1.8 Autosave + seed sprouting | ⬜ Not started | |
-| 2.1 – 6.5 | ⬜ Not started | See milestones below |
+| 2.x – 6.x | ⬜ Not started | See milestones below |
 
 Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · ✅ Done
 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
-- _(none yet)_
+- **1.1 v1 review (floating island):**
+  - *Feedback:* Prefers Tiny Glade's framing: a dense forest all around with a garden patch in the middle and a cozy home. No floating island and no empty orange background; use the space. Wants subtle, natural wind that makes the grass wavy, and a real airflow model so future flags flutter, settle and gust again, and wind chimes play with the wind. Wants a procedurally built cozy pond with rocks and jumping fish. Wants wildflowers in empty, unbuilt grass. The collection is **only flowers** (no vegetables or other plants), and a huge one. Seasons follow the **real current season** (autumn has autumn colors). The world moves fast: plants grow and flowers bloom quickly.
+  - *Changes:*
+    - 1.1 rebuilt as a forest clearing with a cottage.
+    - New shared **wind field** (moving gust patches plus a calm/gust "breathing" cycle) that both the GPU and game code read, ready for flags and chimes.
+    - **Real-season palettes** (hemisphere aware), with seasonal wildflowers.
+    - Backlog reshaped: the tree tool is replaced by flowers, the pond moves into the MVP (1.6), flags and wind chimes get their own story (3.1), and the flower collection and real seasons get their own milestone (4).
+
+---
+
+## Product principles (from feedback)
+- **Relaxing above all.** No goals, no fail state. Every touch is rewarded with something lovely.
+- **No empty space.** The garden sits in a clearing inside a dense forest, and the screen is always full of life.
+- **Flowers are the collection.** No vegetables, crops or utility plants: a huge, ever-growing set of flowers.
+- **The real season.** The garden reflects the player's actual season (hemisphere aware). Each flower blooms in its own seasons, and autumn looks like autumn.
+- **A fast world.** Things sprout, grow and bloom in seconds to minutes, not days.
+- **One air.** Grass, flowers, trees, smoke, flags and wind chimes all respond to the same moving gusts.
 
 ---
 
 ## How we work
 
 **Loop per story**
-1. I build the story on a branch and deploy it to a preview URL.
+1. I build the story and deploy it to the preview URL.
 2. You open it on your iPhone and try the "Demo script" for that story.
 3. You give feedback. Small tweaks happen immediately; bigger ideas become new stories.
 4. Story is marked done and we move to the next one.
@@ -53,246 +69,194 @@ _Feedback from each review, newest first, and what we changed because of it._
 
 ---
 
-## Technical decisions (proposed defaults, easy to change)
+## Technical decisions
 
 | Area | Decision | Why |
 |---|---|---|
 | Rendering | **Three.js** (WebGL2) | Mature, fast on iOS Safari, has instancing and post-processing. |
 | Language/build | **TypeScript + Vite** | Fast dev loop and small static output. |
-| Hosting | **GitHub Pages via GitHub Actions** | Static, free, no server, so you get a link to open on your phone. |
-| World model | Grid/heightfield ground plus a list of placed "features" (paths, beds, trees…), each with a **seed** | Procedural uniqueness is reproducible: the same seed gives the same tree. This makes save and share small and exact. |
-| Vegetation | GPU-instanced grass, flowers, and stones, with wind done in the vertex shader | The only way to get thousands of swaying blades at 60fps on a phone. |
-| Look | Custom toon/painterly lighting, height fog, tilt-shift depth of field, bloom, color-grading LUT | Gives the storybook diorama feel. |
-| Audio | Web Audio API, with procedural and lightweight sampled sounds | Needs one user tap to unlock on iOS, which happens naturally on the first touch. |
-| Persistence | `localStorage`/IndexedDB with a **versioned, compact save format** | Designed so that the share link (later) is the same data, compressed into the URL. |
-
-> **Note on hosting:** GitHub Pages on a *private* repo needs a paid GitHub plan. If the repo is private and you're on a free plan, we can make it public or use another static host. We'll sort this out in Story 1.
+| Hosting | **GitHub Pages via GitHub Actions** (push to `master` deploys) | Static, free, no server. |
+| World layout | Meadow **clearing** (radius ~13 m) inside a dense instanced forest, with the cottage at the back edge | Matches the Tiny Glade framing: the garden is the clearing. |
+| World model | Placed "features" (paths, flowers, pond…), each with a **seed** | Procedural uniqueness is reproducible: the same seed gives the same flower. Save and share stay small and exact. |
+| Wind | `WindField`: a tileable gust-noise texture scrolling with the wind, times a slow global calm/gust envelope. Sampled identically on GPU (`gardenWind()`) and CPU (`WindField.sample()`) | One airflow drives everything: grass waves now, and flags and chimes later. |
+| Seasons | `currentSeason()` from the device date and time zone (southern hemisphere flips). `?season=` overrides | "The season should reflect what the current season is." |
+| Vegetation | GPU-instanced grass, wildflowers, trees and bushes, with wind in the vertex shader | Tens of thousands of swaying blades at 60fps on a phone. |
+| Look | Soft Lambert lighting, neutral tone mapping, tilt-shift, bloom, warm grade | Storybook diorama feel. |
+| Audio | Web Audio API | Unlocks on the first touch. |
+| Persistence | `localStorage`/IndexedDB with a **versioned, compact save format** | The share link (later) is the same data, compressed. |
 
 ---
 
-## Milestone 1 — MVP: "I touched it and something lovely happened"
+## Milestone 1 — MVP: "A cozy garden I can touch"
 
-Goal: a real, beautiful, playable toy on your phone as fast as possible. Paths, trees, and flowers in a gorgeous diorama, with camera controls and autosave.
-
-### Story 1.1 — A tiny world on my phone (M)
-**As a** player, **I want** to open a link on my iPhone and see a small, beautiful garden island in warm golden light, **so that** I immediately feel the mood of the game.
+### Story 1.1 — A cozy clearing in the forest (M) — *rebuilt after feedback*
+**As a** player, **I want** to open the game and see my little home in a sunny meadow, wrapped in a dense forest in this season's colors, **so that** I immediately feel cozy and want to start gardening.
 
 Acceptance criteria
-- Vite + TS + Three.js project scaffolded; GitHub Actions deploys to Pages on push.
-- Fullscreen canvas with safe-area insets respected (notch and home indicator). No zoom, scroll, rubber-banding, long-press callouts, or text selection.
-- A soft, rounded diorama ground (a grassy island with gently rolling terrain and earthy, cut-away edges, Tiny Glade style).
-- Golden-hour lighting: warm key light, cool sky fill, soft shadows, gentle height fog, a painterly sky gradient.
-- A first pass at a few thousand instanced grass blades that sway in the wind.
-- Tilt-shift depth of field and light bloom (simple versions).
-- Device pixel ratio capped so it stays smooth.
+- Meadow clearing in the middle, a **dense procedural forest** all around (broadleaf trees in seasonal colors, evergreens, a bushy fringe). No empty background anywhere.
+- A **cozy cottage** at the back of the clearing: stone plinth, plaster and timber walls, shingled roof, shutters, flower boxes, glowing windows, a lantern, and **chimney smoke** drifting with the wind.
+- **Subtle, natural wind:** gusts roll across the meadow as visible waves, then settle into calm spells. Trees rustle gently.
+- **Wildflowers** dot the untended grass, in this season's colors.
+- Forest, meadow, wildflowers and light all follow the **real current season**.
+- Fullscreen, safe-area aware, no zoom, scroll or selection.
 
-Demo script: open the link on the phone, then add it to the home screen and open it again. Does it feel cozy? Is the color direction right?
+Demo script: open it on the phone. Watch a gust sweep the grass and the smoke lean. Try `?season=spring` and compare.
 
 ---
 
 ### Story 1.2 — Hold the world in my hand (S)
-**As a** player, **I want** to pan, pinch-zoom, and twist to rotate the garden with smooth inertia, **so that** it feels like a tiny diorama I'm turning in my hands.
+**As a** player, **I want** to pan, pinch-zoom, and twist to rotate around my clearing with smooth inertia, **so that** it feels like a tiny diorama I'm turning in my hands.
 
-Acceptance criteria
-- One-finger drag on empty ground **pans** the camera (until a tool is selected; see 1.3).
-- Two-finger pinch zooms and two-finger twist rotates, both with inertia and soft limits (no flipping under the world or flying off).
-- Tilt-shift focus follows the center of the view.
-- Camera motion is eased, never jerky.
+- One finger drag pans (until a tool is selected; see 1.3). Two-finger pinch zooms and twist rotates, both with inertia and soft limits that keep the clearing in view.
+- Zooming in close lowers the camera angle a little, for a cozier view of the flowers. Tilt-shift focus follows the view center.
 
-Demo script: spin the garden, zoom in close, flick it and let it glide.
+Demo script: zoom right into the flower boxes on the cottage, spin around, flick and let it glide.
 
 ---
 
 ### Story 1.3 — Thumb-reach toolbar (S)
 **As a** player, **I want** a beautiful, chunky toolbar at the bottom of the screen, **so that** I can switch what my finger does with one hand.
 
-Acceptance criteria
-- Bottom toolbar inside thumb reach, with large rounded "tactile" buttons, soft shadows, and a press/bounce animation.
-- Tools (some are placeholders until their story ships): **Move** (camera), **Path**, **Flowers**, **Tree**, **Erase**.
+- Large rounded "tactile" buttons with a press/bounce animation, inside thumb reach.
+- Tools (placeholders until their story ships): **Move**, **Path**, **Flowers**, **Pond**, **Erase**.
 - When a build tool is active, one finger builds and two fingers still move the camera.
-- Icons are custom and illustrated-feeling, not system emoji.
-
-Demo script: switch tools quickly; confirm that two-finger camera control always works.
+- Custom illustrated icons, not emoji.
 
 ---
 
 ### Story 1.4 — Draw a winding path (M)
 **As a** player, **I want** to drag my finger to draw a path and watch stepping stones settle into place one by one, **so that** building feels magical.
 
-Acceptance criteria
-- Path stroke is smoothed into a gentle curve that follows the terrain.
-- Stones are procedurally unique (shape, size, rotation, tint), placed along the curve with natural jitter.
-- Each stone drops in **one after another**, with a soft squash-and-bounce and a small dust puff.
-- The ground under the path becomes worn earth. Grass tufts, clover, and tiny flowers creep in along the edges over about 1–2 s.
-- Crossing paths merge nicely; stones never pile up on top of each other.
-
-Demo script: draw a long S-curve, then cross it with a second path.
+- The stroke is smoothed into a gentle curve that follows the ground. Procedurally unique stones drop in **one after another** with a soft squash-and-bounce and a dust puff.
+- The ground under the path becomes worn earth. Grass tufts, clover and tiny flowers creep in along the edges. Wildflowers step aside.
+- Crossing paths merge nicely. A path that reaches the cottage door connects to the doorstep.
 
 ---
 
-### Story 1.5 — Plant a tree (M)
-**As a** player, **I want** to tap to plant a tree that grows up from a sapling, **so that** every tree feels like my own.
+### Story 1.5 — Plant flowers that bloom fast (M)
+**As a** player, **I want** to paint flowers and watch them bloom outward in a wave within seconds, **so that** the garden fills with color right away.
 
-Acceptance criteria
-- Tap with the Tree tool to place a tree. It grows from the ground with an overshoot-and-settle animation.
-- Procedural trees: trunk/branch structure plus clustered painterly foliage blobs. **No two are alike** (height, lean, canopy shape, hue variation from a curated palette).
-- At least 2 tree types (e.g., round deciduous and a slender birch).
-- Trees cast soft shadows. Foliage sways gently.
-- Grass fades back slightly at the trunk base.
+- Painting creates a soft-edged bed. Flowers appear in a **wave** from the stroke: sprout → bud → petals unfurl, all within a few seconds.
+- A **starter set of about 8 flower species** (for example tulip, daisy, lavender, poppy, cosmos, aster, chrysanthemum, foxglove). Each is procedurally varied: petal count, size, height and color within its palette.
+- Each species has **bloom seasons**. In-season flowers bloom fully. Out-of-season flowers show foliage and buds (for example, asters and chrysanthemums shine in autumn).
+- A simple species picker above the toolbar.
+- Flowers sway in the shared wind.
 
-Demo script: plant a small grove and check the variety.
+Demo script: paint a bed of autumn flowers by the cottage and watch it bloom.
 
 ---
 
-### Story 1.6 — Paint a blooming flower bed (M)
-**As a** player, **I want** to paint a stroke of flowers and watch them bloom outward in a wave, **so that** the garden fills with color.
+### Story 1.6 — A cozy garden pond (L)
+**As a** player, **I want** to draw a pond and watch water fill it, ringed with rocks, with fish that jump, **so that** I have a calm place to watch.
 
-Acceptance criteria
-- Painting with the Flowers tool creates a soft-edged bed area (rich soil plus a border).
-- Flowers appear in a **wave** spreading out from the stroke: sprout → bud → petals unfurl.
-- Procedural flower variety (petal count, size, height, color) drawn from **curated palettes** (e.g., "cottage pinks", "lavender & white", "sunny yellows").
-- Instanced, sways with the wind, warm rim light on petals.
+- Draw or tap a shape. The ground dips into an organic basin, then water fills it with a gentle rise.
+- **Procedural rocks** settle around the shoreline (varied sizes, mossy tops). Pebbles show in the shallows.
+- Stylized water: sky and tree reflections, depth tint, soft shoreline foam, wind-driven ripples that follow the same gusts.
+- **Fish** glide beneath the surface and occasionally **jump** with a splash and expanding ripples.
+- Lily pads and reeds appear over the following seconds.
 
-Demo script: paint a bed beside your path and wait for the wave.
+Demo script: draw a pond next to the path and wait for the first fish to jump.
 
 ---
 
 ### Story 1.7 — Gently erase (S)
-**As a** player, **I want** to drag over things to remove them, and see them shrink back into the earth, **so that** mistakes feel harmless and still lovely.
-
-Acceptance criteria
-- Erase brush shows a soft circular cursor under the finger.
-- Stones, flowers, and trees inside the brush shrink and sink away, with a small puff of soil or leaves.
-- Partially erased paths and beds update cleanly. Edge grass grows back.
-
-Demo script: erase half of a path and a corner of a flower bed.
+- Erase brush with a soft cursor. Things inside shrink and sink back into the earth with a little puff. The grass grows back and wildflowers return to the empty grass.
 
 ---
 
 ### Story 1.8 — My garden is still here + a seed sprouting (S)
-**As a** player, **I want** my garden to be saved automatically and to greet me with a charming loading moment, **so that** I can come back and relax.
+- Versioned, compact save format (features + seeds). Autosaves after every change, and the garden rebuilds exactly on reload with a staggered "regrow" animation.
+- Loading screen: a small seed sprouting while assets and shaders warm up, then a soft fade into the world.
+- A "New garden" option behind a long-press, with confirmation.
 
-Acceptance criteria
-- Versioned, compact save format (features + seeds, not meshes). Autosaves after every change.
-- On reload, the garden rebuilds **exactly**, with a quick staggered "regrow" animation.
-- Loading screen: a small seed sprouting into a leaf while assets and shaders warm up, then a soft fade into the world.
-- A small "New garden" option (behind a long-press or a tiny menu, with confirmation).
-
-Demo script: build something, close Safari, reopen it from the home screen.
-
-**🎉 MVP complete: a playable, beautiful garden toy.**
+**🎉 MVP complete: a cozy, playable flower garden.**
 
 ---
 
 ## Milestone 2 — More to build
 
 ### Story 2.1 — Hedges and wooden fences that build themselves (L)
-**As a** player, **I want** to draw a line and watch a fence build itself post by post (or a hedge grow along it), **so that** I can shape spaces.
+- Draw a line: the fence builds post by post (weathered wood) or a hedge grows along it. Corners are detected automatically, and **gates** appear where a path crosses.
 
-- Fence: posts land one by one, then rails slide in. Weathered, slightly irregular wood.
-- Corners are detected automatically (sharp turns get corner posts). **Gates** appear automatically where a path crosses.
-- Hedge variant: a leafy volume that grows up along the line, with soft, rounded tops.
-- Toolbar gets a "Fence/Hedge" tool with a small style toggle.
-
-### Story 2.2 — A little pond (L)
-**As a** player, **I want** to tap or paint a pond, **so that** my garden has water.
-
-- Terrain dips into an organic pond shape with a pebbled shoreline.
-- Stylized water: soft reflections of the sky and trees, depth tint, gentle shoreline foam, idle ripples.
-- Paths that run into a pond get stepping stones across it.
+### Story 2.2 — Rocks and boulders (S)
+- Tap to place procedurally unique rocks and boulder clusters that settle with a thud. Moss grows on them over time.
 
 ### Story 2.3 — Stone walls that crumble charmingly (M)
-- Drawn like a fence. Stacked, irregular stones. The ends taper and crumble, with a few loose stones on the ground.
+- Stacked irregular stones, with ends that taper and crumble.
 
-### Story 2.4 — Garden props: bench, lantern (M)
-- Tap to place. Props auto-orient sensibly (benches face paths or ponds). Procedural variation in wear and color.
-- A "props drawer" opens from the toolbar.
+### Story 2.4 — Garden props: bench, lantern, birdhouse (M)
+- Tap to place. Props auto-orient sensibly (benches face paths or the pond). A "props drawer" opens from the toolbar.
 
 ### Story 2.5 — Gazebo and arched bridge (L)
-- Gazebo: a procedural little structure that assembles itself piece by piece.
-- Bridge: drag across a pond (or a path over water) and an arched bridge builds itself span by span.
+- A gazebo that assembles itself. An arched bridge that builds itself across a pond.
 
 ### Story 2.6 — Undo (S)
-- An undo button (and maybe a two-finger tap) that reverses the last action with a reverse animation.
 
 ---
 
 ## Milestone 3 — A living world
 
-### Story 3.1 — Wind you can see (M)
-- Global gust system: rolling waves of wind sweep across the meadow, and grass, flowers, and trees respond together.
-- Occasional petals and leaves carried on the breeze.
+### Story 3.1 — Air you can feel: flags and wind chimes (M)
+- Place a **flag/pennant**: cloth simulation driven by `WindField.sample()`. It streams out in a gust, droops and settles in the calm, then lifts again.
+- Place **wind chimes** (on the cottage eaves or a post): the tubes swing with the local wind and **ring** when they touch, with sound from Web Audio, pitched by tube length.
+- Optional: wind visualized by drifting leaves and petals that ride the gusts.
 
-### Story 3.2 — The garden reacts to itself (L)
-- **Water** grows reeds, cattails, and lily pads.
-- **Shade** under trees grows ferns and mushrooms.
-- **Stones** (path, walls) slowly gather moss.
-- Changes appear gradually over time (seconds to minutes), so returning to the game feels rewarding.
+### Story 3.2 — Wildflowers reclaim empty grass (M)
+- Untended meadow slowly fills with seasonal wildflowers. Built areas push them back, and erased areas invite them in again.
+- Shade under the forest edge grows ferns and mushrooms, and stones gather moss.
 
 ### Story 3.3 — Creatures (L)
-- Butterflies and bees drift between blooms (they're attracted to flower beds).
-- Birds land on fences, hop, and fly off when you build nearby.
-- Dragonflies skim the ponds and touch down with a ripple. Fish jump occasionally.
+- Butterflies and bees drift between blooms. Birds land on fences and the cottage roof. Dragonflies skim the pond.
 
 ### Story 3.4 — Vines and climbing roses (M)
-- Over time, vines creep along fences, walls, and the gazebo, and roses bloom on them.
+- Vines creep along fences, walls and the cottage, and roses bloom on them.
 
 ---
 
-## Milestone 4 — Time, seasons, and weather
+## Milestone 4 — A world of flowers, through the real seasons
 
-### Story 4.1 — Time of day (L)
-- A thumb-friendly sun dial or slider: dawn mist → golden afternoon → deep-blue dusk → night.
-- Lighting, sky, fog, shadows, and color grading are all keyed to the time.
+### Story 4.1 — A huge flower collection (L)
+- Grow the collection to **50+ species**, with a data-driven species definition (shape generator, palettes, height, bloom seasons). No vegetables or utility plants.
+- A beautiful **flower book** to browse and pick species, sorted by "blooming now".
 
-### Story 4.2 — Night magic (M)
-- Lanterns glow with bloom, fireflies rise from the grass, stars fade in, and the moon rises.
+### Story 4.2 — Real seasons, beautifully (L)
+- Seasons already follow the real date (from 1.1). Add the full feel: **spring** cherry blossoms and drifting petals, **summer** lush and buzzing, **autumn** amber leaves falling and gathering, **winter** quiet snowfall, frosted hedges and snow on the roof, with glowing windows.
+- Flowers change with the season: some bloom, some fade to seed heads, some rest.
+- A hidden "peek at another season" toggle, for fun and screenshots.
 
-### Story 4.3 — Seasons (L)
-- One tap cycles the season, with a beautiful transition.
-- Spring: cherry blossoms and drifting petals. Summer: lush. Autumn: amber leaves falling and piling up. Winter: quiet snowfall, frosted hedges, glowing gazebo windows.
+### Story 4.3 — Time of day (L)
+- A thumb-friendly sun dial: dawn mist → golden afternoon → dusk → night.
 
-### Story 4.4 — Weather (L)
-- Soft rain with pond ripples and wet, shiny stones. Rolling fog banks. Clouds with sunbeams breaking through.
-- Weather is chosen manually and also drifts gently on its own.
+### Story 4.4 — Night magic (M)
+- The cottage windows and lanterns glow, fireflies rise, and stars come out.
+
+### Story 4.5 — Weather (L)
+- Soft rain with pond ripples and wet, shiny stones. Rolling fog. Sunbeams through clouds.
 
 ---
 
 ## Milestone 5 — Sound
 
 ### Story 5.1 — Ambient soundscape (M)
-- Layered birdsong, wind, rain, and night crickets that cross-fade with the time of day and weather.
-- Audio unlocks on the first touch. A mute toggle is available.
+- Birdsong, wind that follows the gust envelope, rain, night crickets, and a crackle from the chimney.
 
 ### Story 5.2 — Satisfying build sounds (M)
-- Soft pops, rustles, stone clacks, and wood knocks, with randomized pitch so they never sound repetitive.
-- Sounds are spatialized by screen position.
+- Soft pops, rustles, stone clacks, water plops, and fish splashes.
 
 ---
 
 ## Milestone 6 — Share, polish, ship
 
 ### Story 6.1 — Share my garden as a link (M)
-- The share button compresses the save into a URL (iOS share sheet via `navigator.share`).
-- Opening the link rebuilds the garden exactly, with a "regrow" intro. It never overwrites the recipient's own garden without asking.
-
-### Story 6.2 — Admire mode (S)
-- One tap hides the UI and starts a slow cinematic orbit with a gentle depth-of-field pull, made for screenshots.
-
-### Story 6.3 — Home-screen app (S)
-- PWA manifest, icon, splash screen, and status-bar styling. Works offline after the first load.
-
-### Story 6.4 — Stays smooth everywhere (M)
-- Automatic quality tiers (resolution scale, shadow quality, grass density, post-FX) driven by measured frame time, scaling smoothly instead of stuttering.
-
+### Story 6.2 — Admire mode: a slow cinematic orbit with no UI (S)
+### Story 6.3 — Home-screen app: PWA manifest, icon, offline support (S)
+### Story 6.4 — Stays smooth everywhere: automatic quality tiers (M)
 ### Story 6.5 — The "wow" first 10 seconds (M)
-- First launch with an empty save: the camera drifts in over a pre-seeded starter garden, wind sweeps through, and a butterfly passes by. Then a soft hint invites you to draw.
-- An overall polish pass across all the moments that feel flat.
 
 ---
 
 ## Parking lot (ideas to revisit)
-- Haptics (iOS Safari has limited vibration support; we'll investigate what's possible).
-- More plant palettes and tree species.
+- Haptics (iOS Safari has limited vibration support).
 - Photo mode with filters and a frame.
-- Larger or expandable garden plots.
+- Expandable clearing (push the forest back as the garden grows).
+- Decorative tree placement (removed from the MVP: the collection is flowers).

@@ -1,0 +1,314 @@
+import * as THREE from 'three';
+import { createRng, lerp } from '../core/random';
+import type { WindField } from '../render/wind';
+import type { SeasonPalette } from './season';
+
+const W = 4.6; // wall length (along local x)
+const D = 3.4; // wall depth (along local z)
+const WALL_H = 2.3;
+const BASE_H = 0.45;
+const ROOF_RISE = 1.75;
+const COTTAGE_SCALE = 1.45;
+
+const lambert = (color: string, extra: THREE.MeshLambertMaterialParameters = {}) =>
+  new THREE.MeshLambertMaterial({ color, ...extra });
+
+/** A small storybook cottage, built from simple procedural pieces with hand-placed charm. */
+export class Cottage {
+  readonly group = new THREE.Group();
+  private readonly smoke: Smoke;
+  private readonly yaw: number;
+
+  constructor(
+    readonly position: THREE.Vector3,
+    yaw: number,
+    palette: SeasonPalette,
+    seed: number,
+  ) {
+    this.yaw = yaw;
+    const rng = createRng(seed);
+    const g = this.group;
+    g.position.copy(position);
+    g.rotation.y = yaw;
+    g.scale.setScalar(COTTAGE_SCALE);
+
+    const plaster = lambert('#f1e3c8');
+    const timber = lambert('#5e412d');
+    const stone = lambert('#a29a8d');
+    const roof = lambert('#a65a41');
+    const roofDark = lambert('#8f4935');
+    const shutter = lambert('#6e9896');
+    const glass = new THREE.MeshLambertMaterial({ color: '#3a2a1a', emissive: '#ffbf6e', emissiveIntensity: 1.6 });
+    const trim = lambert('#efe6d6');
+
+    const box = (w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number, shadow = true) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = shadow;
+      mesh.receiveShadow = true;
+      g.add(mesh);
+      return mesh;
+    };
+
+    // Stone plinth with a few chunky cobbles around it.
+    box(W + 0.35, BASE_H, D + 0.35, stone, 0, BASE_H / 2 - 0.05, 0);
+    const cobbleGeo = new THREE.DodecahedronGeometry(1, 0);
+    for (let i = 0; i < 46; i++) {
+      const side = i % 4;
+      const t = rng() - 0.5;
+      const x = side < 2 ? t * (W + 0.3) : (side === 2 ? -1 : 1) * (W / 2 + 0.2);
+      const z = side < 2 ? (side === 0 ? -1 : 1) * (D / 2 + 0.2) : t * (D + 0.3);
+      const s = lerp(0.1, 0.2, rng());
+      const c = new THREE.Mesh(cobbleGeo, lambert(['#9f978a', '#b2a998', '#8d867b'][i % 3], { flatShading: true }));
+      c.position.set(x, lerp(0.05, BASE_H - 0.05, rng()), z);
+      c.scale.set(s * 1.3, s, s);
+      c.rotation.set(rng() * 3, rng() * 3, rng() * 3);
+      c.castShadow = true;
+      g.add(c);
+    }
+
+    // Walls.
+    const wallY = BASE_H + WALL_H / 2;
+    box(W, WALL_H, D, plaster, 0, wallY, 0);
+
+    // Gable ends: a triangular prism spanning the width (ridge runs along x).
+    const tri = new THREE.Shape();
+    tri.moveTo(-D / 2, 0);
+    tri.lineTo(D / 2, 0);
+    tri.lineTo(0, ROOF_RISE);
+    tri.closePath();
+    const gableGeo = new THREE.ExtrudeGeometry(tri, { depth: W, bevelEnabled: false });
+    gableGeo.translate(0, 0, -W / 2);
+    gableGeo.rotateY(Math.PI / 2);
+    const gable = new THREE.Mesh(gableGeo, plaster);
+    gable.position.y = BASE_H + WALL_H;
+    gable.castShadow = true;
+    gable.receiveShadow = true;
+    g.add(gable);
+
+    // Half-timbering: corner posts, sill and eave beams, a few braces on the front.
+    const post = 0.16;
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) box(post, WALL_H, post, timber, sx * (W / 2), wallY, sz * (D / 2));
+    }
+    for (const sz of [-1, 1]) {
+      box(W + 0.05, post, post, timber, 0, BASE_H + 0.05, sz * (D / 2));
+      box(W + 0.05, post, post, timber, 0, BASE_H + WALL_H - 0.05, sz * (D / 2));
+    }
+    for (const sx of [-1, 1]) {
+      box(post, post, D + 0.05, timber, sx * (W / 2), BASE_H + WALL_H - 0.05, 0);
+    }
+
+    // Shingled roof: overlapping courses on each slope give it a hand-made texture.
+    const slopeLen = Math.hypot(D / 2 + 0.45, ROOF_RISE + 0.3);
+    const pitch = Math.atan2(ROOF_RISE + 0.3, D / 2 + 0.45);
+    const courses = 6;
+    for (const side of [-1, 1]) {
+      for (let k = 0; k < courses; k++) {
+        const along = (k + 0.5) / courses; // 0 = eave, 1 = ridge
+        const mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(W + 0.8, 0.12, slopeLen / courses + 0.12),
+          k % 2 === 0 ? roof : roofDark,
+        );
+        const zEave = side * (D / 2 + 0.45);
+        const yEave = BASE_H + WALL_H - 0.3;
+        mesh.position.set(
+          (rng() - 0.5) * 0.04,
+          yEave + Math.sin(pitch) * slopeLen * along + 0.06 * (courses - k) * 0.15,
+          zEave - side * Math.cos(pitch) * slopeLen * along,
+        );
+        mesh.rotation.x = side * pitch;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        g.add(mesh);
+      }
+    }
+    box(W + 0.9, 0.16, 0.22, timber, 0, BASE_H + WALL_H + ROOF_RISE + 0.05, 0); // ridge
+
+    // Front (+z): a door and two windows with shutters and flower boxes.
+    const front = D / 2 + 0.03;
+    box(0.95, 1.7, 0.1, lambert('#7c4f33'), -0.55, BASE_H + 0.85, front);
+    box(1.15, 0.12, 0.14, timber, -0.55, BASE_H + 1.76, front);
+    box(1.1, 0.12, 0.7, stone, -0.55, BASE_H - 0.12, front + 0.35); // doorstep
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), lambert('#d8b46a'));
+    knob.position.set(-0.2, BASE_H + 0.85, front + 0.08);
+    g.add(knob);
+
+    const flowers = palette.wildflowers.map((c) => new THREE.Color(c));
+    const windowAt = (x: number, y: number, z: number, rotY: number, withBox: boolean) => {
+      const w = new THREE.Group();
+      w.position.set(x, y, z);
+      w.rotation.y = rotY;
+      const add = (geo: THREE.BufferGeometry, mat: THREE.Material, px: number, py: number, pz: number) => {
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(px, py, pz);
+        m.castShadow = true;
+        w.add(m);
+        return m;
+      };
+      add(new THREE.BoxGeometry(0.8, 0.85, 0.06), glass, 0, 0, 0);
+      add(new THREE.BoxGeometry(0.92, 0.08, 0.1), trim, 0, 0.46, 0.02);
+      add(new THREE.BoxGeometry(0.92, 0.08, 0.1), trim, 0, -0.46, 0.02);
+      add(new THREE.BoxGeometry(0.05, 0.85, 0.08), trim, 0, 0, 0.03);
+      add(new THREE.BoxGeometry(0.8, 0.05, 0.08), trim, 0, 0, 0.03);
+      for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.36, 0.9, 0.05), shutter, sx * 0.62, 0, 0.04);
+      if (withBox) {
+        add(new THREE.BoxGeometry(0.95, 0.2, 0.26), lambert('#7a5236'), 0, -0.6, 0.14);
+        const bloom = new THREE.IcosahedronGeometry(0.075, 0);
+        for (let i = 0; i < 9; i++) {
+          const m = new THREE.Mesh(bloom, lambert('#fff', { color: flowers[i % flowers.length] }));
+          m.position.set(lerp(-0.4, 0.4, i / 8), -0.46 + rng() * 0.06, 0.1 + (rng() - 0.5) * 0.12);
+          w.add(m);
+        }
+        for (let i = 0; i < 7; i++) {
+          const leaf = new THREE.Mesh(bloom, lambert('#5f8a3e'));
+          leaf.position.set(lerp(-0.38, 0.38, i / 6), -0.5, 0.2);
+          leaf.scale.setScalar(1.2);
+          w.add(leaf);
+        }
+      }
+      g.add(w);
+    };
+    windowAt(1.15, BASE_H + 1.25, front, 0, true);
+    windowAt(-W / 2 - 0.03, BASE_H + 1.25, 0, -Math.PI / 2, true);
+    windowAt(W / 2 + 0.03, BASE_H + 1.25, 0, Math.PI / 2, false);
+    windowAt(0.9, BASE_H + 1.3, -front, Math.PI, false);
+
+    // Lantern by the door.
+    const lantern = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.22, 0.16),
+      new THREE.MeshLambertMaterial({ color: '#2b2118', emissive: '#ffb45c', emissiveIntensity: 2.2 }),
+    );
+    lantern.position.set(0.12, BASE_H + 1.55, front + 0.12);
+    g.add(lantern);
+
+    // Chimney through the right side of the roof.
+    const chimX = W / 2 - 0.75;
+    const chimTop = BASE_H + WALL_H + ROOF_RISE + 0.75;
+    box(0.62, chimTop - BASE_H - WALL_H + 0.2, 0.62, stone, chimX, (chimTop + BASE_H + WALL_H) / 2, -0.55);
+    box(0.74, 0.14, 0.74, lambert('#8d867b'), chimX, chimTop, -0.55);
+
+    const chimneyLocal = new THREE.Vector3(chimX, chimTop + 0.1, -0.55);
+    this.group.updateMatrixWorld(true);
+    this.smoke = new Smoke(this.group.localToWorld(chimneyLocal.clone()), seed + 3);
+  }
+
+  get smokePoints(): THREE.Points {
+    return this.smoke.points;
+  }
+
+  /** True if (x, z) is within the cottage footprint plus `margin`. */
+  contains(x: number, z: number, margin = 0): boolean {
+    const dx = x - this.position.x;
+    const dz = z - this.position.z;
+    const c = Math.cos(-this.yaw);
+    const s = Math.sin(-this.yaw);
+    const lx = dx * c + dz * s;
+    const lz = -dx * s + dz * c;
+    return Math.abs(lx) < (W / 2 + 0.5) * COTTAGE_SCALE + margin && Math.abs(lz) < (D / 2 + 0.5) * COTTAGE_SCALE + margin;
+  }
+
+  update(dt: number, wind: WindField) {
+    this.smoke.update(dt, wind);
+  }
+
+  setPixelRatio(pr: number) {
+    this.smoke.setPixelRatio(pr);
+  }
+}
+
+/** Soft chimney smoke. Particles rise, swell, and lean with whatever the wind is doing. */
+class Smoke {
+  readonly points: THREE.Points;
+  private readonly count = 34;
+  private readonly age: Float32Array;
+  private readonly life: Float32Array;
+  private readonly vel: Float32Array;
+  private readonly pos: Float32Array;
+  private readonly alpha: Float32Array;
+  private readonly size: Float32Array;
+  private readonly rng: () => number;
+
+  constructor(private readonly origin: THREE.Vector3, seed: number) {
+    this.rng = createRng(seed);
+    const n = this.count;
+    this.age = new Float32Array(n);
+    this.life = new Float32Array(n);
+    this.vel = new Float32Array(n * 3);
+    this.pos = new Float32Array(n * 3);
+    this.alpha = new Float32Array(n);
+    this.size = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      this.respawn(i);
+      this.age[i] = this.rng() * this.life[i]; // start mid-plume
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+    geo.setAttribute('aAlpha', new THREE.BufferAttribute(this.alpha, 1));
+    geo.setAttribute('aSize', new THREE.BufferAttribute(this.size, 1));
+    const mat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      uniforms: { uPixelRatio: { value: 1 }, uColor: { value: new THREE.Color('#efe8e0') } },
+      vertexShader: /* glsl */ `
+        uniform float uPixelRatio;
+        attribute float aAlpha, aSize;
+        varying float vAlpha;
+        void main() {
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mv;
+          gl_PointSize = aSize * uPixelRatio * (320.0 / -mv.z);
+          vAlpha = aAlpha;
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uColor;
+        varying float vAlpha;
+        void main() {
+          float d = length(gl_PointCoord - 0.5);
+          float a = smoothstep(0.5, 0.1, d);
+          gl_FragColor = vec4(uColor, a * vAlpha);
+        }`,
+    });
+    this.points = new THREE.Points(geo, mat);
+    this.points.frustumCulled = false;
+  }
+
+  private respawn(i: number) {
+    this.age[i] = 0;
+    this.life[i] = lerp(4, 7, this.rng());
+    this.pos[i * 3] = this.origin.x + (this.rng() - 0.5) * 0.2;
+    this.pos[i * 3 + 1] = this.origin.y;
+    this.pos[i * 3 + 2] = this.origin.z + (this.rng() - 0.5) * 0.2;
+    this.vel[i * 3] = (this.rng() - 0.5) * 0.1;
+    this.vel[i * 3 + 1] = lerp(0.45, 0.7, this.rng());
+    this.vel[i * 3 + 2] = (this.rng() - 0.5) * 0.1;
+  }
+
+  update(dt: number, wind: WindField) {
+    for (let i = 0; i < this.count; i++) {
+      this.age[i] += dt;
+      if (this.age[i] > this.life[i]) this.respawn(i);
+      const k = i * 3;
+      const w = wind.sample(this.pos[k], this.pos[k + 2]);
+      // Ease toward the local wind; smoke is light, so it follows gusts quickly.
+      const push = 0.6 + this.pos[k + 1] * 0.05;
+      this.vel[k] += (wind.direction.x * w * 1.6 * push - this.vel[k]) * dt * 0.8;
+      this.vel[k + 2] += (wind.direction.y * w * 1.6 * push - this.vel[k + 2]) * dt * 0.8;
+      this.vel[k + 1] *= 1 - dt * 0.08;
+      this.pos[k] += this.vel[k] * dt;
+      this.pos[k + 1] += this.vel[k + 1] * dt;
+      this.pos[k + 2] += this.vel[k + 2] * dt;
+      const t = this.age[i] / this.life[i];
+      this.alpha[i] = Math.min(1, t * 6) * (1 - t) * 0.55;
+      this.size[i] = lerp(0.35, 1.6, Math.sqrt(t));
+    }
+    const geo = this.points.geometry;
+    geo.attributes.position.needsUpdate = true;
+    geo.attributes.aAlpha.needsUpdate = true;
+    geo.attributes.aSize.needsUpdate = true;
+  }
+
+  setPixelRatio(pr: number) {
+    (this.points.material as THREE.ShaderMaterial).uniforms.uPixelRatio.value = pr;
+  }
+}
