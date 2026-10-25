@@ -32,11 +32,12 @@ export class TouchMarker {
         varying vec2 vUv;
         void main() {
           float d = length(vUv - 0.5) * 2.0;
-          float ringR = mix(0.62, 0.98, uRipple);
-          float ring = smoothstep(0.16, 0.0, abs(d - ringR));
-          float fill = smoothstep(0.75, 0.0, d) * 0.1 * (1.0 - uRipple);
+          float ringR = mix(0.6, 0.95, uRipple);
+          float ring = smoothstep(0.1, 0.0, abs(d - ringR));
+          // A tiny bright centre: a glint at the fingertip, not an area.
+          float fill = smoothstep(0.3, 0.0, d) * 0.55 * (1.0 - uRipple);
           float breathe = 0.9 + 0.1 * sin(uTime * 4.0);
-          float a = (ring * breathe + fill) * uOpacity * (1.0 - uRipple * 0.9);
+          float a = (ring * breathe * 0.8 + fill) * uOpacity * (1.0 - uRipple * 0.9);
           gl_FragColor = vec4(uColor * 1.2, a);
         }`,
     });
@@ -69,7 +70,7 @@ export class TouchMarker {
   /** @param viewDistance camera distance, so the ring stays fingertip-sized at any zoom */
   update(dt: number, viewDistance: number) {
     if (!this.mesh.visible) return;
-    this.radius = viewDistance * 0.042;
+    this.radius = viewDistance * 0.017;
     this.uniforms.uTime.value += dt;
     this.mesh.position.lerp(this.target, 1 - Math.exp(-dt * 18));
     this.mesh.position.y = this.target.y + 0.04;
@@ -82,7 +83,7 @@ export class TouchMarker {
       if (o.value <= 0) this.mesh.visible = false;
     }
     this.uniforms.uRipple.value = this.active ? 0 : this.ripple;
-    const s = this.radius * (1 + (this.active ? 0 : this.ripple * 0.6));
+    const s = this.radius * (1 + (this.active ? 0 : this.ripple * 0.45));
     this.mesh.scale.set(s, 1, s);
   }
 }
