@@ -197,9 +197,6 @@ body {
   left: 0;
   right: 0;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
-  display: flex;
-  gap: 10px;
-  padding: 10px 16px 6px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -213,6 +210,13 @@ body {
 }
 .flower-picker::-webkit-scrollbar {
   display: none;
+}
+.flower-picker-row {
+  display: flex;
+  gap: 10px;
+  width: max-content;
+  margin: 0 auto; /* centred when it fits; scrolls from the left edge when it doesn't */
+  padding: 10px 16px 6px;
 }
 .flower-picker.show {
   opacity: 1;
@@ -284,4 +288,21 @@ body.picking .tool-label {
 }
 body.picking .sound-hint {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 230px);
+}
+
+/* Tablets and wider: chips wrap into centred rows instead of a long sideways scroll. */
+@media (min-width: 700px) {
+  .flower-picker-row {
+    flex-wrap: wrap;
+    justify-content: center;
+    width: auto;
+    max-width: min(92vw, 820px);
+    row-gap: 6px;
+  }
+  body.picking .tool-label {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 270px);
+  }
+  body.picking .sound-hint {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 314px);
+  }
 }

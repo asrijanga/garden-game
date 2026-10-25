@@ -70,6 +70,10 @@ export class FlowerPicker {
   ) {
     this.el = document.createElement('div');
     this.el.className = 'flower-picker';
+    // The row centres itself when it fits (iPad), and scrolls sideways when it doesn't (iPhone).
+    const row = document.createElement('div');
+    row.className = 'flower-picker-row';
+    this.el.append(row);
     const entries: [string, string, FlowerSpecies | null, boolean][] = [
       [MIX_ID, 'Seasonal mix', null, true],
       ...species.map((s) => [s.id, s.name, s, inSeason(s)] as [string, string, FlowerSpecies, boolean]),
@@ -87,7 +91,7 @@ export class FlowerPicker {
         this.onPick(id, blooming ? `${label}: blooming now` : `${label}: buds until its season`);
       });
       this.chips.set(id, b);
-      this.el.append(b);
+      row.append(b);
     }
     document.body.append(this.el);
     this.select(MIX_ID);

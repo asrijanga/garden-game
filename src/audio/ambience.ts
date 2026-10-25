@@ -54,6 +54,15 @@ export class Ambience {
       void this.ctx.resume();
       return;
     }
+    // iPhone/iPad: play like media, so Silent Mode doesn't mute the garden (Safari 16.4+).
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+    if (session) {
+      try {
+        session.type = 'playback';
+      } catch {
+        /* older WebKit: ignore */
+      }
+    }
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new Ctx();
     this.ctx = ctx;
@@ -134,6 +143,7 @@ export class Ambience {
 
   setMuted(muted: boolean) {
     this.muted = muted;
+    this.ensureRunning(); // unmuting after the page was hidden must wake the audio too
     this.applyMute(0.6);
   }
 
@@ -240,6 +250,14 @@ export class Ambience {
 
   resume() {
     if (this.ctx && !this.muted) void this.ctx.resume();
+  }
+
+  /**
+   * iOS can pause audio at any time (app switch, lock screen, calls) and only lets us restart it
+   * from a touch, so every touch checks and wakes it if needed.
+   */
+  ensureRunning() {
+    if (this.ctx && !this.muted && this.ctx.state !== 'running') void this.ctx.resume();
   }
 
   /**

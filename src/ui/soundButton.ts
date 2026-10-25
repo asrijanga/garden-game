@@ -23,7 +23,8 @@ function writeMuted(muted: boolean) {
 
 /**
  * Sound toggle (top-right, out of the way of the thumb zone) plus a soft one-time hint.
- * The very first touch anywhere starts the ambience, as iOS requires.
+ * The first touch anywhere starts the ambience (iOS requires a gesture), and later touches
+ * wake it if iOS paused it.
  */
 export function mountSoundControls(ambience: Ambience) {
   let muted = readMuted();
@@ -45,19 +46,24 @@ export function mountSoundControls(ambience: Ambience) {
   document.body.append(button);
   requestAnimationFrame(() => hint.classList.add('show'));
 
-  const startAudio = () => {
+  let hintGone = false;
+  const onGesture = () => {
     if (!ambience.started) {
       ambience.start();
       ambience.setMuted(muted);
     } else {
-      ambience.resume();
+      // iOS may have paused audio since (app switch, lock screen): every touch wakes it again.
+      ambience.ensureRunning();
     }
-    hint.classList.remove('show');
-    setTimeout(() => hint.remove(), 800);
+    if (!hintGone) {
+      hintGone = true;
+      hint.classList.remove('show');
+      setTimeout(() => hint.remove(), 800);
+    }
   };
-  // iOS unlocks audio on touchend/click; pointerup covers everything else.
-  for (const type of ['touchend', 'pointerup', 'click']) {
-    window.addEventListener(type, startAudio, { once: true, capture: true });
+  // iPhone/iPad allow audio to start only from these gestures; listen on every one, not just the first.
+  for (const type of ['touchend', 'pointerup', 'click', 'keydown']) {
+    window.addEventListener(type, onGesture, { capture: true });
   }
 
   button.addEventListener('pointerdown', (e) => e.stopPropagation());
