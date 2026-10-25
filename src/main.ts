@@ -6,6 +6,7 @@ import { CameraRig } from './core/cameraRig';
 import { Cottage } from './world/cottage';
 import { createGrass, createWildflowers } from './world/grass';
 import { createMotes } from './world/motes';
+import { FlyingBirds } from './world/flyingBirds';
 import { currentSeason, PALETTES } from './world/season';
 import { WindField, bindWind } from './render/wind';
 import { PostFX } from './render/post';
@@ -80,6 +81,10 @@ const blocked = (x: number, z: number) => cottage.contains(x, z, -0.3);
 scene.add(createGrass(ground, isSmallGpu ? 34000 : 48000, WORLD_SEED + 10, blocked));
 scene.add(createWildflowers(ground, palette.wildflowers, 1600, WORLD_SEED + 11, (x, z) => cottage.contains(x, z, 0.4)));
 
+const debug = new URLSearchParams(location.search).has('debug');
+const flyingBirds = new FlyingBirds((x, z) => ground.heightAt(x, z), 60, debug ? 2 : 15);
+scene.add(flyingBirds.mesh);
+
 const motes = createMotes(140, WORLD_SEED + 12);
 scene.add(motes);
 
@@ -98,7 +103,7 @@ function fitDistance(aspect: number): number {
 // --- Sound: the wind you can hear ------------------------------------------------------------
 const ambience = new Ambience(season);
 mountSoundControls(ambience);
-if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { ambience, wind });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds });
 
 // --- Post-processing ----------------------------------------------------------------------
 const post = new PostFX(renderer, scene, camera);
@@ -134,6 +139,7 @@ function frame(time: number) {
 
   wind.update(dt);
   cottage.update(dt, wind);
+  flyingBirds.update(dt);
   (motes.material as THREE.ShaderMaterial).uniforms.uTime.value = elapsed;
   rig.update(dt);
   ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));

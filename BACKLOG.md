@@ -10,13 +10,13 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current story:** 1.2 — Hear the wind (built, awaiting review). Next: 1.4 toolbar.
+**Current story:** Birds overhead (small add-on, awaiting review). Next: 1.4 toolbar.
 **Preview URL:** https://asrijanga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
 |---|---|---|
 | 1.1 A cozy clearing in the forest | ✅ Done | v3: procedural branching trees with leaf-cluster crowns, firs with jagged tiers, birches; tilt-shift blur removed. Wind and mood approved. |
-| 1.2 Hear the wind | 👀 Awaiting feedback | Procedural Web Audio: air bed, gust whoosh, canopy rush, leaf flurries, all driven by the wind field at the view centre. A whisper (calm about −40 dBFS) plus rare distant synthesised birdsong, seasonal pace. Limiter, 4 s fade-in. Sound toggle top-right (remembered) and a one-time hint. |
+| 1.2 Hear the wind | ✅ Done | Procedural Web Audio: air bed, gust whoosh, canopy rush, leaf flurries, all driven by the wind field at the view centre. A whisper (calm about −40 dBFS) plus rare distant synthesised birdsong, seasonal pace. Limiter, 4 s fade-in. Sound toggle top-right (remembered) and a one-time hint. |
 | 1.3 Hold the world in my hand | ✅ Done | Pulled forward (player asked to zoom). Pinch zoom, drag pan, twist rotate, inertia; camera lowers as you zoom in. |
 | 1.4 Thumb-reach toolbar | ⬜ Not started | |
 | 1.5 Draw a winding path | ⬜ Not started | |
@@ -31,6 +31,7 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **1.2 review 3:** "This is beautiful sound." 1.2 done. *Request:* random birds flying in and out of frame, very rare: small beautiful birds or a flock. → Built as 1.2b (`FlyingBirds`): a songbird, a pair, or a 5–9 bird loose V-flock on a curved path at 14–28 m, flap/glide cycles, banking, soft shadows, storybook scale (2.1×), every 30–75 s (first after about 15 s).
 - **Grass review 2 (real iPhone screenshot):**
   - *Feedback:* No blades, but the grass looks honestly horrible (on device, thin blades aliased into scratchy hatching and the meadow looked blotchy).
   - *Changes:* Painterly lawn. Ground carries the lawn colour (no dark soil showing). Blade colour is within ±6% of the ground, with only slightly lighter, warmer tips. Tufts of 3 broader, soft blades (no shimmering lines). Broad, gentle colour drifts only. Fresher seasonal meadow greens. Softer wind sheen.
@@ -264,6 +265,7 @@ Demo script: draw a pond next to the path and wait for the first fish to jump.
 
 ### Story 3.3 — Creatures (L)
 - Butterflies and bees drift between blooms. Birds land on fences and the cottage roof. Dragonflies skim the pond.
+- *(Birds flying across the sky were already pulled forward as 1.2b.)*
 
 ### Story 3.4 — Vines and climbing roses (M)
 - Vines creep along fences, walls and the cottage, and roses bloom on them.
