@@ -12,6 +12,14 @@ const GRAVEL_RADIUS = 0.9; // painted gravel; its edge sits under the edging
 const CURB_OFFSET = 0.62; // centre line → edging stone centre
 const INSIDE = CURB_OFFSET - 0.1; // closer than this to a centre line = inside that path
 const CELL = 1; // spatial hash for path centre lines
+const FLARE_START = 2.4; // junction curve begins this far from another path's centre line…
+const FLARE_FULL = 0.75; // …and is fully flared by here
+
+/** Smoothstep from a (0) to b (1); works with a > b. */
+const smooth = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
 
 const STONE_TONES = ['#d6cfc3', '#cdc5b7', '#dcd4c6', '#c8c1b5', '#d2c8b6'];
 const CURB_TONES = ['#b4ab9d', '#aaa294', '#bab1a2', '#a59d91', '#bdb6a8', '#9f988c'];
@@ -104,14 +112,21 @@ export class PathBuilder {
     }
     this.active?.points.push({ x: w.x, z: w.y });
     this.addLinePoint(w.x, w.y);
-    this.paint.wear(w.x, w.y, GRAVEL_RADIUS, 1, 1);
-    this.wildflowers.clearNear(w.x, w.y, 1.1);
 
-    // Merging: the old path's edging that now sits inside our gravel is lifted away.
-    this.stones.removeNear(w.x, w.y, INSIDE, 'curb', this.pathId);
+    // Junctions curve: approaching (or leaving) another path, this one gradually flares wider,
+    // so its edging sweeps round in a soft fillet to meet the other path's edge.
+    const toOther = this.distanceTo(w.x, w.y, true, 3);
+    const flare = smooth(FLARE_START, FLARE_FULL, toOther);
+    const gravel = GRAVEL_RADIUS * (1 + flare * 0.9);
+    const curbOffset = CURB_OFFSET * (1 + flare * 1.0);
+    this.paint.wear(w.x, w.y, gravel, 1, 1);
+    this.wildflowers.clearNear(w.x, w.y, 1.1 + flare);
+
+    // Merging: the old path's edging that now sits inside our (flared) gravel is lifted away.
+    this.stones.removeNear(w.x, w.y, INSIDE * (1 + flare), 'curb', this.pathId);
 
     // Centre stones, unless we're running through another path (its stones carry on there).
-    const insideOther = this.distanceTo(w.x, w.y, true) < INSIDE;
+    const insideOther = toOther < INSIDE;
     this.sinceStone += first ? 0 : STEP;
     if ((first || this.sinceStone >= STONE_SPACING) && !insideOther) {
       this.sinceStone = 0;
@@ -129,7 +144,7 @@ export class PathBuilder {
     // so blocks stay evenly spaced round curves.
     const perp = new THREE.Vector2(-this.heading.y, this.heading.x);
     [-1, 1].forEach((side, i) => {
-      const at = w.clone().addScaledVector(perp, side * CURB_OFFSET);
+      const at = w.clone().addScaledVector(perp, side * curbOffset);
       const last = this.lastCurb[i];
       if (!last) {
         this.lastCurb[i] = at;
@@ -147,7 +162,8 @@ export class PathBuilder {
       this.lastCurb[i] = at;
       this.curbTarget[i] = lerp(0.26, 0.46, this.rng());
       // Never inside a path (this one on a tight bend, or another we're merging with).
-      if (this.distanceTo(mid.x, mid.y, false) < INSIDE || this.blocked(mid.x, mid.y)) return;
+      if (this.distanceTo(mid.x, mid.y, false) < INSIDE * (1 + flare * 0.8) || this.blocked(mid.x, mid.y)) return;
+      if (this.distanceTo(mid.x, mid.y, true) < INSIDE) return;
       if (this.rng() < 0.05) return; // the odd missing block, as in any hand-laid edge
       // Hand-laid: nudged in or out, a little twisted, set slightly high or low.
       const nudge = (this.rng() - 0.5) * 0.05;
@@ -178,12 +194,12 @@ export class PathBuilder {
   }
 
   /** Distance to the nearest path centre line (optionally ignoring the path being drawn). */
-  private distanceTo(x: number, z: number, othersOnly: boolean): number {
+  private distanceTo(x: number, z: number, othersOnly: boolean, reach = 1): number {
     let best = Infinity;
     const cx = Math.floor(x / CELL);
     const cz = Math.floor(z / CELL);
-    for (let i = cx - 1; i <= cx + 1; i++) {
-      for (let j = cz - 1; j <= cz + 1; j++) {
+    for (let i = cx - reach; i <= cx + reach; i++) {
+      for (let j = cz - reach; j <= cz + reach; j++) {
         for (const p of this.lines.get(`${i},${j}`) ?? []) {
           if (othersOnly && p.id === this.pathId) continue;
           best = Math.min(best, (p.x - x) ** 2 + (p.z - z) ** 2);
