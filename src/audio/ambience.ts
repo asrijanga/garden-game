@@ -1,15 +1,20 @@
 import { createRng } from '../core/random';
+import type { Season } from '../world/season';
+import { Birds } from './birds';
 
 /**
- * A calm bed of moving air and rustling trees, synthesised with Web Audio (nothing to load).
+ * A very calm bed of air and distant trees, with the occasional bird, synthesised with Web
+ * Audio (nothing to load). The goal is absolute relaxation: it should sit at the edge of
+ * hearing, like a quiet afternoon by an open window.
  *
  * Layers, all driven by the same wind that moves the grass:
  *  - air:    deep, soft brown noise, the constant hush of open air
- *  - gust:   a broad, low "whoosh" that swells as a gust passes and sighs away in the calm
- *  - trees:  the forest canopy answering the gust a moment later
- *  - leaves: delicate high rustle in little flurries, drifting between left and right
+ *  - gust:   the faintest low breath as a gust passes
+ *  - trees:  a distant canopy murmur answering the gust a moment later
+ *  - leaves: a near-silent high rustle (kept almost off: hiss reads as tension)
+ *  - birds:  rare, distant birdsong
  *
- * Every change is smoothed over hundreds of milliseconds, so the volume never spikes.
+ * Every change is smoothed over seconds, so nothing ever jumps out.
  */
 /** Overall loudness. Kept low on purpose: this is background calm, not an effect. */
 const MASTER_VOLUME = 0.3;
@@ -33,6 +38,9 @@ export class Ambience {
   private leafPan = 0;
   private treeLevel = 0;
   private time = 0;
+  private birds: Birds | null = null;
+
+  constructor(private readonly season: Season) {}
   /** Debug/testing: pin the wind input (set via ?debug in the console). */
   override: { envelope: number; local: number } | null = null;
 
@@ -78,7 +86,7 @@ export class Ambience {
     for (const [buf, pan] of [[brown, -0.6], [brown2, 0.6]] as const) {
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = 300;
+      lp.frequency.value = 240;
       const p = ctx.createStereoPanner();
       p.pan.value = pan;
       loop(ctx, buf).connect(lp).connect(p).connect(air);
@@ -120,6 +128,7 @@ export class Ambience {
     loop(ctx, white2).connect(leavesHp).connect(leavesLp).connect(leaves).connect(leavesPan).connect(master);
 
     this.layers = { air, gust, gustFilter, trees, treesPan, leaves, leavesPan };
+    this.birds = new Birds(ctx, master, this.season);
     this.applyMute(4); // slow, gentle fade-in
   }
 
@@ -166,13 +175,14 @@ export class Ambience {
     this.leafPan = Math.sin(this.time * 0.11) * 0.5 + Math.sin(this.time * 0.37 + 2) * 0.2;
 
     // Deliberately understated: a hush that breathes, never weather.
-    L.air.gain.setTargetAtTime(0.13 + envelope * 0.05, now, 2.0);
-    L.gust.gain.setTargetAtTime(gust * gust * 0.2, now, 1.6);
-    L.gustFilter.frequency.setTargetAtTime(300 + gust * 160, now, 2.0);
-    L.trees.gain.setTargetAtTime(0.006 + this.treeLevel * 0.022, now, 1.8);
+    L.air.gain.setTargetAtTime(0.075 + envelope * 0.02, now, 3.0);
+    L.gust.gain.setTargetAtTime(gust * gust * 0.05, now, 2.5);
+    L.gustFilter.frequency.setTargetAtTime(260 + gust * 80, now, 3.0);
+    L.trees.gain.setTargetAtTime(0.002 + this.treeLevel * 0.006, now, 3.0);
     L.treesPan.pan.setTargetAtTime(Math.sin(this.time * 0.07) * 0.3, now, 2.0);
-    L.leaves.gain.setTargetAtTime((0.0012 + this.flurry * 0.006) * (0.4 + envelope), now, 0.4);
+    L.leaves.gain.setTargetAtTime((0.0002 + this.flurry * 0.0008) * (0.4 + envelope), now, 0.8);
     L.leavesPan.pan.setTargetAtTime(this.leafPan, now, 1.0);
+    this.birds?.update();
   }
 }
 

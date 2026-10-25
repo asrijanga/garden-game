@@ -16,7 +16,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | Story | Status | Notes / feedback |
 |---|---|---|
 | 1.1 A cozy clearing in the forest | ✅ Done | v3: procedural branching trees with leaf-cluster crowns, firs with jagged tiers, birches; tilt-shift blur removed. Wind and mood approved. |
-| 1.2 Hear the wind | 👀 Awaiting feedback | Procedural Web Audio: air bed, gust whoosh, canopy rush, leaf flurries, all driven by the wind field at the view centre. Very understated (calm about −35 dBFS, gust about −30 dBFS, about 4 dB swell), heavily low-passed, limiter, 4 s fade-in. Sound toggle top-right (remembered) and a one-time hint. |
+| 1.2 Hear the wind | 👀 Awaiting feedback | Procedural Web Audio: air bed, gust whoosh, canopy rush, leaf flurries, all driven by the wind field at the view centre. A whisper (calm about −40 dBFS) plus rare distant synthesised birdsong, seasonal pace. Limiter, 4 s fade-in. Sound toggle top-right (remembered) and a one-time hint. |
 | 1.3 Hold the world in my hand | ✅ Done | Pulled forward (player asked to zoom). Pinch zoom, drag pan, twist rotate, inertia; camera lowers as you zoom in. |
 | 1.4 Thumb-reach toolbar | ⬜ Not started | |
 | 1.5 Draw a winding path | ⬜ Not started | |
@@ -31,6 +31,9 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **1.2 review 2 (sound):**
+  - *Feedback:* Even calmer: "so calm I should hear the birds chirping once in a while". Right now it makes me tense; it should be absolutely relaxing.
+  - *Changes:* Wind reduced to a whisper (calm about −40 dBFS, gust about −38 dBFS, about 2–3 dB swell; leaf hiss effectively removed; slower 3 s smoothing). Added rare, distant, synthesised **birdsong** (two-note whistle, warble, trill, chirps) with a per-bird voice, random position, a soft forest reverb and occasional answering birds. Paced by the real audio clock: every 7–17 s in spring, 11–27 s in autumn, rarer in winter.
 - **Grass review:**
   - *Feedback:* Grass should be much finer, denser and smaller; it looks like thorns.
   - *Changes:* Single wide blades replaced by tufts of 5 fine blades (about 2.5× the blade count). Height 0.28–0.6 → 0.2–0.38 m. Blades about 6 cm wide with soft rounded tips. Less tilt, gentler root-to-tip contrast and colour variation. Soil under the lawn slightly darker so blades read as texture.
@@ -141,7 +144,7 @@ Demo script: open it on the phone. Watch a gust sweep the grass and the smoke le
 **As a** player, **I want** a calm, soothing bed of wind and rustling trees behind everything, **so that** the garden relaxes me the moment I open it.
 
 - Soft, layered wind ambience: a low airy bed plus treetop "whooshes" that **swell with each gust and fade in the calm**, driven by the same `WindField` envelope the grass uses, so what you hear matches what you see.
-- Leaves rustle gently, panned slightly left and right. No music and no birds yet: just air and trees.
+- Leaves rustle gently, panned slightly left and right. No music. Rare, distant birdsong (added after feedback).
 - Generated with Web Audio (filtered noise), so nothing to download. Starts softly on the first touch (iOS needs a tap to unlock audio). A small mute toggle.
 - Volume never spikes. It should feel like sitting by an open window.
 

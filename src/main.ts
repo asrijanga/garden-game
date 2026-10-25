@@ -96,7 +96,7 @@ function fitDistance(aspect: number): number {
 }
 
 // --- Sound: the wind you can hear ------------------------------------------------------------
-const ambience = new Ambience();
+const ambience = new Ambience(season);
 mountSoundControls(ambience);
 if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { ambience, wind });
 
