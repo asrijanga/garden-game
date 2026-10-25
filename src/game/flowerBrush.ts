@@ -77,7 +77,7 @@ export class FlowerBrush {
     this.wildflowers.clearNear(c.x, c.y, BED_RADIUS);
     // In a mix, neighbouring plants tend to share a species, in soft drifts like a real border.
     let drift = this.pickSpecies();
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 26; i++) {
       if (this.rng() < 0.35) drift = this.pickSpecies();
       const sp = drift;
       const a = this.rng() * Math.PI * 2;
@@ -85,7 +85,7 @@ export class FlowerBrush {
       const x = c.x + Math.cos(a) * r;
       const z = c.y + Math.sin(a) * r;
       if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.85) continue;
-      if (this.flowers.isCrowded(x, z, sp.spacing * FLOWER_SCALE)) continue;
+      if (this.flowers.isCrowded(x, z, sp.spacing * FLOWER_SCALE * 0.8)) continue;
       const base = new THREE.Color(sp.colors[Math.floor(this.rng() * sp.colors.length)]);
       const color = base.offsetHSL((this.rng() - 0.5) * 0.03, (this.rng() - 0.5) * 0.1, (this.rng() - 0.5) * 0.06);
       // The wave: plants further from the stroke sprout a little later.

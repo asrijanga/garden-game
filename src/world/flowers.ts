@@ -104,7 +104,7 @@ function stem(m: FlowerMesh, height: number, lean: THREE.Vector3, rng: () => num
   for (let i = 0; i < leaves; i++) {
     const az = rng() * Math.PI * 2;
     const y = height < 0.26 ? 0.015 + rng() * 0.03 : lerp(0.06, height * 0.5, rng());
-    const len = height < 0.26 ? lerp(0.06, 0.08, rng()) : lerp(0.07, 0.11, rng());
+    const len = height < 0.26 ? lerp(0.09, 0.12, rng()) : lerp(0.1, 0.16, rng());
     const tilt = height < 0.26 ? 0.25 : lerp(0.5, 0.9, rng());
     const d = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
     const dir = d.clone().multiplyScalar(Math.cos(tilt)).add(UP.clone().multiplyScalar(Math.sin(tilt)));
@@ -158,6 +158,9 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
   }
 }
 
+/** Storybook proportions: blooms drawn about twice life size so they read from the garden camera. */
+const HEAD = 2.1;
+
 /** Build one geometry variant of a species. */
 export function flowerGeometry(sp: FlowerSpecies, seed: number): THREE.BufferGeometry {
   const rng = createRng(seed);
@@ -165,7 +168,13 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number): THREE.BufferGeo
   const height = lerp(sp.height[0], sp.height[1], rng());
   const lean = new THREE.Vector3((rng() - 0.5) * 0.06, 0, (rng() - 0.5) * 0.06);
   const top = stem(m, height, lean, rng);
-  const f = sp.form;
+  const base = sp.form;
+  const f: typeof base =
+    base.kind === 'spike'
+      ? { ...base, floretSize: base.floretSize * HEAD, spikeLength: base.spikeLength * 1.5 }
+      : base.kind === 'cup'
+        ? { ...base, length: base.length * HEAD, width: base.width * HEAD }
+        : { ...base, length: base.length * HEAD, width: base.width * HEAD, centerSize: base.centerSize * HEAD };
 
   if (f.kind === 'radial') {
     const n = Math.round(lerp(f.petals[0], f.petals[1], rng()));

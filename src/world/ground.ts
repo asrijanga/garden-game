@@ -143,7 +143,7 @@ function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
         float bedField = paintTex.b + ragged * 1.2;
         float bed = smoothstep(0.32, 0.46, bedField) * (1.0 - earth);
         float crumb = lawnNoise(vWorld.xz * 26.0);
-        vec3 bedSoil = mix(vec3(0.075, 0.05, 0.032), vec3(0.13, 0.09, 0.055), grain) * (0.85 + crumb * 0.3);
+        vec3 bedSoil = mix(vec3(0.15, 0.1, 0.062), vec3(0.23, 0.16, 0.095), grain) * (0.85 + crumb * 0.3);
         bedSoil *= 1.0 - (1.0 - smoothstep(0.46, 0.62, bedField)) * 0.25; // darker turned edge
         diffuseColor.rgb = mix(diffuseColor.rgb, soil, earth);
         diffuseColor.rgb = mix(diffuseColor.rgb, bedSoil, bed);
