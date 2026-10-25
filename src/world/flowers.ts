@@ -214,7 +214,7 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
   const blotch = style.blotch ?? 0;
   const shadeAt = (t: number, edge: number) => {
     const face = blotch > 0 ? lerp(1 - blotch, 1, Math.min(1, Math.max(0, (t - 0.12) / 0.38))) : 1;
-    return lerp(0.78, 1.12, Math.pow(t, 0.7)) * (1 - edge * 0.06) * face;
+    return lerp(0.74, 0.98, Math.pow(t, 0.7)) * (1 - edge * 0.06) * face;
   };
   for (let i = 0; i < rows.length - 1; i++) {
     const [t0, w0] = rows[i];
@@ -281,7 +281,7 @@ export function foliageGeometry(seed: number): THREE.BufferGeometry {
       const [t0, w0] = rows[r];
       const [t1, w1] = rows[r + 1];
       const sh = (t: number) => lerp(0.62, 1.08, t);
-      const o = (a: number, b: number, c: number) => ({ color: WHITE, petal: true, glow: 0.25, hinge: base, axis: UP, close: 0, shade: [a, b, c] as [number, number, number] });
+      const o = (a: number, b: number, c: number) => ({ color: WHITE, petal: true, glow: 0.1, hinge: base, axis: UP, close: 0, shade: [a, b, c] as [number, number, number] });
       m.tri(at(t0, -w0), at(t1, -w1), at(t1, w1), o(sh(t0), sh(t1), sh(t1)));
       m.tri(at(t0, -w0), at(t1, w1), at(t0, w0), o(sh(t0), sh(t1), sh(t0)));
     }
@@ -489,8 +489,8 @@ export class Flowers {
           )
           .replace(
             '#include <emissivemap_fragment>',
-            // Sunlight glows through thin petals: colours stay vivid even in shade.
-            '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * 0.24 * vGlow;',
+            // A whisper of sunlight through thin petals (kept low: petals should look matte).
+            '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * 0.07 * vGlow;',
           );
       },
       0.17, // flowers sway very gently

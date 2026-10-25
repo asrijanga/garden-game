@@ -31,6 +31,7 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **1.6 review 3:** *Feedback:* Flowers reflect a lot of light; add black-brown mulch to beds instead of brown ground. *Changes:* Petal glow 0.24 → 0.07 (foliage 0.25 → 0.1). Petal tip brightness capped (1.12 → 0.98), so nothing trips the bloom pass. Petals read matte. Beds are now black-brown bark mulch: rotated, stretched shreds, scattered lighter bark chips, fine crumbs, and a tucked-in edge.
 - **Bees (requested during 1.6, pulled from 3.3):** honeybees, round fuzzy bumblebees (white tail) and small dark mason bees. They only visit open, in-season blooms; bob and wander between nearby flowers; hover a few seconds; sometimes fly off into the woods while new ones arrive. About 1 bee per 25 open blooms, up to 8. Storybook scale (5.5×). A faint, soft buzz only when the camera is close to a bee.
 - **iPad review:** *Feedback:* Sound isn't working on iPad; there are some bugs with sound; the flower menu is aligned left on bigger screens. *Changes:*
   - Audio session set to "playback" (Safari 16.4+) so Silent Mode doesn't mute the garden. Trade-off: like a video, it may pause other apps' music.

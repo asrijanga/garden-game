@@ -142,9 +142,16 @@ function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
         // Flower beds: rich, dark, crumbly soil with a soft hand-dug edge.
         float bedField = paintTex.b + ragged * 1.2;
         float bed = smoothstep(0.32, 0.46, bedField) * (1.0 - earth);
-        float crumb = lawnNoise(vWorld.xz * 26.0);
-        vec3 bedSoil = mix(vec3(0.1, 0.075, 0.045), vec3(0.16, 0.12, 0.07), grain) * (0.85 + crumb * 0.3);
-        bedSoil *= 1.0 - (1.0 - smoothstep(0.46, 0.62, bedField)) * 0.25; // darker turned edge
+        // Black-brown bark mulch: dark shreds, scattered lighter chips, fine crumbs between.
+        vec2 mp = vWorld.xz;
+        vec2 mr = vec2(mp.x * 0.8 - mp.y * 0.6, mp.x * 0.6 + mp.y * 0.8); // rotated, so chips don't line up
+        float shreds = lawnNoise(vec2(mr.x * 34.0, mr.y * 11.0));
+        float chips = lawnNoise(mp * 16.0 + 5.3) * 0.65 + lawnNoise(mp * 41.0 - 2.7) * 0.35;
+        float crumb = lawnNoise(mp * 90.0);
+        vec3 bedSoil = mix(vec3(0.03, 0.022, 0.016), vec3(0.055, 0.038, 0.026), shreds);
+        bedSoil = mix(bedSoil, vec3(0.13, 0.085, 0.05), smoothstep(0.66, 0.74, chips)); // lighter bark chips
+        bedSoil *= 0.85 + crumb * 0.3;
+        bedSoil *= 1.0 - (1.0 - smoothstep(0.46, 0.62, bedField)) * 0.2; // tucked-in edge
         diffuseColor.rgb = mix(diffuseColor.rgb, soil, earth);
         diffuseColor.rgb = mix(diffuseColor.rgb, bedSoil, bed);
         // Gust sheen: the meadow brightens softly as wind passes, like grass bowing in waves.
