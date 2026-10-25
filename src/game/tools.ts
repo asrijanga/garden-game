@@ -6,6 +6,7 @@ import type { TouchMarker } from '../world/touchMarker';
 import type { PathBuilder } from './pathBuilder';
 import type { FlowerBrush } from './flowerBrush';
 import type { PondBrush } from './pondBrush';
+import type { EraseBrush } from './eraseBrush';
 
 const MARKER_COLORS: Record<Tool, string> = {
   move: '#fff2cf',
@@ -15,9 +16,7 @@ const MARKER_COLORS: Record<Tool, string> = {
   erase: '#ffe2c4',
 };
 
-const COMING_SOON: Partial<Record<Tool, string>> = {
-  erase: 'Tidying up comes later',
-};
+const COMING_SOON: Partial<Record<Tool, string>> = {};
 
 /**
  * Routes touches: with a build tool, one finger works the garden while two fingers always
@@ -37,6 +36,7 @@ export class ToolController {
     private readonly paths: PathBuilder,
     private readonly flowers: FlowerBrush,
     private readonly ponds: PondBrush,
+    private readonly eraser: EraseBrush,
     private readonly onToolChange: (tool: Tool) => void = () => {},
   ) {
     el.addEventListener('pointerdown', this.onDown);
@@ -49,6 +49,7 @@ export class ToolController {
   setTool(tool: Tool) {
     this.rig.oneFingerPans = tool === 'move';
     this.marker.setColor(MARKER_COLORS[tool]);
+    this.marker.brush = tool === 'erase' ? this.eraser.radius : null;
     this.cancelStroke();
     this.onToolChange(tool);
   }
@@ -72,6 +73,12 @@ export class ToolController {
     if (this.tool === 'path') this.paths.begin(hit);
     if (this.tool === 'flowers') this.flowers.begin(hit);
     if (this.tool === 'pond') this.ponds.begin(hit);
+    if (this.tool === 'erase') {
+      // A bigger brush when you're zoomed out, a finer one up close.
+      this.eraser.radius = Math.min(2.2, Math.max(0.7, this.rig.distance * 0.028));
+      this.marker.brush = this.eraser.radius;
+      this.eraser.begin(hit);
+    }
   };
 
   private onMove = (e: PointerEvent) => {
@@ -82,6 +89,7 @@ export class ToolController {
     if (this.tool === 'path') this.paths.extend(hit);
     if (this.tool === 'flowers') this.flowers.extend(hit);
     if (this.tool === 'pond') this.ponds.extend(hit);
+    if (this.tool === 'erase') this.eraser.extend(hit);
   };
 
   private onUp = (e: PointerEvent) => {
@@ -92,6 +100,7 @@ export class ToolController {
     if (this.tool === 'path') this.paths.end();
     if (this.tool === 'flowers') this.flowers.end();
     if (this.tool === 'pond') this.ponds.end();
+    if (this.tool === 'erase') this.eraser.end();
     const soon = COMING_SOON[this.tool];
     if (soon) this.toolbar.showLabel(soon, 2200);
   };
@@ -103,5 +112,6 @@ export class ToolController {
     this.paths.end();
     this.flowers.end();
     this.ponds.end();
+    this.eraser.end();
   }
 }

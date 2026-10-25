@@ -152,6 +152,7 @@ export class Stones {
   readonly group = new THREE.Group();
   private readonly meshes = new Map<StoneKind, THREE.InstancedMesh[]>();
   private readonly falling: Falling[] = [];
+  private readonly sinking: { stone: Placed; t: number }[] = [];
   private readonly grid = new Map<string, Placed[]>();
   private readonly rng = createRng(31);
   private readonly m = new THREE.Matrix4();
@@ -229,6 +230,20 @@ export class Stones {
     }
   }
 
+  /** Every stone within `r` of (x, z) sinks back into the earth. Returns where they were. */
+  erase(x: number, z: number, r: number): THREE.Vector3[] {
+    const gone: THREE.Vector3[] = [];
+    for (const s of this.near(x, z, r)) {
+      if (s.removed || (s.pos.x - x) ** 2 + (s.pos.z - z) ** 2 > r * r) continue;
+      s.removed = true;
+      const f = this.falling.findIndex((f) => f.stone === s);
+      if (f >= 0) this.falling.splice(f, 1);
+      this.sinking.push({ stone: s, t: 0 });
+      gone.push(s.pos);
+    }
+    return gone;
+  }
+
   add(kind: StoneKind, x: number, y: number, z: number, scale: THREE.Vector3, yaw: number, r: number, tone: THREE.Color, delay: number, owner = 0) {
     const list = this.meshes.get(kind)!;
     const mesh = list[Math.floor(this.rng() * list.length)];
@@ -244,8 +259,8 @@ export class Stones {
     this.write(stone, 0, 0.0001);
   }
 
-  private write(st: Placed, lift: number, k: number, squash = 0) {
-    if (st.removed) return;
+  private write(st: Placed, lift: number, k: number, squash = 0, force = false) {
+    if (st.removed && !force) return;
     this.e.set(0, st.yaw, 0);
     this.q.setFromEuler(this.e);
     this.s.set(st.scale.x * k * (1 + squash * 0.4), st.scale.y * k * (1 - squash), st.scale.z * k * (1 + squash * 0.4));
@@ -255,6 +270,19 @@ export class Stones {
   }
 
   update(dt: number) {
+    for (let i = this.sinking.length - 1; i >= 0; i--) {
+      const s = this.sinking[i];
+      s.t = Math.min(1, s.t + dt / 0.45);
+      // A little shrug, then down into the soil.
+      const k = 1 - s.t * s.t;
+      this.write(s.stone, -s.t * s.stone.r * 0.8 + Math.sin(s.t * Math.PI) * 0.03, Math.max(0.0001, k), 0, true);
+      if (s.t >= 1) {
+        this.m.makeScale(0, 0, 0);
+        s.stone.mesh.setMatrixAt(s.stone.index, this.m);
+        s.stone.mesh.instanceMatrix.needsUpdate = true;
+        this.sinking.splice(i, 1);
+      }
+    }
     for (let i = this.falling.length - 1; i >= 0; i--) {
       const f = this.falling[i];
       const st = f.stone;

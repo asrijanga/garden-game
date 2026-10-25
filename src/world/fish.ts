@@ -95,6 +95,7 @@ interface Swimmer {
   grow: number;
   delay: number;
   kiss: number;
+  gone?: boolean;
   jump: { t: number; dur: number; x0: number; z0: number; dist: number; h: number; level: number; out: boolean } | null;
 }
 
@@ -157,16 +158,20 @@ export class Fish {
     const area = deep * 0.038;
     const want = Math.min(6, Math.round(area / 2.5));
     let have = 0;
-    for (const f of this.fish) if (this.ponds.bodyAt(f.x, f.z)?.id === body.id) have++;
-    for (let n = have; n < want && this.fish.length < MAX_FISH; n++) {
+    for (const f of this.fish) if (!f.gone && this.ponds.bodyAt(f.x, f.z)?.id === body.id) have++;
+    for (let n = have; n < want && this.fish.filter((f) => !f.gone).length < MAX_FISH; n++) {
       const spot = this.deepSpot(body);
       if (!spot) return;
       // Mostly goldfish and kohaku; the odd gold or three-colour koi.
       const r = this.rng();
       const kind = r < 0.4 ? 0 : r < 0.7 ? 1 : r < 0.85 ? 2 : 3;
       const mesh = this.meshes[kind];
-      if (mesh.count >= CAPACITY) continue;
-      const index = mesh.count++;
+      // Reuse the slot of a fish that slipped away, if there is one.
+      const old = this.fish.findIndex((f) => f.gone && f.grow <= 0 && f.mesh === mesh);
+      let index: number;
+      if (old >= 0) index = this.fish.splice(old, 1)[0].index;
+      else if (mesh.count < CAPACITY) index = mesh.count++;
+      else continue;
       mesh.setColorAt(index, new THREE.Color(1, 1, 1).multiplyScalar(lerp(0.92, 1.05, this.rng())));
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       this.fish.push({
@@ -212,6 +217,19 @@ export class Fish {
       }
       f.grow = Math.min(1, f.grow + dt / 1.5);
       const body = this.ponds.bodyAt(f.x, f.z);
+      if (f.gone || (!f.jump && f.grow >= 1 && this.ponds.waterDepth(f.x, f.z) < 0.06)) {
+        // Its water was filled in: the fish slips away.
+        f.gone = true;
+        f.grow = Math.max(0, f.grow - dt * 2.5);
+        this.m.makeScale(0, 0, 0);
+        if (f.grow > 0) {
+          const k = f.scale * f.grow;
+          this.m.compose(this.p.set(f.x, f.y, f.z), this.q.setFromEuler(this.e.set(0, -f.heading, 0)), this.s.set(k, k, k));
+        }
+        f.mesh.setMatrixAt(f.index, this.m);
+        f.mesh.instanceMatrix.needsUpdate = true;
+        continue;
+      }
       if (!body?.filled) continue;
       const level = body.level;
       let pitch = 0;
@@ -266,7 +284,7 @@ export class Fish {
   }
 
   private tryJump() {
-    const ready = this.fish.filter((f) => f.grow >= 1 && !f.jump && f.delay <= 0);
+    const ready = this.fish.filter((f) => f.grow >= 1 && !f.jump && !f.gone && f.delay <= 0);
     this.nextJump = lerp(7, 15, this.rng());
     for (let tries = 0; tries < 6 && ready.length; tries++) {
       const f = ready[Math.floor(this.rng() * ready.length)];

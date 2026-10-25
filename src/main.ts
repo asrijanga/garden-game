@@ -20,6 +20,7 @@ import { PondPlants } from './world/pondPlants';
 import { Fish } from './world/fish';
 import { Splash } from './world/splash';
 import { PondBrush } from './game/pondBrush';
+import { EraseBrush } from './game/eraseBrush';
 import { createMotes } from './world/motes';
 import { FlyingBirds } from './world/flyingBirds';
 import { currentSeason, PALETTES } from './world/season';
@@ -206,8 +207,25 @@ const picker = new FlowerPicker(flowerBrush.ordered(), (sp) => flowerBrush.inSea
   ambience.tap(1.3);
   toolbar.showLabel(label, 1800);
 });
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash });
-tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker, paths, flowerBrush, pondBrush, (tool) => {
+const eraser = new EraseBrush(
+  {
+    stones,
+    flowers,
+    edgePlants,
+    pondPlants,
+    ponds,
+    paint,
+    wildflowers,
+    dust,
+    paths,
+    beds: flowerBrush,
+    heightAt: (x, z) => ground.heightAt(x, z),
+    occupied: (x, z) => cottage.contains(x, z, 0.4) || paths.distanceToPaths(x, z) < 1.0 || flowerBrush.distanceToBeds(x, z) < 0.15 || ponds.contains(x, z, 0.4),
+  },
+  (amount) => ambience.erase(amount),
+);
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers });
+tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker, paths, flowerBrush, pondBrush, eraser, (tool) => {
   picker.setVisible(tool === 'flowers');
   document.body.classList.toggle('picking', tool === 'flowers');
 });
@@ -260,7 +278,7 @@ function frame(time: number) {
   splash.update(dt);
   wildflowers.update(dt);
   dust.update(dt);
-  paint.update();
+  paint.update(dt);
   (motes.material as THREE.ShaderMaterial).uniforms.uTime.value = elapsed;
   rig.update(dt);
   ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));

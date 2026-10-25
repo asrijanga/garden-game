@@ -135,6 +135,7 @@ export class PondPlants {
   private readonly reeds: THREE.InstancedMesh[] = [];
   private readonly items: Item[] = [];
   private readonly growing: Item[] = [];
+  private readonly wilting: { it: Item; t: number }[] = [];
   private readonly rng = createRng(606);
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
@@ -201,6 +202,18 @@ export class PondPlants {
     }
   }
 
+  /** Plants within `r` of (x, z) shrink away. Returns how many. */
+  erase(x: number, z: number, r: number): number {
+    let n = 0;
+    for (const it of this.items) {
+      if (it.gone || (it.pos.x - x) ** 2 + (it.pos.z - z) ** 2 > r * r) continue;
+      it.gone = true;
+      this.wilting.push({ it, t: 0 });
+      n++;
+    }
+    return n;
+  }
+
   private write(it: Item, scale: number) {
     this.e.set(0, it.yaw, 0);
     this.q.setFromEuler(this.e);
@@ -211,6 +224,12 @@ export class PondPlants {
   }
 
   update(dt: number) {
+    for (let i = this.wilting.length - 1; i >= 0; i--) {
+      const w = this.wilting[i];
+      w.t = Math.min(1, w.t + dt / 0.45);
+      this.write(w.it, w.t >= 1 ? 0 : Math.max(0.0001, 1 - w.t * w.t));
+      if (w.t >= 1) this.wilting.splice(i, 1);
+    }
     for (let i = this.growing.length - 1; i >= 0; i--) {
       const g = this.growing[i];
       if (g.gone) {

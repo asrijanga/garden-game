@@ -83,6 +83,8 @@ export class EdgePlants {
   private readonly clover: THREE.InstancedMesh;
   private readonly daisies: THREE.InstancedMesh;
   private readonly growing: Growing[] = [];
+  private readonly all: Growing[] = [];
+  private readonly wilting: { g: Growing; t: number }[] = [];
   private readonly rng = createRng(77);
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
@@ -113,7 +115,23 @@ export class EdgePlants {
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     const g: Growing = { mesh, index, pos: new THREE.Vector3(x, y, z), yaw: this.rng() * Math.PI * 2, size: lerp(0.8, 1.3, this.rng()), delay, t: 0 };
     this.growing.push(g);
+    this.all.push(g);
     this.write(g, 0.0001);
+  }
+
+  /** Plants within `r` of (x, z) shrink back into the lawn. Returns how many. */
+  erase(x: number, z: number, r: number): number {
+    let n = 0;
+    for (let i = this.all.length - 1; i >= 0; i--) {
+      const g = this.all[i];
+      if ((g.pos.x - x) ** 2 + (g.pos.z - z) ** 2 > r * r) continue;
+      this.all.splice(i, 1);
+      const k = this.growing.indexOf(g);
+      if (k >= 0) this.growing.splice(k, 1);
+      this.wilting.push({ g, t: 0 });
+      n++;
+    }
+    return n;
   }
 
   private write(g: Growing, scale: number) {
@@ -126,6 +144,15 @@ export class EdgePlants {
   }
 
   update(dt: number) {
+    for (let i = this.wilting.length - 1; i >= 0; i--) {
+      const w = this.wilting[i];
+      w.t = Math.min(1, w.t + dt / 0.4);
+      this.write(w.g, Math.max(0.0001, 1 - w.t));
+      if (w.t >= 1) {
+        this.write(w.g, 0);
+        this.wilting.splice(i, 1);
+      }
+    }
     for (let i = this.growing.length - 1; i >= 0; i--) {
       const g = this.growing[i];
       if (g.delay > 0) {

@@ -16,6 +16,7 @@ export class Wildflowers {
   private readonly scale: Float32Array;
   private readonly target: Float32Array;
   private readonly shrinking = new Set<number>();
+  private readonly delay = new Map<number, number>();
 
   constructor(ground: Ground, palette: string[], count: number, seed: number, blocked: Blocked) {
     this.mesh = buildWildflowers(ground, palette, count, seed, blocked, this.base, this.positions);
@@ -32,6 +33,7 @@ export class Wildflowers {
       const dz = this.positions[i].y - z;
       if (dx * dx + dz * dz < r2) {
         this.target[i] = 0;
+        this.delay.delete(i);
         this.shrinking.add(i);
       }
     }
@@ -42,6 +44,17 @@ export class Wildflowers {
     for (let i = 0; i < this.positions.length; i++) {
       if (this.target[i] === 0 || !inside(this.positions[i].x, this.positions[i].y)) continue;
       this.target[i] = 0;
+      this.delay.delete(i);
+      this.shrinking.add(i);
+    }
+  }
+
+  /** Cleared flowers wherever `free(x, z)` is true grow back, one by one, after a moment. */
+  restoreIf(free: (x: number, z: number) => boolean, delay = 1) {
+    for (let i = 0; i < this.positions.length; i++) {
+      if (this.target[i] === 1 || !free(this.positions[i].x, this.positions[i].y)) continue;
+      this.target[i] = 1;
+      this.delay.set(i, delay + Math.random() * 2);
       this.shrinking.add(i);
     }
   }
@@ -51,11 +64,20 @@ export class Wildflowers {
     const m = new THREE.Matrix4();
     const sc = new THREE.Matrix4();
     for (const i of this.shrinking) {
-      this.scale[i] = Math.max(0, this.scale[i] - dt * 2.5);
+      const wait = this.delay.get(i);
+      if (wait !== undefined) {
+        if (wait > 0) {
+          this.delay.set(i, wait - dt);
+          continue;
+        }
+        this.delay.delete(i);
+      }
+      // Shrink away fast; grow back slowly.
+      this.scale[i] = this.target[i] ? Math.min(1, this.scale[i] + dt * 0.8) : Math.max(0, this.scale[i] - dt * 2.5);
       const k = Math.max(0.0001, this.scale[i]);
       m.copy(this.base[i]).multiply(sc.makeScale(k, k, k));
       this.mesh.setMatrixAt(i, m);
-      if (this.scale[i] <= 0) this.shrinking.delete(i);
+      if (this.scale[i] === this.target[i]) this.shrinking.delete(i);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
   }

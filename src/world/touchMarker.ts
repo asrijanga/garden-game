@@ -16,6 +16,8 @@ export class TouchMarker {
   private active = false;
   private ripple = 1;
   private radius = 0.9;
+  /** When set, the ring shows a brush of this many metres instead of a fingertip. */
+  brush: number | null = null;
 
   constructor() {
     const mat = new THREE.ShaderMaterial({
@@ -70,7 +72,8 @@ export class TouchMarker {
   /** @param viewDistance camera distance, so the ring stays fingertip-sized at any zoom */
   update(dt: number, viewDistance: number) {
     if (!this.mesh.visible) return;
-    this.radius = viewDistance * 0.017;
+    // The ring sits at 0.6 of the quad when active.
+    this.radius = this.brush !== null ? this.brush / 0.6 : viewDistance * 0.017;
     this.uniforms.uTime.value += dt;
     this.mesh.position.lerp(this.target, 1 - Math.exp(-dt * 18));
     this.mesh.position.y = this.target.y + 0.04;

@@ -81,6 +81,19 @@ export class FlowerBrush {
     this.last = null;
   }
 
+  /** Forget bed dabs centred within `r` of (x, z). */
+  erase(x: number, z: number, r: number) {
+    for (let i = this.beds.length - 1; i >= 0; i--) {
+      if (Math.hypot(this.beds[i].c.x - x, this.beds[i].c.y - z) < r) this.beds.splice(i, 1);
+    }
+  }
+
+  /** After erasing along `path`: lay stones along the new edges of beds that were cut. */
+  reborder(path: THREE.Vector2[], r: number) {
+    const cut = this.beds.filter((b) => path.some((p) => b.c.distanceTo(p) < r + EDGE_RADIUS + 0.4)).map((b) => b.c);
+    if (cut.length) this.layBorder(cut);
+  }
+
   /** Rough distance from (x, z) to the edge of the nearest flower bed (negative inside). */
   distanceToBeds(x: number, z: number): number {
     let d = Infinity;

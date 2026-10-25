@@ -332,6 +332,53 @@ export class Ponds {
     return changed;
   }
 
+  /**
+   * Fill in pond within `r` of (x, z): the outline is pulled back with a soft curve and the bed
+   * rises back up to the lawn. Returns whether any pond was touched.
+   */
+  erase(x: number, z: number, r: number): boolean {
+    const k = 0.5;
+    const reach = r + k;
+    const i0 = Math.max(1, Math.floor(this.gi(x - reach)));
+    const i1 = Math.min(N - 2, Math.ceil(this.gi(x + reach)));
+    const j0 = Math.max(1, Math.floor(this.gi(z - reach)));
+    const j1 = Math.min(N - 2, Math.ceil(this.gi(z + reach)));
+    let touched = false;
+    for (let j = j0; j <= j1; j++) {
+      const pz = this.wx(j);
+      for (let i = i0; i <= i1; i++) {
+        const v = j * N + i;
+        const a = this.S[v];
+        if (a <= -SHORE_HALO - 0.5) continue;
+        const px = this.wx(i);
+        const d = Math.hypot(px - x, pz - z) - r;
+        const h = Math.max(k - Math.abs(a - d), 0) / k;
+        const S = Math.min(a, d) - h * h * k * 0.25;
+        if (S >= a - 1e-4) continue;
+        this.S[v] = S;
+        this.setDepth(v, px, pz);
+        touched = true;
+      }
+    }
+    if (touched) this.compsDirty = true;
+    return touched;
+  }
+
+  /** After erasing: ponds that lost part of their bank settle to their new lowest edge. */
+  settle() {
+    this.recomputeBodies();
+    for (const body of this.bodies.values()) {
+      if (!body.filled) continue;
+      let low = Infinity;
+      for (const v of this.rim(body)) low = Math.min(low, this.groundAt(v));
+      const target = low - 0.07;
+      if (Math.abs(target - body.target) < 0.01) continue;
+      body.fillFrom = body.level;
+      body.fillT = 0;
+      body.target = target;
+    }
+  }
+
   private showWater(body: PondBody) {
     for (const k of body.chunks) {
       const ch = this.chunks.get(k);

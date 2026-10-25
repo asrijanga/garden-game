@@ -310,6 +310,31 @@ export class Ambience {
     osc.stop(at + 0.15);
   }
 
+  private lastErase = 0;
+
+  /** A soft, earthy "shff" as things sink back into the ground. */
+  erase(amount = 0.5) {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    if (t - this.lastErase < 0.14) return;
+    this.lastErase = t;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise(ctx);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(900 + Math.random() * 300, t);
+    bp.frequency.exponentialRampToValueAtTime(380, t + 0.25);
+    bp.Q.value = 0.9;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.06 + amount * 0.07, t + 0.03);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    src.connect(bp).connect(env).connect(this.master);
+    src.start(t, Math.random());
+    src.stop(t + 0.32);
+  }
+
   private lastSplash = 0;
 
   /** A fish breaking the surface: a soft plop with a little spray. */

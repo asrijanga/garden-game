@@ -13,6 +13,7 @@ export class GroundPaint {
   readonly texture: THREE.CanvasTexture;
   private readonly ctx: CanvasRenderingContext2D;
   private dirty = false;
+  private readonly clearing: { x: number; z: number; r: number; t: number }[] = [];
 
   constructor() {
     const canvas = document.createElement('canvas');
@@ -65,8 +66,33 @@ export class GroundPaint {
     this.dab(x, z, radius, 0, 0, strength);
   }
 
+  /** Let the lawn grow back over (x, z): paint fades away there over a moment, softly at the rim. */
+  clear(x: number, z: number, radius: number) {
+    this.clearing.push({ x, z, r: radius, t: 0 });
+  }
+
   /** Upload changes at most once per frame. */
-  update() {
+  update(dt = 0) {
+    // Darken = per-channel minimum: each pass can only take paint away, never add it.
+    this.ctx.globalCompositeOperation = 'darken';
+    for (let i = this.clearing.length - 1; i >= 0; i--) {
+      const c = this.clearing[i];
+      c.t = Math.min(1, c.t + dt / 0.9);
+      const [cx, cy] = this.toCanvas(c.x, c.z);
+      const rad = (c.r / (PAINT_HALF * 2)) * SIZE;
+      const v = Math.round(255 * (1 - c.t * c.t * (3 - 2 * c.t)));
+      const grad = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      grad.addColorStop(0, `rgb(${v},${v},${v})`);
+      grad.addColorStop(0.6, `rgb(${v},${v},${v})`);
+      grad.addColorStop(1, 'rgb(255,255,255)');
+      this.ctx.fillStyle = grad;
+      this.ctx.beginPath();
+      this.ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.dirty = true;
+      if (c.t >= 1) this.clearing.splice(i, 1);
+    }
+    this.ctx.globalCompositeOperation = 'source-over';
     if (!this.dirty) return;
     this.texture.needsUpdate = true;
     this.dirty = false;

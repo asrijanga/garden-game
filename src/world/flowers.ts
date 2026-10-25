@@ -426,6 +426,14 @@ interface Pending {
  * Every planted flower. One InstancedMesh per species variant; growth and petal unfurling run
  * in the vertex shader from each plant's birth time, so a bed of hundreds costs almost nothing.
  */
+interface Placed {
+  mesh: THREE.InstancedMesh;
+  index: number;
+  pos: THREE.Vector3;
+  yaw: number;
+  scale: number;
+}
+
 export class Flowers {
   readonly group = new THREE.Group();
   private readonly meshes = new Map<string, THREE.InstancedMesh[]>();
@@ -434,6 +442,9 @@ export class Flowers {
   private readonly grid = new Map<string, { x: number; z: number; r: number }[]>();
   private readonly blooms: Pending[] = [];
   private readonly heads: { pos: THREE.Vector3; openAt: number }[] = [];
+  /** Every plant placed, by 1 m cell, so the eraser can find them. */
+  private readonly placed = new Map<string, Placed[]>();
+  private readonly wilting: { p: Placed; t: number }[] = [];
   private time = 0;
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
@@ -535,6 +546,9 @@ export class Flowers {
     mesh.setMatrixAt(i, this.m);
     mesh.instanceMatrix.addUpdateRange(i * 16, 16);
     mesh.instanceMatrix.needsUpdate = true;
+    const key = `${Math.floor(x)},${Math.floor(z)}`;
+    if (!this.placed.has(key)) this.placed.set(key, []);
+    this.placed.get(key)!.push({ mesh, index: i, pos: new THREE.Vector3(x, y, z), yaw, scale });
     const g = mesh.geometry;
     const set = (name: string, values: number[]) => {
       const a = g.attributes[name] as THREE.InstancedBufferAttribute;
@@ -578,6 +592,30 @@ export class Flowers {
     }
   }
 
+  /** Plants within `r` of (x, z) wilt and sink back into the soil. Returns how many. */
+  erase(x: number, z: number, r: number): number {
+    let n = 0;
+    const r2 = r * r;
+    const near = (p: { x: number; z: number }) => (p.x - x) ** 2 + (p.z - z) ** 2 < r2;
+    for (let i = Math.floor(x - r); i <= Math.floor(x + r); i++) {
+      for (let j = Math.floor(z - r); j <= Math.floor(z + r); j++) {
+        const key = `${i},${j}`;
+        const list = this.placed.get(key);
+        if (list) {
+          const keep = list.filter((p) => !near(p.pos));
+          for (const p of list) if (near(p.pos)) this.wilting.push({ p, t: 0 });
+          n += list.length - keep.length;
+          this.placed.set(key, keep);
+        }
+        const spacing = this.grid.get(key);
+        if (spacing) this.grid.set(key, spacing.filter((p) => !near(p)));
+      }
+    }
+    for (let i = this.heads.length - 1; i >= 0; i--) if (near(this.heads[i].pos)) this.heads.splice(i, 1);
+    for (let i = this.blooms.length - 1; i >= 0; i--) if (near(this.blooms[i].pos)) this.blooms.splice(i, 1);
+    return n;
+  }
+
   /** Open blooms bees can visit (in-season flowers that have finished unfurling). */
   openBlooms(): THREE.Vector3[] {
     const out: THREE.Vector3[] = [];
@@ -588,6 +626,17 @@ export class Flowers {
   update(dt: number) {
     this.time += dt;
     this.uniforms.uFlowerTime.value = this.time;
+    for (let i = this.wilting.length - 1; i >= 0; i--) {
+      const w = this.wilting[i];
+      w.t = Math.min(1, w.t + dt / 0.5);
+      const k = Math.max(0, 1 - w.t * w.t) * w.p.scale;
+      this.q.setFromAxisAngle(UP, w.p.yaw + w.t * 0.6);
+      this.m.compose(new THREE.Vector3(w.p.pos.x, w.p.pos.y - w.t * 0.12, w.p.pos.z), this.q, new THREE.Vector3(k, k, k));
+      w.p.mesh.setMatrixAt(w.p.index, this.m);
+      w.p.mesh.instanceMatrix.addUpdateRange(w.p.index * 16, 16);
+      w.p.mesh.instanceMatrix.needsUpdate = true;
+      if (w.t >= 1) this.wilting.splice(i, 1);
+    }
     for (let i = this.blooms.length - 1; i >= 0; i--) {
       if (this.time >= this.blooms[i].at) {
         this.onBloom(this.blooms[i].pos);

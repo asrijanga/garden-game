@@ -214,6 +214,16 @@ export class PathBuilder {
     this.lines.get(key)!.push({ x, z, id: this.pathId });
   }
 
+  /** Forget path centre line within `r` of (x, z), so the lawn there is free again. */
+  erase(x: number, z: number, r: number) {
+    for (let i = Math.floor((x - r) / CELL); i <= Math.floor((x + r) / CELL); i++) {
+      for (let j = Math.floor((z - r) / CELL); j <= Math.floor((z + r) / CELL); j++) {
+        const list = this.lines.get(`${i},${j}`);
+        if (list) this.lines.set(`${i},${j}`, list.filter((p) => (p.x - x) ** 2 + (p.z - z) ** 2 > r * r));
+      }
+    }
+  }
+
   /** Distance to the nearest path centre line (optionally ignoring the path being drawn). */
   private distanceTo(x: number, z: number, othersOnly: boolean, reach = 1): number {
     let best = Infinity;
