@@ -160,7 +160,7 @@ const picker = new FlowerPicker(flowerBrush.ordered(), (sp) => flowerBrush.inSea
   ambience.tap(1.3);
   toolbar.showLabel(label, 1800);
 });
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers });
 tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker, paths, flowerBrush, (tool) => {
   picker.setVisible(tool === 'flowers');
   document.body.classList.toggle('picking', tool === 'flowers');
