@@ -2,49 +2,10 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createRng, lerp } from '../core/random';
 
-export type StoneKind = 'slab' | 'curb';
-const SHAPES: Record<StoneKind, number> = { slab: 6, curb: 3 };
+export type StoneKind = 'curb';
+const SHAPES: Record<StoneKind, number> = { curb: 3 };
 const CAPACITY = 2000; // per shape
 const CELL = 0.5; // spatial hash cell, metres
-
-/**
- * A hand-cut flagstone: an irregular polygon filling a unit cell (x across, z along the path),
- * a few millimetres short of the edges, with softened, bevelled edges.
- */
-function slabGeometry(seed: number): THREE.BufferGeometry {
-  const rng = createRng(seed);
-  const shape = new THREE.Shape();
-  const j = () => lerp(0, 0.07, rng());
-  // Walk round the cell, sometimes chamfering a corner or nudging an edge midpoint.
-  const pts: [number, number][] = [];
-  const corners: [number, number][] = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]];
-  corners.forEach(([cx, cz], i) => {
-    const sx = -Math.sign(cx);
-    const sz = -Math.sign(cz);
-    if (rng() < 0.45) {
-      const c = lerp(0.08, 0.16, rng());
-      // chamfered corner: two points
-      const first = i % 2 === 0 ? [cx + sx * j(), cz + sz * c] : [cx + sx * c, cz + sz * j()];
-      const second = i % 2 === 0 ? [cx + sx * c, cz + sz * j()] : [cx + sx * j(), cz + sz * c];
-      pts.push(first as [number, number], second as [number, number]);
-    } else {
-      pts.push([cx + sx * j(), cz + sz * j()]);
-    }
-    const [nx, nz] = corners[(i + 1) % 4];
-    if (rng() < 0.5) pts.push([(cx + nx) / 2 + (rng() - 0.5) * 0.05, (cz + nz) / 2 + (rng() - 0.5) * 0.05]);
-  });
-  shape.moveTo(pts[0][0], pts[0][1]);
-  for (const [x, z] of pts.slice(1)) shape.lineTo(x, z);
-  shape.closePath();
-
-  const g = new THREE.ExtrudeGeometry(shape, { depth: 0.06, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 1 });
-  g.rotateX(Math.PI / 2); // extrude downward; the shape's y becomes world z
-  g.translate(0, 0.06, 0);
-  g.deleteAttribute('uv');
-  colorByHeight(g, 0.03, 0.06);
-  g.computeVertexNormals();
-  return g;
-}
 
 /** A neatly cut edging stone with softly rounded arrises, long along z. */
 function curbGeometry(seed: number): THREE.BufferGeometry {
@@ -75,6 +36,7 @@ interface Placed {
   scale: THREE.Vector3;
   yaw: number;
   r: number;
+  owner: number;
   removed?: boolean;
 }
 
@@ -87,7 +49,7 @@ interface Falling {
 }
 
 /**
- * Path stones (flagstones and edging) that drop into place with a soft squash and bounce.
+ * Edging stones that drop into place with a soft squash and bounce.
  * All stones of a shape share one InstancedMesh; only those still settling update each frame.
  */
 export class Stones {
@@ -107,7 +69,7 @@ export class Stones {
     (Object.keys(SHAPES) as StoneKind[]).forEach((kind, ki) => {
       const list: THREE.InstancedMesh[] = [];
       for (let k = 0; k < SHAPES[kind]; k++) {
-        const geo = kind === 'slab' ? slabGeometry(200 + ki * 50 + k * 7) : curbGeometry(300 + k * 11);
+        const geo = curbGeometry(300 + ki * 50 + k * 11);
         const mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
         mesh.count = 0;
         mesh.castShadow = true;
@@ -142,10 +104,10 @@ export class Stones {
     return false;
   }
 
-  /** Lift away stones of `kind` within `r` (e.g. edging where a new path crosses). */
-  removeNear(x: number, z: number, r: number, kind: StoneKind) {
+  /** Lift away stones of `kind` within `r`, except `keepOwner`'s (e.g. edging where a new path crosses). */
+  removeNear(x: number, z: number, r: number, kind: StoneKind, keepOwner = -1) {
     for (const s of this.near(x, z, r)) {
-      if (s.removed || s.kind !== kind) continue;
+      if (s.removed || s.kind !== kind || s.owner === keepOwner) continue;
       if ((s.pos.x - x) ** 2 + (s.pos.z - z) ** 2 < (r + s.r * 0.5) ** 2) {
         s.removed = true;
         this.m.makeScale(0, 0, 0);
@@ -155,14 +117,14 @@ export class Stones {
     }
   }
 
-  add(kind: StoneKind, x: number, y: number, z: number, scale: THREE.Vector3, yaw: number, r: number, tone: THREE.Color, delay: number) {
+  add(kind: StoneKind, x: number, y: number, z: number, scale: THREE.Vector3, yaw: number, r: number, tone: THREE.Color, delay: number, owner = 0) {
     const list = this.meshes.get(kind)!;
     const mesh = list[Math.floor(this.rng() * list.length)];
     if (mesh.count >= CAPACITY) return;
     const index = mesh.count++;
     mesh.setColorAt(index, tone);
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    const stone: Placed = { kind, mesh, index, pos: new THREE.Vector3(x, y, z), scale: scale.clone(), yaw, r };
+    const stone: Placed = { kind, mesh, index, pos: new THREE.Vector3(x, y, z), scale: scale.clone(), yaw, r, owner };
     const k = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
     if (!this.grid.has(k)) this.grid.set(k, []);
     this.grid.get(k)!.push(stone);

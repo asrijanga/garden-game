@@ -7,6 +7,7 @@ import { Cottage } from './world/cottage';
 import { Wildflowers } from './world/wildflowers';
 import { GroundPaint } from './world/groundPaint';
 import { Stones } from './world/stones';
+import { Paving } from './world/paving';
 import { EdgePlants } from './world/edgePlants';
 import { Dust } from './world/dust';
 import { PathBuilder } from './game/pathBuilder';
@@ -120,14 +121,16 @@ const TOOL_PITCH = { move: 1, path: 0.9, flowers: 1.2, pond: 0.8, erase: 1.05 };
 let tools: ToolController | null = null;
 const dust = new Dust();
 scene.add(dust.points);
-const stones = new Stones((p, size, kind) => {
-  if (kind === 'slab') dust.puff(p, 5, size * 1.6);
-  ambience.stone(kind === 'slab' ? 0.3 : 0.18);
-});
+const stones = new Stones(() => ambience.stone(0.18));
 scene.add(stones.group);
+const paving = new Paving((p, r) => {
+  dust.puff(p, 4, r * 1.2);
+  ambience.stone(0.3);
+});
+scene.add(paving.group);
 const edgePlants = new EdgePlants(palette.wildflowers);
 scene.add(edgePlants.group);
-const paths = new PathBuilder(ground, paint, stones, edgePlants, wildflowers, (x, z) => cottage.contains(x, z, 0.1) || ground.forestness(x, z) > 0.45, cottage.doorstep);
+const paths = new PathBuilder(ground, paint, stones, paving, edgePlants, wildflowers, (x, z) => cottage.contains(x, z, 0.1) || ground.forestness(x, z) > 0.45, cottage.doorstep);
 
 const toolbar = new Toolbar((tool) => {
   ambience.tap(TOOL_PITCH[tool]);
@@ -174,6 +177,7 @@ function frame(time: number) {
   flyingBirds.update(dt);
   marker.update(dt, rig.distance);
   stones.update(dt);
+  paving.update(dt);
   edgePlants.update(dt);
   wildflowers.update(dt);
   dust.update(dt);
