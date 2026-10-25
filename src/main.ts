@@ -9,6 +9,8 @@ import { createMotes } from './world/motes';
 import { currentSeason, PALETTES } from './world/season';
 import { WindField, bindWind } from './render/wind';
 import { PostFX } from './render/post';
+import { Ambience } from './audio/ambience';
+import { mountSoundControls } from './ui/soundButton';
 
 const WORLD_SEED = 20261025;
 
@@ -93,6 +95,11 @@ function fitDistance(aspect: number): number {
   return Math.max(fitHalfWidth / Math.tan(hHalf), (fitHalfWidth * 0.9) / Math.tan(vHalf));
 }
 
+// --- Sound: the wind you can hear ------------------------------------------------------------
+const ambience = new Ambience();
+mountSoundControls(ambience);
+if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { ambience, wind });
+
 // --- Post-processing ----------------------------------------------------------------------
 const post = new PostFX(renderer, scene, camera);
 
@@ -129,6 +136,7 @@ function frame(time: number) {
   cottage.update(dt, wind);
   (motes.material as THREE.ShaderMaterial).uniforms.uTime.value = elapsed;
   rig.update(dt);
+  ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));
   post.render(dt);
 }
 
