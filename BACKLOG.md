@@ -16,7 +16,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | Story | Status | Notes / feedback |
 |---|---|---|
 | 1.1 A cozy clearing in the forest | ✅ Done | v3: procedural branching trees with leaf-cluster crowns, firs with jagged tiers, birches; tilt-shift blur removed. Wind and mood approved. |
-| 1.2 Hear the wind | 👀 Awaiting feedback | Procedural Web Audio: air bed, gust whoosh, canopy rush, leaf flurries, all driven by the wind field at the view centre. About 8 dB swell from calm to gust, limiter, 4 s fade-in. Sound toggle top-right (remembered) and a one-time hint. |
+| 1.2 Hear the wind | 👀 Awaiting feedback | Procedural Web Audio: air bed, gust whoosh, canopy rush, leaf flurries, all driven by the wind field at the view centre. Very understated (calm about −35 dBFS, gust about −30 dBFS, about 4 dB swell), heavily low-passed, limiter, 4 s fade-in. Sound toggle top-right (remembered) and a one-time hint. |
 | 1.3 Hold the world in my hand | ✅ Done | Pulled forward (player asked to zoom). Pinch zoom, drag pan, twist rotate, inertia; camera lowers as you zoom in. |
 | 1.4 Thumb-reach toolbar | ⬜ Not started | |
 | 1.5 Draw a winding path | ⬜ Not started | |
@@ -31,6 +31,9 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **1.2 review (sound):**
+  - *Feedback:* The wind is too intense; it must be much, much calmer, very subtle and relaxing.
+  - *Changes:* Master volume 0.75 → 0.3. Gust swell about 8 dB → about 4 dB. All layers low-passed lower (less hiss). Leaf rustle cut to a whisper. Parameter changes smoothed over about 2 s, so it ebbs and flows. Calm is now about −35 dBFS and a full gust about −30 dBFS (was −27 and −19).
 - **Busy-ness review (during 1.2):**
   - *Feedback:* Way fewer trees and way more space in the middle; it looks very busy, and fewer trees is easier on the phone.
   - *Changes:*

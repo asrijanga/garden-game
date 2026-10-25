@@ -11,6 +11,9 @@ import { createRng } from '../core/random';
  *
  * Every change is smoothed over hundreds of milliseconds, so the volume never spikes.
  */
+/** Overall loudness. Kept low on purpose: this is background calm, not an effect. */
+const MASTER_VOLUME = 0.3;
+
 export class Ambience {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -54,7 +57,7 @@ export class Ambience {
     blip.start();
 
     const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -18;
+    limiter.threshold.value = -24;
     limiter.knee.value = 12;
     limiter.ratio.value = 4;
     limiter.connect(ctx.destination);
@@ -75,7 +78,7 @@ export class Ambience {
     for (const [buf, pan] of [[brown, -0.6], [brown2, 0.6]] as const) {
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = 420;
+      lp.frequency.value = 300;
       const p = ctx.createStereoPanner();
       p.pan.value = pan;
       loop(ctx, buf).connect(lp).connect(p).connect(air);
@@ -85,8 +88,8 @@ export class Ambience {
     // Gust: band-passed brown noise whose pitch rises a little as it swells.
     const gustFilter = ctx.createBiquadFilter();
     gustFilter.type = 'bandpass';
-    gustFilter.frequency.value = 500;
-    gustFilter.Q.value = 0.6;
+    gustFilter.frequency.value = 320;
+    gustFilter.Q.value = 0.5;
     const gust = ctx.createGain();
     gust.gain.value = 0;
     loop(ctx, brown2, 1.3).connect(gustFilter).connect(gust).connect(master);
@@ -94,11 +97,11 @@ export class Ambience {
     // Trees: mid-band rush of a canopy, slightly off to one side.
     const treesBp = ctx.createBiquadFilter();
     treesBp.type = 'bandpass';
-    treesBp.frequency.value = 1300;
+    treesBp.frequency.value = 950;
     treesBp.Q.value = 0.5;
     const treesLp = ctx.createBiquadFilter();
     treesLp.type = 'lowpass';
-    treesLp.frequency.value = 2600;
+    treesLp.frequency.value = 1700;
     const trees = ctx.createGain();
     trees.gain.value = 0;
     const treesPan = ctx.createStereoPanner();
@@ -107,10 +110,10 @@ export class Ambience {
     // Leaves: soft, airy high rustle (kept well below harsh frequencies).
     const leavesHp = ctx.createBiquadFilter();
     leavesHp.type = 'highpass';
-    leavesHp.frequency.value = 2400;
+    leavesHp.frequency.value = 2200;
     const leavesLp = ctx.createBiquadFilter();
     leavesLp.type = 'lowpass';
-    leavesLp.frequency.value = 6500;
+    leavesLp.frequency.value = 4600;
     const leaves = ctx.createGain();
     leaves.gain.value = 0;
     const leavesPan = ctx.createStereoPanner();
@@ -130,7 +133,7 @@ export class Ambience {
     const now = this.ctx.currentTime;
     this.master.gain.cancelScheduledValues(now);
     this.master.gain.setValueAtTime(this.master.gain.value, now);
-    this.master.gain.linearRampToValueAtTime(this.muted ? 0 : 0.75, now + seconds);
+    this.master.gain.linearRampToValueAtTime(this.muted ? 0 : MASTER_VOLUME, now + seconds);
   }
 
   suspend() {
@@ -162,13 +165,14 @@ export class Ambience {
     this.flurry += (this.flurryTarget - this.flurry) * Math.min(1, dt * 6);
     this.leafPan = Math.sin(this.time * 0.11) * 0.5 + Math.sin(this.time * 0.37 + 2) * 0.2;
 
-    L.air.gain.setTargetAtTime(0.16 + envelope * 0.14, now, 0.8);
-    L.gust.gain.setTargetAtTime(gust * gust * 0.55, now, 0.5);
-    L.gustFilter.frequency.setTargetAtTime(380 + gust * 420, now, 0.6);
-    L.trees.gain.setTargetAtTime(0.012 + this.treeLevel * 0.07, now, 0.6);
-    L.treesPan.pan.setTargetAtTime(Math.sin(this.time * 0.07) * 0.35, now, 1.0);
-    L.leaves.gain.setTargetAtTime((0.004 + this.flurry * 0.03) * (0.4 + envelope), now, 0.12);
-    L.leavesPan.pan.setTargetAtTime(this.leafPan, now, 0.5);
+    // Deliberately understated: a hush that breathes, never weather.
+    L.air.gain.setTargetAtTime(0.13 + envelope * 0.05, now, 2.0);
+    L.gust.gain.setTargetAtTime(gust * gust * 0.2, now, 1.6);
+    L.gustFilter.frequency.setTargetAtTime(300 + gust * 160, now, 2.0);
+    L.trees.gain.setTargetAtTime(0.006 + this.treeLevel * 0.022, now, 1.8);
+    L.treesPan.pan.setTargetAtTime(Math.sin(this.time * 0.07) * 0.3, now, 2.0);
+    L.leaves.gain.setTargetAtTime((0.0012 + this.flurry * 0.006) * (0.4 + envelope), now, 0.4);
+    L.leavesPan.pan.setTargetAtTime(this.leafPan, now, 1.0);
   }
 }
 
