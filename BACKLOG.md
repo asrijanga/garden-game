@@ -10,19 +10,20 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current story:** 1.1 — A cozy clearing in the forest (rebuilt after feedback, awaiting review)
+**Current story:** 1.1 — A cozy clearing in the forest (v2 live; next: tree detail pass after the rest of the feedback)
 **Preview URL:** https://asrijanga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
 |---|---|---|
 | 1.1 A cozy clearing in the forest | 👀 Awaiting feedback | v2: dense seasonal forest around a meadow clearing, cottage with chimney smoke, gust-field wind, seasonal wildflowers. (v1 floating island was replaced, see feedback log.) |
-| 1.2 Hold the world in my hand | ⬜ Not started | |
-| 1.3 Thumb-reach toolbar | ⬜ Not started | |
-| 1.4 Draw a winding path | ⬜ Not started | |
-| 1.5 Plant flowers that bloom fast | ⬜ Not started | |
-| 1.6 A cozy garden pond | ⬜ Not started | |
-| 1.7 Gently erase | ⬜ Not started | |
-| 1.8 Autosave + seed sprouting | ⬜ Not started | |
+| 1.2 Hear the wind | ⬜ Not started | Moved up from Milestone 5 at the player's request |
+| 1.3 Hold the world in my hand | ⬜ Not started | |
+| 1.4 Thumb-reach toolbar | ⬜ Not started | |
+| 1.5 Draw a winding path | ⬜ Not started | |
+| 1.6 Plant flowers that bloom fast | ⬜ Not started | |
+| 1.7 A cozy garden pond | ⬜ Not started | |
+| 1.8 Gently erase | ⬜ Not started | |
+| 1.9 Autosave + seed sprouting | ⬜ Not started | |
 | 2.x – 6.x | ⬜ Not started | See milestones below |
 
 Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · ✅ Done
@@ -30,13 +31,20 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **1.1 v2 review (forest clearing):**
+  - *Feedback:* Chimney smoke is a nice touch. The home should be simple but upgradable, with variations; the garden and its objects are the focus. "No island, just land." Wants a calm, soothing wind sound plus trees whooshing as the background, with wind-chime sounds only when chimes are placed. Relaxation and calm are the goal. Trees lack detail (message was cut off; waiting on the rest).
+  - *Changes:*
+    - Deploy fixed: it now publishes from `main` (see CLAUDE.md).
+    - New **Story 1.2 "Hear the wind"** (ambient wind and tree sound driven by the wind field), moved up into the MVP.
+    - New **Story 2.7 "My cottage, my way"** (variations and upgrades).
+    - Tree detail pass queued for 1.1 v3.
 - **1.1 v1 review (floating island):**
   - *Feedback:* Prefers Tiny Glade's framing: a dense forest all around with a garden patch in the middle and a cozy home. No floating island and no empty orange background; use the space. Wants subtle, natural wind that makes the grass wavy, and a real airflow model so future flags flutter, settle and gust again, and wind chimes play with the wind. Wants a procedurally built cozy pond with rocks and jumping fish. Wants wildflowers in empty, unbuilt grass. The collection is **only flowers** (no vegetables or other plants), and a huge one. Seasons follow the **real current season** (autumn has autumn colors). The world moves fast: plants grow and flowers bloom quickly.
   - *Changes:*
     - 1.1 rebuilt as a forest clearing with a cottage.
     - New shared **wind field** (moving gust patches plus a calm/gust "breathing" cycle) that both the GPU and game code read, ready for flags and chimes.
     - **Real-season palettes** (hemisphere aware), with seasonal wildflowers.
-    - Backlog reshaped: the tree tool is replaced by flowers, the pond moves into the MVP (1.6), flags and wind chimes get their own story (3.1), and the flower collection and real seasons get their own milestone (4).
+    - Backlog reshaped: the tree tool is replaced by flowers, the pond moves into the MVP (1.7), flags and wind chimes get their own story (3.1), and the flower collection and real seasons get their own milestone (4).
 
 ---
 
@@ -75,14 +83,14 @@ _Feedback from each review, newest first, and what we changed because of it._
 |---|---|---|
 | Rendering | **Three.js** (WebGL2) | Mature, fast on iOS Safari, has instancing and post-processing. |
 | Language/build | **TypeScript + Vite** | Fast dev loop and small static output. |
-| Hosting | **GitHub Pages via GitHub Actions** (push to `master` deploys) | Static, free, no server. |
+| Hosting | **GitHub Pages via GitHub Actions** (pushing `main` deploys; work happens on `master` and is mirrored with `git push origin master:main`) | Static, free, no server. |
 | World layout | Meadow **clearing** (radius ~13 m) inside a dense instanced forest, with the cottage at the back edge | Matches the Tiny Glade framing: the garden is the clearing. |
 | World model | Placed "features" (paths, flowers, pond…), each with a **seed** | Procedural uniqueness is reproducible: the same seed gives the same flower. Save and share stay small and exact. |
 | Wind | `WindField`: a tileable gust-noise texture scrolling with the wind, times a slow global calm/gust envelope. Sampled identically on GPU (`gardenWind()`) and CPU (`WindField.sample()`) | One airflow drives everything: grass waves now, and flags and chimes later. |
 | Seasons | `currentSeason()` from the device date and time zone (southern hemisphere flips). `?season=` overrides | "The season should reflect what the current season is." |
 | Vegetation | GPU-instanced grass, wildflowers, trees and bushes, with wind in the vertex shader | Tens of thousands of swaying blades at 60fps on a phone. |
 | Look | Soft Lambert lighting, neutral tone mapping, tilt-shift, bloom, warm grade | Storybook diorama feel. |
-| Audio | Web Audio API | Unlocks on the first touch. |
+| Audio | Web Audio API, procedural (filtered noise for wind and leaves; synthesized chimes later) | Nothing to download. Unlocks on the first touch. Driven by `WindField`. |
 | Persistence | `localStorage`/IndexedDB with a **versioned, compact save format** | The share link (later) is the same data, compressed. |
 
 ---
@@ -104,17 +112,29 @@ Demo script: open it on the phone. Watch a gust sweep the grass and the smoke le
 
 ---
 
-### Story 1.2 — Hold the world in my hand (S)
+### Story 1.2 — Hear the wind (S) — *moved up: calm is the goal*
+**As a** player, **I want** a calm, soothing bed of wind and rustling trees behind everything, **so that** the garden relaxes me the moment I open it.
+
+- Soft, layered wind ambience: a low airy bed plus treetop "whooshes" that **swell with each gust and fade in the calm**, driven by the same `WindField` envelope the grass uses, so what you hear matches what you see.
+- Leaves rustle gently, panned slightly left and right. No music and no birds yet: just air and trees.
+- Generated with Web Audio (filtered noise), so nothing to download. Starts softly on the first touch (iOS needs a tap to unlock audio). A small mute toggle.
+- Volume never spikes. It should feel like sitting by an open window.
+
+Demo script: open the garden, put the phone down, and listen through a few gust cycles.
+
+---
+
+### Story 1.3 — Hold the world in my hand (S)
 **As a** player, **I want** to pan, pinch-zoom, and twist to rotate around my clearing with smooth inertia, **so that** it feels like a tiny diorama I'm turning in my hands.
 
-- One finger drag pans (until a tool is selected; see 1.3). Two-finger pinch zooms and twist rotates, both with inertia and soft limits that keep the clearing in view.
+- One finger drag pans (until a tool is selected; see 1.4). Two-finger pinch zooms and twist rotates, both with inertia and soft limits that keep the clearing in view.
 - Zooming in close lowers the camera angle a little, for a cozier view of the flowers. Tilt-shift focus follows the view center.
 
 Demo script: zoom right into the flower boxes on the cottage, spin around, flick and let it glide.
 
 ---
 
-### Story 1.3 — Thumb-reach toolbar (S)
+### Story 1.4 — Thumb-reach toolbar (S)
 **As a** player, **I want** a beautiful, chunky toolbar at the bottom of the screen, **so that** I can switch what my finger does with one hand.
 
 - Large rounded "tactile" buttons with a press/bounce animation, inside thumb reach.
@@ -124,7 +144,7 @@ Demo script: zoom right into the flower boxes on the cottage, spin around, flick
 
 ---
 
-### Story 1.4 — Draw a winding path (M)
+### Story 1.5 — Draw a winding path (M)
 **As a** player, **I want** to drag my finger to draw a path and watch stepping stones settle into place one by one, **so that** building feels magical.
 
 - The stroke is smoothed into a gentle curve that follows the ground. Procedurally unique stones drop in **one after another** with a soft squash-and-bounce and a dust puff.
@@ -133,7 +153,7 @@ Demo script: zoom right into the flower boxes on the cottage, spin around, flick
 
 ---
 
-### Story 1.5 — Plant flowers that bloom fast (M)
+### Story 1.6 — Plant flowers that bloom fast (M)
 **As a** player, **I want** to paint flowers and watch them bloom outward in a wave within seconds, **so that** the garden fills with color right away.
 
 - Painting creates a soft-edged bed. Flowers appear in a **wave** from the stroke: sprout → bud → petals unfurl, all within a few seconds.
@@ -146,7 +166,7 @@ Demo script: paint a bed of autumn flowers by the cottage and watch it bloom.
 
 ---
 
-### Story 1.6 — A cozy garden pond (L)
+### Story 1.7 — A cozy garden pond (L)
 **As a** player, **I want** to draw a pond and watch water fill it, ringed with rocks, with fish that jump, **so that** I have a calm place to watch.
 
 - Draw or tap a shape. The ground dips into an organic basin, then water fills it with a gentle rise.
@@ -159,12 +179,12 @@ Demo script: draw a pond next to the path and wait for the first fish to jump.
 
 ---
 
-### Story 1.7 — Gently erase (S)
+### Story 1.8 — Gently erase (S)
 - Erase brush with a soft cursor. Things inside shrink and sink back into the earth with a little puff. The grass grows back and wildflowers return to the empty grass.
 
 ---
 
-### Story 1.8 — My garden is still here + a seed sprouting (S)
+### Story 1.9 — My garden is still here + a seed sprouting (S)
 - Versioned, compact save format (features + seeds). Autosaves after every change, and the garden rebuilds exactly on reload with a staggered "regrow" animation.
 - Loading screen: a small seed sprouting while assets and shaders warm up, then a soft fade into the world.
 - A "New garden" option behind a long-press, with confirmation.
@@ -191,6 +211,11 @@ Demo script: draw a pond next to the path and wait for the first fish to jump.
 - A gazebo that assembles itself. An arched bridge that builds itself across a pond.
 
 ### Story 2.6 — Undo (S)
+
+### Story 2.7 — My cottage, my way (M)
+- The home stays simple (the garden is the focus), but you can **tap it to cycle variations**: roof color and material, wall color, shutters, door, and chimney.
+- Small **upgrades** you can add: a porch, a bay window, window flower boxes, climbing roses, a little extension or lean-to shed.
+- Each variation is seeded, so it saves and shares exactly.
 
 ---
 
@@ -237,8 +262,8 @@ Demo script: draw a pond next to the path and wait for the first fish to jump.
 
 ## Milestone 5 — Sound
 
-### Story 5.1 — Ambient soundscape (M)
-- Birdsong, wind that follows the gust envelope, rain, night crickets, and a crackle from the chimney.
+### Story 5.1 — Richer ambience (M)
+- Builds on 1.2's wind bed: gentle seasonal layers (soft birdsong in spring, crickets at night, rain), always subtle and never busy.
 
 ### Story 5.2 — Satisfying build sounds (M)
 - Soft pops, rustles, stone clacks, water plops, and fish splashes.

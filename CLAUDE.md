@@ -8,6 +8,10 @@ A cozy, painterly, procedural garden builder for iPhone browsers (inspired by Ti
 3. When the user gives feedback, record it in the **Feedback log**, apply it, and mark the story ✅ only once they're happy.
 4. Before ending a session, update the Status section (current story, statuses, preview URL, notes), then commit and push.
 
+## Deploying
+- Work and commit on `master`, then deploy with `git push origin master && git push origin master:main`.
+- Only pushes to `main` deploy: the `github-pages` environment rejects `master`. Check the run under Actions, and confirm https://asrijanga.github.io/garden-game/ serves the new `assets/index-*.js`.
+
 ## Ground rules
 - iPhone Safari, portrait-first, smooth 60fps. Beauty matters, but never at the cost of stutter.
 - Follow the stack and the "Definition of Done" in `BACKLOG.md`. If you change a technical decision, update the decisions table there.
