@@ -6,6 +6,34 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 ---
 
+## 📍 Status — where we are
+
+> Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
+
+**Current story:** 1.1 — A tiny world on my phone (not started)
+**Preview URL:** _not deployed yet_
+
+| Story | Status | Notes / feedback |
+|---|---|---|
+| 1.1 A tiny world on my phone | ⬜ Not started | |
+| 1.2 Hold the world in my hand | ⬜ Not started | |
+| 1.3 Thumb-reach toolbar | ⬜ Not started | |
+| 1.4 Draw a winding path | ⬜ Not started | |
+| 1.5 Plant a tree | ⬜ Not started | |
+| 1.6 Paint a blooming flower bed | ⬜ Not started | |
+| 1.7 Gently erase | ⬜ Not started | |
+| 1.8 Autosave + seed sprouting | ⬜ Not started | |
+| 2.1 – 6.5 | ⬜ Not started | See milestones below |
+
+Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · ✅ Done
+
+### Feedback log
+_Feedback from each review, newest first, and what we changed because of it._
+
+- _(none yet)_
+
+---
+
 ## How we work
 
 **Loop per story**
