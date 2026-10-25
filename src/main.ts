@@ -65,7 +65,7 @@ const ground = new Ground(WORLD_SEED, palette);
 scene.add(ground.mesh);
 
 // The cottage sits at the back of the clearing, tucked against the trees, facing the player.
-const cottagePos = new THREE.Vector3(1.0, 0, -CLEARING_RADIUS + 5.2);
+const cottagePos = new THREE.Vector3(1.0, 0, -CLEARING_RADIUS + 3.6);
 cottagePos.y = ground.heightAt(cottagePos.x, cottagePos.z) - 0.05;
 const cottage = new Cottage(cottagePos, -0.18, palette, WORLD_SEED + 30);
 scene.add(cottage.group);
@@ -75,8 +75,8 @@ scene.add(createForest(ground, palette, season, WORLD_SEED + 40, (x, z) => cotta
 
 const isSmallGpu = Math.min(screen.width, screen.height) * (window.devicePixelRatio || 1) < 900;
 const blocked = (x: number, z: number) => cottage.contains(x, z, -0.3);
-scene.add(createGrass(ground, isSmallGpu ? 28000 : 42000, WORLD_SEED + 10, blocked));
-scene.add(createWildflowers(ground, palette.wildflowers, 900, WORLD_SEED + 11, (x, z) => cottage.contains(x, z, 0.4)));
+scene.add(createGrass(ground, isSmallGpu ? 36000 : 56000, WORLD_SEED + 10, blocked));
+scene.add(createWildflowers(ground, palette.wildflowers, 1300, WORLD_SEED + 11, (x, z) => cottage.contains(x, z, 0.4)));
 
 const motes = createMotes(140, WORLD_SEED + 12);
 scene.add(motes);

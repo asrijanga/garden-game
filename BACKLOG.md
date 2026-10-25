@@ -31,6 +31,9 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **1.1 v3 review (space):**
+  - *Feedback:* Is the patch usable space? Wants a smaller house or a larger garden.
+  - *Changes:* Clearing radius 13 → 16 m (about 1.6× more garden). Cottage scaled down about 25% and tucked further back against the treeline. Grass and wildflowers scaled to the new area.
 - **1.1 v2 review, round 2:**
   - *Feedback:* Wind effect is great. Overall mood is spot on. Wants to zoom. The edge blur is "really horrible": no blur at all. Trees lack detail, and they are the majority of the screen.
   - *Changes:*
@@ -90,7 +93,7 @@ _Feedback from each review, newest first, and what we changed because of it._
 | Rendering | **Three.js** (WebGL2) | Mature, fast on iOS Safari, has instancing and post-processing. |
 | Language/build | **TypeScript + Vite** | Fast dev loop and small static output. |
 | Hosting | **GitHub Pages via GitHub Actions** (pushing `main` deploys; work happens on `master` and is mirrored with `git push origin master:main`) | Static, free, no server. |
-| World layout | Meadow **clearing** (radius ~13 m) inside a dense instanced forest, with the cottage at the back edge | Matches the Tiny Glade framing: the garden is the clearing. |
+| World layout | Meadow **clearing** (radius ~16 m) inside a dense instanced forest, with the cottage at the back edge | Matches the Tiny Glade framing: the garden is the clearing. |
 | World model | Placed "features" (paths, flowers, pond…), each with a **seed** | Procedural uniqueness is reproducible: the same seed gives the same flower. Save and share stay small and exact. |
 | Wind | `WindField`: a tileable gust-noise texture scrolling with the wind, times a slow global calm/gust envelope. Sampled identically on GPU (`gardenWind()`) and CPU (`WindField.sample()`) | One airflow drives everything: grass waves now, and flags and chimes later. |
 | Seasons | `currentSeason()` from the device date and time zone (southern hemisphere flips). `?season=` overrides | "The season should reflect what the current season is." |

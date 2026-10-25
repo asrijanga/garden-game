@@ -69,7 +69,7 @@ export function createGrass(ground: Ground, count: number, seed: number, blocked
   const e = new THREE.Euler();
   const color = new THREE.Color();
   const tint = new THREE.Color();
-  const extent = 17;
+  const extent = 20;
 
   let placed = 0;
   let guard = 0;
@@ -126,8 +126,8 @@ export function createWildflowers(ground: Ground, palette: string[], count: numb
   let guard = 0;
   while (placed < count && guard++ < count * 6) {
     // Clustered: pick a patch centre, then scatter around it.
-    const cx = (rng() * 2 - 1) * 13;
-    const cz = (rng() * 2 - 1) * 13;
+    const cx = (rng() * 2 - 1) * 16;
+    const cz = (rng() * 2 - 1) * 16;
     const patch = 3 + Math.floor(rng() * 7);
     const hex = palette[Math.floor(rng() * palette.length)];
     for (let i = 0; i < patch && placed < count; i++) {

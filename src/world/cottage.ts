@@ -8,7 +8,7 @@ const D = 3.4; // wall depth (along local z)
 const WALL_H = 2.3;
 const BASE_H = 0.45;
 const ROOF_RISE = 1.75;
-const COTTAGE_SCALE = 1.45;
+const COTTAGE_SCALE = 1.1;
 
 const lambert = (color: string, extra: THREE.MeshLambertMaterialParameters = {}) =>
   new THREE.MeshLambertMaterial({ color, ...extra });

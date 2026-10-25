@@ -13,7 +13,7 @@ export class CameraRig {
   minDistance = 9;
   maxDistance = 45;
   /** How far the view centre may wander from the middle of the clearing. */
-  panLimit = 10;
+  panLimit = 12;
 
   private readonly pointers = new Map<number, { x: number; y: number }>();
   private velPan = new THREE.Vector2();

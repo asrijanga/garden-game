@@ -8,7 +8,7 @@ export function createMotes(count: number, seed: number): THREE.Points {
   const rnd = new Float32Array(count);
   for (let i = 0; i < count; i++) {
     const a = rng() * Math.PI * 2;
-    const r = Math.sqrt(rng()) * 10;
+    const r = Math.sqrt(rng()) * 13;
     pos[i * 3] = Math.cos(a) * r;
     pos[i * 3 + 1] = 0.3 + rng() * 4.5;
     pos[i * 3 + 2] = Math.sin(a) * r;
