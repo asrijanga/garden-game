@@ -306,3 +306,117 @@ body.picking .sound-hint {
     bottom: calc(env(safe-area-inset-bottom, 0px) + 314px);
   }
 }
+
+/* --- Loading: a seed sprouting --------------------------------------------------------------- */
+#loader {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: linear-gradient(#a9c6d6, #f2d0a8 70%, #e9b98f);
+  transition: opacity 0.9s ease;
+  font: 500 15px/1.3 ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, sans-serif;
+  color: rgba(70, 48, 30, 0.75);
+  letter-spacing: 0.02em;
+}
+#loader.done {
+  opacity: 0;
+  pointer-events: none;
+}
+#loader p {
+  margin: 0;
+  opacity: 0;
+  animation: loader-fade 0.8s ease 0.3s forwards;
+}
+.sprout {
+  width: 132px;
+  height: 132px;
+  overflow: visible;
+}
+.sprout .soil-shadow { fill: rgba(80, 50, 25, 0.18); }
+.sprout .soil { fill: #7d5a3b; }
+.sprout .soil-top { fill: none; stroke: #94704c; stroke-width: 2.5; stroke-linecap: round; }
+.sprout .seed {
+  fill: #b1844f;
+  transform-origin: 60px 88px;
+  animation: seed-wiggle 0.7s ease-in-out 0.1s 2;
+}
+.sprout .stem {
+  fill: none;
+  stroke: #5f9a3f;
+  stroke-width: 3.6;
+  stroke-linecap: round;
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: stem-grow 0.9s cubic-bezier(0.3, 0.7, 0.4, 1) 1.1s forwards;
+}
+.sprout .leaf {
+  fill: #74ae4a;
+  transform: scale(0);
+  animation: leaf-open 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) forwards, leaf-sway 2.6s ease-in-out 2.4s infinite alternate;
+}
+.sprout .leaf-l { transform-origin: 61px 58px; animation-delay: 1.75s, 2.45s; }
+.sprout .leaf-r { transform-origin: 61px 56px; fill: #82bb55; animation-delay: 1.9s, 2.6s; }
+@keyframes seed-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-9deg) translateY(-1px); }
+  75% { transform: rotate(8deg); }
+}
+@keyframes stem-grow { to { stroke-dashoffset: 0; } }
+@keyframes leaf-open { to { transform: scale(1); } }
+@keyframes leaf-sway {
+  from { transform: scale(1) rotate(-3deg); }
+  to { transform: scale(1) rotate(4deg); }
+}
+@keyframes loader-fade { to { opacity: 1; } }
+
+/* --- A gentle confirmation card ------------------------------------------------------------- */
+.confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(40, 28, 18, 0.28);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.confirm.show { opacity: 1; }
+.confirm-card {
+  width: min(320px, 100%);
+  padding: 22px 20px 18px;
+  border-radius: 26px;
+  background: rgba(255, 247, 234, 0.88);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: 0 14px 40px rgba(60, 40, 20, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  text-align: center;
+  color: #4a3424;
+  font: 500 15px/1.4 ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, sans-serif;
+  transform: translateY(12px) scale(0.96);
+  transition: transform 0.3s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.confirm.show .confirm-card { transform: none; }
+.confirm-card h2 { margin: 0 0 6px; font-size: 19px; font-weight: 700; }
+.confirm-card p { margin: 0 0 18px; color: rgba(74, 52, 36, 0.75); }
+.confirm-actions { display: flex; gap: 10px; }
+.confirm-actions button {
+  flex: 1;
+  padding: 13px 10px;
+  border: none;
+  border-radius: 16px;
+  font: inherit;
+  font-weight: 650;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease;
+}
+.confirm-actions button:active { transform: scale(0.95); }
+.confirm-keep { background: #fffdf8; color: #4a3424; box-shadow: 0 2px 8px rgba(60, 40, 20, 0.15); }
+.confirm-go { background: #e8956a; color: #fffaf2; box-shadow: 0 3px 10px rgba(180, 90, 40, 0.35); }

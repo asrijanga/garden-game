@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { regrow } from '../core/regrow';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
@@ -166,7 +167,7 @@ export class PondPlants {
     const index = mesh.count++;
     mesh.setColorAt(index, tint);
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    const item: Item = { mesh, index, pos: new THREE.Vector3(x, y, z), yaw: this.rng() * Math.PI * 2, size, delay, t: 0, reed };
+    const item: Item = { mesh, index, pos: new THREE.Vector3(x, y, z), yaw: this.rng() * Math.PI * 2, size, delay: delay + regrow.offset, t: 0, reed };
     this.items.push(item);
     this.growing.push(item);
     this.write(item, 0.0001);

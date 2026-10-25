@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { regrow } from '../core/regrow';
 import { createNoise2D } from '../core/noise';
 import { smoothstep } from '../core/random';
 import { uniforms as windUniforms, windSampleGLSL } from '../render/wind';
@@ -354,7 +355,7 @@ export class Ponds {
       let low = Infinity;
       for (const v of rim) low = Math.min(low, this.groundAt(v));
       const target = low - 0.07;
-      if (!body.filled) body.delay = 0.7;
+      body.delay = (body.filled ? 0 : 0.7) + regrow.offset;
       body.filled = true;
       body.fillFrom = body.level;
       body.fillT = 0;

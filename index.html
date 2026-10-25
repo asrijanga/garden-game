@@ -18,6 +18,19 @@
   </head>
   <body>
     <canvas id="world"></canvas>
+    <!-- Shown before any script runs: a seed sprouting while the garden grows. -->
+    <div id="loader" aria-live="polite">
+      <svg class="sprout" viewBox="0 0 120 120" aria-hidden="true">
+        <ellipse class="soil-shadow" cx="60" cy="99" rx="38" ry="8" />
+        <path class="soil" d="M24 98 C30 88, 46 84, 60 84 C74 84, 90 88, 96 98 Z" />
+        <path class="soil-top" d="M30 92 C40 87, 52 86, 60 86 C70 86, 82 88, 90 93" />
+        <g class="seed"><ellipse cx="60" cy="86" rx="7" ry="5" /></g>
+        <path class="stem" d="M60 86 C60 76, 56 68, 61 54" />
+        <g class="leaf leaf-l"><path d="M61 58 C52 58, 44 52, 42 44 C51 43, 59 48, 61 58 Z" /></g>
+        <g class="leaf leaf-r"><path d="M61 56 C66 50, 74 46, 82 47 C79 55, 70 59, 61 56 Z" /></g>
+      </svg>
+      <p>Growing your garden…</p>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { regrow } from '../core/regrow';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import type { Ponds, PondBody } from './pond';
@@ -150,6 +151,7 @@ export class Fish {
 
   /** Make sure a pond has a few fish (more for bigger ponds), arriving after `delay` seconds. */
   stock(body: PondBody, delay: number) {
+    delay += regrow.offset;
     let deep = 0;
     for (const v of body.cells) {
       this.ponds.cellPosition(v, this.v2);

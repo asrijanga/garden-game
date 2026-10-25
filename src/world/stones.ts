@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { regrow } from '../core/regrow';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
@@ -255,7 +256,7 @@ export class Stones {
     const k = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
     if (!this.grid.has(k)) this.grid.set(k, []);
     this.grid.get(k)!.push(stone);
-    this.falling.push({ stone, delay, t: 0, landed: false });
+    this.falling.push({ stone, delay: delay + regrow.offset, t: 0, landed: false });
     this.write(stone, 0, 0.0001);
   }
 

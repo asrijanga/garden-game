@@ -19,6 +19,8 @@ export class Toolbar {
   private readonly buttons = new Map<Tool, HTMLButtonElement>();
   private readonly label: HTMLDivElement;
   private labelTimer = 0;
+  /** Called when a tool button is held down for a while (rather than tapped). */
+  onHold: ((tool: Tool) => void) | null = null;
 
   constructor(private readonly onChange: (tool: Tool) => void) {
     const tray = document.createElement('nav');
@@ -35,14 +37,27 @@ export class Toolbar {
       b.dataset.tool = t.id;
       b.setAttribute('aria-label', t.label);
       b.innerHTML = `<span class="tool-face">${ICONS[t.id]}</span>`;
+      let hold = 0;
+      let held = false;
+      const release = () => clearTimeout(hold);
       b.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         b.classList.remove('bounce');
         void b.offsetWidth; // restart the squash animation
         b.classList.add('bounce');
+        held = false;
+        release();
+        hold = window.setTimeout(() => {
+          held = true;
+          this.onHold?.(t.id);
+        }, 700);
       });
+      b.addEventListener('pointerup', release);
+      b.addEventListener('pointerleave', release);
+      b.addEventListener('pointercancel', release);
       b.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (held) return; // a long press isn't also a tap
         this.select(t.id);
       });
       this.buttons.set(t.id, b);

@@ -33,6 +33,9 @@ import { Toolbar } from './ui/toolbar';
 import { GroundPicker } from './core/groundPicker';
 import { TouchMarker } from './world/touchMarker';
 import { ToolController } from './game/tools';
+import { GardenStore } from './game/garden';
+import { regrow } from './core/regrow';
+import { confirmCard } from './ui/confirm';
 
 const WORLD_SEED = 20261025;
 
@@ -206,6 +209,25 @@ const pondBrush = new PondBrush(
 const toolbar = new Toolbar((tool) => {
   ambience.tap(TOOL_PITCH[tool]);
   tools?.setTool(tool);
+  if (tool === 'erase') toolbar.showLabel('Tidy up · hold for a new garden', 2600);
+});
+// Holding "Tidy up" offers a fresh start (after asking).
+toolbar.onHold = (tool) => {
+  if (tool !== 'erase') return;
+  ambience.tap(0.7);
+  void confirmCard('Start a new garden?', 'Everything you’ve made here will be cleared away. This can’t be undone.', 'Keep my garden', 'Start fresh').then((go) => {
+    if (!go) return;
+    store.clear();
+    location.reload();
+  });
+};
+
+// Your garden, remembered stroke by stroke.
+const store = new GardenStore();
+const saved = store.load();
+addEventListener('pagehide', () => store.save());
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) store.save();
 });
 const picker = new FlowerPicker(flowerBrush.ordered(), (sp) => flowerBrush.inSeason(sp), (id, label) => {
   flowerBrush.selected = id;
@@ -230,10 +252,24 @@ const eraser = new EraseBrush(
   (amount) => ambience.erase(amount),
 );
 if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, renderer, scene });
-tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker, paths, flowerBrush, pondBrush, eraser, (tool) => {
-  picker.setVisible(tool === 'flowers');
-  document.body.classList.toggle('picking', tool === 'flowers');
-});
+tools = new ToolController(
+  canvas,
+  toolbar,
+  rig,
+  new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)),
+  marker,
+  paths,
+  flowerBrush,
+  pondBrush,
+  eraser,
+  (x, z) => ground.heightAt(x, z),
+  (action) => store.add(action),
+  (tool) => {
+    picker.setVisible(tool === 'flowers');
+    document.body.classList.toggle('picking', tool === 'flowers');
+  },
+);
+const controller = tools;
 
 // --- Post-processing ----------------------------------------------------------------------
 const post = new PostFX(renderer, scene, camera);
@@ -275,11 +311,45 @@ const quality = new Quality(
   fixedTier !== null,
 );
 const fpsMeter = params.has('fps') ? mountFpsMeter(quality) : null;
-if (debug) Object.assign(window, { quality, TIERS });
+if (debug) Object.assign(window, { quality, TIERS, store });
 
 // Compile every shader up front (in parallel where supported), so the first pond or bed
 // doesn't hitch while its material compiles.
-void renderer.compileAsync(scene, camera);
+const warmed = renderer.compileAsync(scene, camera).catch(() => {});
+
+// --- Loading: a seed sprouts while shaders compile and the saved garden is rebuilt ------------
+// The garden's own clock stands still meanwhile, so it regrows in front of you once the loader
+// fades: stroke after stroke, a little apart.
+let loading = true;
+const loadStart = performance.now();
+async function rebuild() {
+  await Promise.race([warmed, new Promise((r) => setTimeout(r, 4000))]);
+  const gap = Math.min(0.18, 3 / Math.max(1, saved.length));
+  let next = 0;
+  await new Promise<void>((done) => {
+    const step = () => {
+      const t0 = performance.now();
+      // A slice of strokes per frame, so the sprout keeps moving.
+      while (next < saved.length && performance.now() - t0 < 12) {
+        regrow.offset = 0.3 + next * gap;
+        controller.replay(saved[next++]);
+      }
+      if (next < saved.length) requestAnimationFrame(step);
+      else done();
+    };
+    step();
+  });
+  regrow.offset = 0;
+  // Let the seed finish sprouting before the garden appears.
+  const shown = performance.now() - loadStart;
+  await new Promise((r) => setTimeout(r, Math.max(0, 2300 - shown)));
+  loading = false;
+  canvas.classList.add('ready');
+  const loader = document.getElementById('loader');
+  loader?.classList.add('done');
+  setTimeout(() => loader?.remove(), 1000);
+}
+void rebuild();
 
 // --- Loop -----------------------------------------------------------------------------------
 const timer = new THREE.Timer();
@@ -289,7 +359,7 @@ function frame(time: number) {
   timer.update(time);
   const raw = timer.getDelta();
   const dt = Math.min(raw, 1 / 20);
-  quality.frame(raw);
+  if (!loading) quality.frame(raw);
   fpsMeter?.(raw);
   elapsed += dt;
 
@@ -297,16 +367,18 @@ function frame(time: number) {
   cottage.update(dt, wind);
   flyingBirds.update(dt);
   marker.update(dt, rig.distance);
-  stones.update(dt);
-  edgePlants.update(dt);
-  flowers.update(dt);
-  bees.update(dt);
-  ponds.update(dt);
-  fish.update(dt);
-  pondPlants.update(dt);
-  splash.update(dt);
-  wildflowers.update(dt);
-  dust.update(dt);
+  if (!loading) {
+    stones.update(dt);
+    edgePlants.update(dt);
+    flowers.update(dt);
+    bees.update(dt);
+    ponds.update(dt);
+    fish.update(dt);
+    pondPlants.update(dt);
+    splash.update(dt);
+    wildflowers.update(dt);
+    dust.update(dt);
+  }
   paint.update(dt);
   (motes.material as THREE.ShaderMaterial).uniforms.uTime.value = elapsed;
   rig.update(dt);
@@ -319,4 +391,3 @@ function frame(time: number) {
 
 rig.update(0);
 renderer.setAnimationLoop(frame);
-requestAnimationFrame(() => canvas.classList.add('ready'));

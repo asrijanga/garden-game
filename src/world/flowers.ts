@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { regrow } from '../core/regrow';
 import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
 import type { FlowerSpecies } from './flowerSpecies';
@@ -446,6 +447,7 @@ export class Flowers {
   private readonly placed = new Map<string, Placed[]>();
   private readonly wilting: { p: Placed; t: number }[] = [];
   private time = 0;
+  private readonly rng = createRng(4242);
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
 
@@ -533,8 +535,8 @@ export class Flowers {
 
   /** A leafy clump that fills the bed around the flowers. It swells in alongside them. */
   plantFoliage(x: number, y: number, z: number, yaw: number, scale: number, delay: number, color: THREE.Color) {
-    const mesh = this.foliage[Math.floor(Math.random() * this.foliage.length)];
-    this.write(mesh, x, y, z, yaw, scale, delay, 1, color);
+    const mesh = this.foliage[Math.floor(this.rng() * this.foliage.length)];
+    this.write(mesh, x, y, z, yaw, scale, delay + regrow.offset, 1, color);
   }
 
   private write(mesh: THREE.InstancedMesh, x: number, y: number, z: number, yaw: number, scale: number, delay: number, bloomMax: number, color: THREE.Color): boolean {
@@ -578,6 +580,7 @@ export class Flowers {
   }
 
   plant(sp: FlowerSpecies, variant: number, x: number, y: number, z: number, yaw: number, scale: number, delay: number, bloomMax: number, color: THREE.Color) {
+    delay += regrow.offset;
     const mesh = this.meshes.get(sp.id)![variant % VARIANTS];
     if (!this.write(mesh, x, y, z, yaw, scale, delay, bloomMax, color)) return;
     const birth = this.time + delay;
