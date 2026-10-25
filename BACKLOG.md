@@ -31,6 +31,7 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **1.5 review:** *Feedback:* Path edges look too clean; make the outline rough so it looks realistic. *Changes:* Lighter, gradually accumulating paint dabs give a gentle edge ramp. The lawn shader displaces the boundary with four octaves of procedural noise (outline wobble down to fine nibbles), adds a darker trodden-soil lip at the turf line, and paints extra scuffs along both edges.
 - **1.4 review 2:** "That looks awesome." 1.4 done.
 - **1.4 review:** "Buttons work, looks great!" *Feedback:* The tap feedback on the grass is too big; it suggests the workable area is a small section. *Changes:* Touch ring shrunk about 60% (radius 0.017× camera distance), thinner ring with a tiny bright centre glint, smaller ripple on release.
 - **Lawn + birds review:** "Perfect, next story." Lawn and 1.2b done.

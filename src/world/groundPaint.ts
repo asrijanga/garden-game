@@ -35,8 +35,9 @@ export class GroundPaint {
     const [cx, cy] = this.toCanvas(x, z);
     const r = (radius / (PAINT_HALF * 2)) * SIZE;
     const g = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0, `rgba(255,0,0,${0.55 * strength})`);
-    g.addColorStop(0.6, `rgba(255,0,0,${0.35 * strength})`);
+    // Light dabs that build up gradually: a gentle ramp at the edge leaves room for roughness.
+    g.addColorStop(0, `rgba(255,0,0,${0.16 * strength})`);
+    g.addColorStop(0.5, `rgba(255,0,0,${0.1 * strength})`);
     g.addColorStop(1, 'rgba(255,0,0,0)');
     this.ctx.globalCompositeOperation = 'lighter';
     this.ctx.fillStyle = g;

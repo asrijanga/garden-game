@@ -88,6 +88,15 @@ export class Ground {
   }
 }
 
+const lawnNoiseGLSL = /* glsl */ `
+float lawnHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float lawnNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(lawnHash(i), lawnHash(i + vec2(1.0, 0.0)), f.x), mix(lawnHash(i + vec2(0.0, 1.0)), lawnHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+`;
+
 /**
  * The lawn is painted, not modelled: a soft, fine grain (mip-mapped, so it melts into smooth
  * colour from afar and never shimmers) plus a gentle sheen where gusts roll across the meadow,
@@ -103,7 +112,7 @@ function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
       .replace('#include <common>', '#include <common>\nattribute float aMeadow;\nvarying float vMeadow;\nvarying vec3 vWorld;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMeadow = aMeadow;\nvWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nuniform sampler2D uGrain;\nuniform sampler2D uPaint;\nvarying float vMeadow;\nvarying vec3 vWorld;\n${windSampleGLSL}\n${paintUvGLSL}`)
+      .replace('#include <common>', `#include <common>\nuniform sampler2D uGrain;\nuniform sampler2D uPaint;\nvarying float vMeadow;\nvarying vec3 vWorld;\n${windSampleGLSL}\n${paintUvGLSL}\n${lawnNoiseGLSL}`)
       .replace(
         '#include <color_fragment>',
         /* glsl */ `#include <color_fragment>
@@ -112,11 +121,17 @@ function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
         diffuseColor.rgb *= mix(1.0, 0.88 + grain * 0.24, vMeadow);
         // Worn earth under paths, with a ragged, organic edge and a lusher rim of grass.
         float wear = texture2D(uPaint, paintUv(vWorld.xz)).r;
-        float ragged = (texture2D(uGrain, vWorld.xz * 0.9 + 0.71).r - 0.5) * 0.5;
-        float earth = smoothstep(0.32, 0.62, wear + ragged);
-        float rim = smoothstep(0.06, 0.3, wear) * (1.0 - earth);
+        // Ragged edge: three octaves of noise nibble the boundary into tufts and bare bites.
+        float rough = lawnNoise(vWorld.xz * 0.9 + 2.1) * 0.35 + lawnNoise(vWorld.xz * 2.2) * 0.3 + lawnNoise(vWorld.xz * 5.5 + 7.3) * 0.22 + lawnNoise(vWorld.xz * 13.0 - 3.1) * 0.13;
+        float ragged = (rough - 0.5) * 0.75;
+        float edgeField = wear + ragged;
+        float earth = smoothstep(0.4, 0.5, edgeField);
+        // Trodden, slightly damp soil where the earth meets the turf.
+        float lip = earth * (1.0 - smoothstep(0.5, 0.66, edgeField));
+        float rim = smoothstep(0.1, 0.38, wear) * (1.0 - earth);
         diffuseColor.rgb *= 1.0 - rim * 0.12;
         vec3 soil = mix(vec3(0.24, 0.16, 0.09), vec3(0.34, 0.24, 0.14), grain);
+        soil *= 1.0 - lip * 0.28;
         diffuseColor.rgb = mix(diffuseColor.rgb, soil, earth);
         // Gust sheen: the meadow brightens softly as wind passes, like grass bowing in waves.
         float gust = windAt(vWorld.xz, 0.0);

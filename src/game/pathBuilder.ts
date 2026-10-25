@@ -8,7 +8,7 @@ import type { Wildflowers } from '../world/wildflowers';
 
 const STEP = 0.18; // metres the path advances per smoothing step
 const STONE_SPACING = 0.86;
-const WEAR_RADIUS = 0.92;
+const WEAR_RADIUS = 1.2;
 const DOOR_SNAP = 3.5; // paths ending this close to the door finish themselves
 
 export interface PathRecord {
@@ -105,7 +105,14 @@ export class PathBuilder {
     this.paint.wear(w.x, w.y, WEAR_RADIUS * lerp(0.82, 1.08, this.rng()));
     if (this.rng() < 0.25) {
       const k = (this.rng() - 0.5) * 1.1;
-      this.paint.wear(w.x - this.heading.y * k, w.y + this.heading.x * k, lerp(0.35, 0.6, this.rng()), 0.8);
+      this.paint.wear(w.x - this.heading.y * k, w.y + this.heading.x * k, lerp(0.45, 0.8, this.rng()), 2.5);
+    }
+    // Small scuffs along both edges so the outline wanders irregularly.
+    for (const side of [-1, 1]) {
+      if (this.rng() < 0.55) {
+        const k = side * lerp(0.55, 0.95, this.rng());
+        this.paint.wear(w.x - this.heading.y * k, w.y + this.heading.x * k, lerp(0.25, 0.45, this.rng()), lerp(1.5, 3, this.rng()));
+      }
     }
     this.wildflowers.clearNear(w.x, w.y, 1.15);
 
