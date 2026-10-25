@@ -12,6 +12,7 @@ const GRAVEL_RADIUS = 0.8; // painted gravel; its visible edge (~80% of this) si
 const CURB_OFFSET = 0.62; // centre line → edging stone centre
 const INSIDE = CURB_OFFSET - 0.1; // closer than this to a centre line = inside that path
 const CELL = 1; // spatial hash for path centre lines
+const LEAD = 0.4; // the finger leads the path by this much before it moves on (ignores jitter)
 const FLARE_START = 1.6; // junction curve begins this far from another path's centre line…
 const FLARE_FULL = 0.75; // …and is fully flared by here
 
@@ -55,6 +56,7 @@ export class PathBuilder {
   private active: PathRecord | null = null;
   private pathId = 0;
   private started = false;
+  private readonly lastTarget = new THREE.Vector2();
   private readonly lines = new Map<string, LinePoint[]>();
 
   constructor(
@@ -71,6 +73,7 @@ export class PathBuilder {
     this.active = { seed: Math.floor(this.rng() * 1e9), points: [] };
     this.records.push(this.active);
     this.walker.set(p.x, p.z);
+    this.lastTarget.set(p.x, p.z);
     this.heading.set(0, 0);
     this.lastCurb = [null, null];
     this.sinceStone = 0;
@@ -81,13 +84,29 @@ export class PathBuilder {
 
   extend(p: THREE.Vector3) {
     if (!this.active) return;
-    const target = new THREE.Vector2(p.x, p.z);
+    this.lastTarget.set(p.x, p.z);
+    this.walkTo(this.lastTarget, LEAD);
+  }
+
+  end() {
+    // Finish exactly where the finger lifted (if it's ahead of us).
+    if (this.active) this.walkTo(this.lastTarget, STEP);
+    this.active = null;
+  }
+
+  /**
+   * Walk toward `target` until within `stopAt`. The finger must lead by `LEAD` before the path
+   * moves on, and targets behind us are ignored, so jitter or wiggling in place never makes
+   * the path loop back on itself.
+   */
+  private walkTo(target: THREE.Vector2, stopAt: number) {
     const dir = new THREE.Vector2();
     for (let guard = 0; guard < 300; guard++) {
       dir.subVectors(target, this.walker);
       const dist = dir.length();
-      if (dist < STEP) break;
+      if (dist < Math.max(stopAt, STEP)) break;
       dir.divideScalar(dist);
+      if (this.heading.lengthSq() > 0 && this.heading.dot(dir) < -0.1 && dist < 1.2) break;
       // Light smoothing: the heading eases toward the finger, so jitter becomes gentle curves.
       if (this.heading.lengthSq() === 0) this.heading.copy(dir);
       else this.heading.lerp(dir, 0.35).normalize();
@@ -99,10 +118,6 @@ export class PathBuilder {
       this.walker.addScaledVector(this.heading, STEP);
       this.stepAt(this.walker, false);
     }
-  }
-
-  end() {
-    this.active = null;
   }
 
   private stepAt(w: THREE.Vector2, first: boolean) {
