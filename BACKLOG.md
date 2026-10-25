@@ -293,10 +293,24 @@ Demo script: draw a pond next to the path and wait for the first fish to jump.
 
 ### Story 3.3 — Creatures (L)
 - Butterflies and bees drift between blooms. Birds land on fences and the cottage roof. Dragonflies skim the pond.
-- *(Birds flying across the sky were already pulled forward as 1.2b.)*
+- *(Birds flying across the sky were already pulled forward as 1.2b; bees as 1.6b.)*
 
 ### Story 3.4 — Vines and climbing roses (M)
 - Vines creep along fences, walls and the cottage, and roses bloom on them.
+
+### Story 3.5 — Bunnies in the garden (M) — *requested by the player*
+**As a** player, **I want** soft little bunnies and their babies hopping around my garden, **so that** it feels alive, sweet and peaceful to watch.
+
+- **A bunny family:** grown-up rabbits and tiny, fluffier baby bunnies, procedurally varied in size and in soft coat colours (sandy brown, grey-brown, cream, and a rare white), with round cotton tails.
+- **Natural hopping:** an anticipation crouch, a bounce with squash and stretch, landing, and a pause. Babies make smaller, quicker, slightly clumsy hops and stay close to a parent, bouncing after it. Ears and tail bob with each hop.
+- **Calm behaviours between hops:** sit up and look around, nibble the grass, twitch noses and ears, wash a face, lie down in a sunny spot, and the odd playful "binky" (a happy twisting jump) from a baby.
+- **Living in the world:** they emerge from and return to the forest edge. They wander the meadow, nibble the edges of flower beds (without damaging them), keep to paths and lawn rather than climbing on stones, and stay a respectful distance from the cottage door.
+- **Gentle with the player:** if your finger draws or plants right next to a bunny, it lollops away a few hops (never a frantic flee) and settles again. Tapping a bunny makes it sit up and look at you.
+- **Rare and relaxing:** a family appears now and then rather than constantly; at most one or two families at a time. Calm, unhurried movement, in keeping with the soothing feel.
+- **Soft sound:** almost silent, perhaps the faintest rustle as they hop through flowers when zoomed in close.
+- **Performance:** a handful of instanced or simple meshes with procedural animation, cheap on iPhone.
+
+Demo script: zoom in near the forest edge and wait for a bunny family; watch the babies bounce after their parent, then plant flowers nearby and watch them hop aside.
 
 ---
 
