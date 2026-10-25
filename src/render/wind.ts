@@ -108,6 +108,20 @@ export function bindWind(field: WindField) {
   uniforms.uWindDir.value = field.direction;
 }
 
+/** Just the wind sampler (no varyings), for use in fragment shaders such as the lawn. */
+export const windSampleGLSL = /* glsl */ `
+uniform sampler2D uWindTex;
+uniform float uWindTime;
+uniform float uWindEnvelope;
+uniform vec2 uWindDir;
+
+float windAt(vec2 p, float lag) {
+  vec2 uv = (p - uWindDir * ${GUST_SPEED.toFixed(2)} * (uWindTime - lag)) * ${WORLD_SCALE.toFixed(6)};
+  float g = smoothstep(0.35, 0.8, texture2D(uWindTex, uv).r);
+  return uWindEnvelope * (0.3 + 0.9 * g);
+}
+`;
+
 export const windGLSL = /* glsl */ `
 uniform sampler2D uWindTex;
 uniform float uWindTime;

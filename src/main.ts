@@ -4,7 +4,7 @@ import { Ground, CLEARING_RADIUS } from './world/ground';
 import { createForest } from './world/trees';
 import { CameraRig } from './core/cameraRig';
 import { Cottage } from './world/cottage';
-import { createGrass, createWildflowers } from './world/grass';
+import { createWildflowers } from './world/wildflowers';
 import { createMotes } from './world/motes';
 import { FlyingBirds } from './world/flyingBirds';
 import { currentSeason, PALETTES } from './world/season';
@@ -76,9 +76,6 @@ scene.add(cottage.smokePoints);
 
 scene.add(createForest(ground, palette, season, WORLD_SEED + 40, (x, z) => cottage.contains(x, z, 1.2)));
 
-const isSmallGpu = Math.min(screen.width, screen.height) * (window.devicePixelRatio || 1) < 900;
-const blocked = (x: number, z: number) => cottage.contains(x, z, -0.3);
-scene.add(createGrass(ground, isSmallGpu ? 34000 : 48000, WORLD_SEED + 10, blocked));
 scene.add(createWildflowers(ground, palette.wildflowers, 1600, WORLD_SEED + 11, (x, z) => cottage.contains(x, z, 0.4)));
 
 const debug = new URLSearchParams(location.search).has('debug');
