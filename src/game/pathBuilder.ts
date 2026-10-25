@@ -125,8 +125,9 @@ export class PathBuilder {
     // Merging: the old path's edging that now sits inside our (flared) gravel is lifted away.
     this.stones.removeNear(w.x, w.y, INSIDE * (1 + flare), 'curb', this.pathId);
 
-    // Centre stones, unless we're running through another path (its stones carry on there).
-    const insideOther = toOther < INSIDE;
+    // Centre stones, unless we're running through or alongside another path's gravel (its
+    // stones carry on there, so overlapping paths keep a single row).
+    const insideOther = toOther < GRAVEL_RADIUS * 0.95;
     this.sinceStone += first ? 0 : STEP;
     if ((first || this.sinceStone >= STONE_SPACING) && !insideOther) {
       this.sinceStone = 0;
