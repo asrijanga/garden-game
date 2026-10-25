@@ -2,17 +2,51 @@ import * as THREE from 'three';
 import { createRng, lerp } from '../core/random';
 import type { Ground } from '../world/ground';
 import type { GroundPaint } from '../world/groundPaint';
-import type { Stones } from '../world/stones';
+import type { StoneFamily, Stones } from '../world/stones';
 import type { EdgePlants } from '../world/edgePlants';
 import type { Wildflowers } from '../world/wildflowers';
 
 const STEP = 0.18; // metres the path advances per smoothing step
-const STONE_SPACING = 0.86;
-const WEAR_RADIUS = 1.2;
+const WEAR_RADIUS = 1.02;
+
+/**
+ * Each new path picks one of these at random, so the garden fills with a variety of walks.
+ *  - layout 'step':    stones alternate side to side along the middle
+ *  - layout 'pairs':   rows of slabs laid across the width
+ *  - layout 'scatter': many small stones scattered across the trail
+ */
+interface PathStyle {
+  name: string;
+  weight: number;
+  family: StoneFamily[];
+  size: [number, number];
+  layout: 'step' | 'pairs' | 'scatter';
+  spacing: number; // metres between stones / rows / scatter batches
+  perBatch?: number; // scatter: stones per batch
+  tones: string[];
+  sand: number;
+  width: number; // multiplier on the worn width
+}
+
+const STYLES: PathStyle[] = [
+  { name: 'stepping stones', weight: 3, family: ['flat'], size: [0.16, 0.25], layout: 'step', spacing: 0.6, tones: ['#d6cfc2', '#c7c0b4', '#ddd3c1', '#bdb7ad', '#d0c2ab'], sand: 0, width: 0.85 },
+  { name: 'cobbles', weight: 2, family: ['pebble'], size: [0.07, 0.12], layout: 'scatter', spacing: 0.2, perBatch: 3, tones: ['#b8b0a5', '#a49c90', '#c9bfb0', '#9a8f80', '#b9a78f', '#8f8a84'], sand: 0.25, width: 0.9 },
+  { name: 'flagstones', weight: 2, family: ['flat'], size: [0.19, 0.27], layout: 'pairs', spacing: 0.52, tones: ['#a9aeb1', '#9ba1a6', '#b6b6ae', '#8f979c', '#a8a397'], sand: 0.1, width: 1.0 },
+  { name: 'gravel trail', weight: 2, family: ['pebble', 'angular'], size: [0.045, 0.08], layout: 'scatter', spacing: 0.18, perBatch: 2, tones: ['#a99f8e', '#8f877a', '#b8ab95', '#9c9282', '#c9bea8'], sand: 1, width: 0.9 },
+  { name: 'mossy stones', weight: 2, family: ['angular', 'flat'], size: [0.14, 0.22], layout: 'step', spacing: 0.55, tones: ['#9fa88f', '#8f9a80', '#b0b4a0', '#a3a38f', '#879377'], sand: 0, width: 0.8 },
+];
+
+function pickStyle(rng: () => number): PathStyle {
+  const total = STYLES.reduce((a, s) => a + s.weight, 0);
+  let r = rng() * total;
+  for (const s of STYLES) if ((r -= s.weight) <= 0) return s;
+  return STYLES[0];
+}
 const DOOR_SNAP = 3.5; // paths ending this close to the door finish themselves
 
 export interface PathRecord {
   seed: number;
+  style: string;
   points: { x: number; z: number }[];
 }
 
@@ -30,6 +64,7 @@ export class PathBuilder {
   private side = 1;
   private active: PathRecord | null = null;
   private autoDelay = 0;
+  private style: PathStyle = STYLES[0];
 
   constructor(
     private readonly ground: Ground,
@@ -42,10 +77,11 @@ export class PathBuilder {
   ) {}
 
   begin(p: THREE.Vector3) {
-    this.active = { seed: Math.floor(this.rng() * 1e9), points: [] };
+    this.style = pickStyle(this.rng);
+    this.active = { seed: Math.floor(this.rng() * 1e9), style: this.style.name, points: [] };
     this.records.push(this.active);
     this.heading.set(0, 0);
-    this.sinceStone = STONE_SPACING; // first stone right where you touch
+    this.sinceStone = this.style.spacing; // first stone right where you touch
     const start = new THREE.Vector2(p.x, p.z);
     if (start.distanceTo(this.door) < DOOR_SNAP && start.distanceTo(this.door) > 0.4) {
       // Starting near the cottage: lay the path out from the doorstep to the finger first.
@@ -102,38 +138,25 @@ export class PathBuilder {
     if (this.blocked(w.x, w.y)) return;
     this.active?.points.push({ x: w.x, z: w.y });
     // Width breathes along the path, with the odd scuff off to one side: a worn trail, not a stripe.
-    this.paint.wear(w.x, w.y, WEAR_RADIUS * lerp(0.82, 1.08, this.rng()));
+    const sand = this.style.sand;
+    this.paint.wear(w.x, w.y, WEAR_RADIUS * this.style.width * lerp(0.82, 1.08, this.rng()), 1, sand);
     if (this.rng() < 0.25) {
       const k = (this.rng() - 0.5) * 1.1;
-      this.paint.wear(w.x - this.heading.y * k, w.y + this.heading.x * k, lerp(0.45, 0.8, this.rng()), 2.5);
+      this.paint.wear(w.x - this.heading.y * k, w.y + this.heading.x * k, lerp(0.45, 0.8, this.rng()), 2.5, sand);
     }
     // Small scuffs along both edges so the outline wanders irregularly.
     for (const side of [-1, 1]) {
       if (this.rng() < 0.55) {
         const k = side * lerp(0.55, 0.95, this.rng());
-        this.paint.wear(w.x - this.heading.y * k, w.y + this.heading.x * k, lerp(0.25, 0.45, this.rng()), lerp(1.5, 3, this.rng()));
+        this.paint.wear(w.x - this.heading.y * k, w.y + this.heading.x * k, lerp(0.25, 0.45, this.rng()), lerp(1.5, 3, this.rng()), sand);
       }
     }
     this.wildflowers.clearNear(w.x, w.y, 1.15);
 
     const perp = new THREE.Vector2(-this.heading.y, this.heading.x);
-    if (this.sinceStone >= STONE_SPACING) {
+    if (this.sinceStone >= this.style.spacing) {
       this.sinceStone = 0;
-      this.side = -this.side;
-      const off = this.side * lerp(0.12, 0.26, this.rng());
-      const sx = w.x + perp.x * off + (this.rng() - 0.5) * 0.08;
-      const sz = w.y + perp.y * off + (this.rng() - 0.5) * 0.08;
-      if (!this.stones.isOccupied(sx, sz, 0.62)) {
-        this.stones.add(sx, this.ground.heightAt(sx, sz) - 0.02, sz, lerp(0.34, 0.46, this.rng()), Math.max(0, delay));
-        // Now and then a smaller companion stone fills out the width.
-        if (this.rng() < 0.45) {
-          const cx = w.x - perp.x * (off + this.side * 0.5);
-          const cz = w.y - perp.y * (off + this.side * 0.5);
-          if (!this.stones.isOccupied(cx, cz, 0.4)) {
-            this.stones.add(cx, this.ground.heightAt(cx, cz) - 0.02, cz, lerp(0.18, 0.26, this.rng()), Math.max(0, delay) + 0.08);
-          }
-        }
-      }
+      this.placeStones(w, perp, Math.max(0, delay));
     }
 
     // Clover and tiny flowers creep in along both edges a moment later.
@@ -144,6 +167,40 @@ export class PathBuilder {
       const ez = w.y + perp.y * s * o + (this.rng() - 0.5) * 0.2;
       if (!this.blocked(ex, ez) && !this.stones.isOccupied(ex, ez, 0.55)) {
         this.edges.add(ex, this.ground.heightAt(ex, ez), ez, Math.max(0, delay) + lerp(0.7, 1.6, this.rng()));
+      }
+    }
+  }
+
+  private placeStones(w: THREE.Vector2, perp: THREE.Vector2, delay: number) {
+    const st = this.style;
+    const put = (x: number, z: number, size: number, d: number) => {
+      if (this.blocked(x, z) || this.stones.isOccupied(x, z, size * 0.85)) return;
+      const family = st.family[Math.floor(this.rng() * st.family.length)];
+      const tone = new THREE.Color(st.tones[Math.floor(this.rng() * st.tones.length)]).multiplyScalar(lerp(0.93, 1.07, this.rng()));
+      this.stones.add(family, x, this.ground.heightAt(x, z) - size * 0.08, z, size, tone, d);
+    };
+    const size = () => lerp(st.size[0], st.size[1], this.rng());
+    const half = 0.55 * st.width;
+
+    if (st.layout === 'step') {
+      this.side = -this.side;
+      const off = this.side * lerp(0.08, 0.22, this.rng());
+      put(w.x + perp.x * off + (this.rng() - 0.5) * 0.06, w.y + perp.y * off + (this.rng() - 0.5) * 0.06, size(), delay);
+      if (this.rng() < 0.3) {
+        const o = off - this.side * 0.38;
+        put(w.x + perp.x * o, w.y + perp.y * o, size() * 0.6, delay + 0.07);
+      }
+    } else if (st.layout === 'pairs') {
+      const shift = (this.rng() - 0.5) * 0.12;
+      for (const sgn of [-1, 1]) {
+        const o = sgn * 0.27 + shift;
+        put(w.x + perp.x * o, w.y + perp.y * o, size(), delay + (sgn > 0 ? 0.06 : 0));
+      }
+    } else {
+      for (let i = 0; i < (st.perBatch ?? 3); i++) {
+        const o = (this.rng() * 2 - 1) * half * 0.85;
+        const a = (this.rng() - 0.5) * st.spacing;
+        put(w.x + perp.x * o + this.heading.x * a, w.y + perp.y * o + this.heading.y * a, size(), delay + i * 0.04);
       }
     }
   }

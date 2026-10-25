@@ -31,6 +31,7 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **1.5 review 2:** *Feedback:* Stones in the pathway are too big; wants more variety of stones and pathways, random. *Changes:* Each new path randomly picks a style: **stepping stones** (smaller flat stones), **cobbles** (packed small pebbles), **flagstones** (slate slabs in pairs), **gravel trail** (sandy soil + tiny pebbles), **mossy stones** (angular, green-grey). Three stone families (flat, pebble, angular/faceted), 5 shapes each. Spatial-hash overlap checks. Sandy soil via the paint G channel. Pebble sounds softer and rate-limited.
 - **1.5 review:** *Feedback:* Path edges look too clean; make the outline rough so it looks realistic. *Changes:* Lighter, gradually accumulating paint dabs give a gentle edge ramp. The lawn shader displaces the boundary with four octaves of procedural noise (outline wobble down to fine nibbles), adds a darker trodden-soil lip at the turf line, and paints extra scuffs along both edges.
 - **1.4 review 2:** "That looks awesome." 1.4 done.
 - **1.4 review:** "Buttons work, looks great!" *Feedback:* The tap feedback on the grass is too big; it suggests the workable area is a small section. *Changes:* Touch ring shrunk about 60% (radius 0.017× camera distance), thinner ring with a tiny bright centre glint, smaller ripple on release.
@@ -130,7 +131,7 @@ _Feedback from each review, newest first, and what we changed because of it._
 | Vegetation | Lawn is a painted ground shader (fine grain + wind sheen), no blade geometry. GPU-instanced wildflowers. Trees are procedural archetypes (branching wood + alpha-tested leaf-cluster cards from canvas textures), instanced with per-tree size, lean, yaw and color, with near/far detail levels. Wind in the vertex shader | Tens of thousands of swaying blades at 60fps on a phone. |
 | Look | Soft Lambert lighting, neutral tone mapping, bloom, warm grade. **No blur effects** (player feedback) | Storybook diorama feel, crisp everywhere. |
 | Audio | Web Audio API, procedural (filtered noise for wind and leaves; synthesized chimes later) | Nothing to download. Unlocks on the first touch. Driven by `WindField`. |
-| Ground paint | `GroundPaint`: a 512² canvas texture over the clearing (R = worn path earth; G/B reserved for flower beds and the pond) read by the lawn shader | Cheap live painting with organic edges, and one texture for every ground change. |
+| Ground paint | `GroundPaint`: a 512² canvas texture over the clearing (R = worn path earth; G = sandiness relative to R; B reserved for flower beds) read by the lawn shader | Cheap live painting with organic edges, and one texture for every ground change. |
 | Persistence | `localStorage`/IndexedDB with a **versioned, compact save format** | The share link (later) is the same data, compressed. |
 
 ---

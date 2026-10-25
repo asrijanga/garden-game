@@ -3,34 +3,36 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createNoise2D } from '../core/noise';
 import { createRng, lerp } from '../core/random';
 
-const ARCHETYPES = 7;
-const CAPACITY = 700; // per archetype
-const STONE_TONES = ['#d6cfc2', '#c7c0b4', '#ddd3c1', '#bdb7ad', '#d0c2ab', '#c9c4ba'];
+export type StoneFamily = 'flat' | 'pebble' | 'angular';
+const SHAPES_PER_FAMILY = 5;
+const CAPACITY = 1500; // per shape
+const CELL = 0.5; // spatial hash cell, metres
 
-/** A flat, rounded, irregular stepping stone. Each archetype is a different hand-picked shape. */
-function stoneGeometry(seed: number): THREE.BufferGeometry {
-  let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(1, 2);
+/** Procedural stone shapes. Every family has several hand-picked variations. */
+function stoneGeometry(family: StoneFamily, seed: number): THREE.BufferGeometry {
+  let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(1, family === 'angular' ? 1 : 2);
   g.deleteAttribute('normal');
   g.deleteAttribute('uv');
   g = mergeVertices(g);
   const noise = createNoise2D(seed);
   const rng = createRng(seed);
-  const sx = lerp(0.85, 1.15, rng());
-  const sz = lerp(0.75, 1.0, rng());
+  const sx = lerp(0.8, 1.2, rng());
+  const sz = lerp(0.7, 1.0, rng());
   const pos = g.attributes.position as THREE.BufferAttribute;
   const col = new Float32Array(pos.count * 3);
   const v = new THREE.Vector3();
+  const top = family === 'flat' ? 0.3 : family === 'pebble' ? 0.55 : 0.5;
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i);
     const a = Math.atan2(v.z, v.x);
-    const lump = 1 + noise(Math.cos(a) * 1.3, Math.sin(a) * 1.3) * 0.16 + noise(v.x * 2.5, v.z * 2.5) * 0.05;
+    let lump = 1 + noise(Math.cos(a) * 1.3, Math.sin(a) * 1.3) * (family === 'pebble' ? 0.08 : 0.16);
+    if (family === 'angular') lump += (rng() - 0.5) * 0.28; // chipped, faceted rock
     v.x *= sx * lump;
     v.z *= sz * lump;
-    // Flat, worn top; rounded shoulders; a buried bottom.
-    v.y = v.y > 0 ? Math.pow(v.y, 1.6) * 0.32 : v.y * 0.25;
+    v.y = v.y > 0 ? Math.pow(v.y, family === 'flat' ? 1.6 : 1.1) * top * lump : v.y * 0.25;
     pos.setXYZ(i, v.x, v.y, v.z);
     // Lighter, sun-bleached top; darker, earthy underside.
-    const shade = v.y > 0 ? lerp(0.92, 1.06, v.y / 0.32) : 0.72;
+    const shade = v.y > 0 ? lerp(0.9, 1.06, Math.min(1, v.y / top)) : 0.7;
     col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = shade;
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -51,14 +53,14 @@ interface Falling {
 }
 
 /**
- * Stepping stones that drop into place with a soft squash and bounce. All stones of a shape share
+ * Path stones that drop into place with a soft squash and bounce. All stones of a shape share
  * one InstancedMesh; only the ones still settling are updated each frame.
  */
 export class Stones {
   readonly group = new THREE.Group();
-  private readonly meshes: THREE.InstancedMesh[] = [];
+  private readonly families = new Map<StoneFamily, THREE.InstancedMesh[]>();
   private readonly falling: Falling[] = [];
-  private readonly placed: THREE.Vector2[] = [];
+  private readonly grid = new Map<string, { x: number; z: number; r: number }[]>();
   private readonly rng = createRng(31);
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
@@ -66,38 +68,56 @@ export class Stones {
   private readonly e = new THREE.Euler();
 
   constructor(private readonly onLand: (p: THREE.Vector3, size: number) => void) {
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
-    for (let a = 0; a < ARCHETYPES; a++) {
-      const mesh = new THREE.InstancedMesh(stoneGeometry(100 + a * 17), mat, CAPACITY);
-      mesh.count = 0;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.frustumCulled = false;
-      this.meshes.push(mesh);
-      this.group.add(mesh);
-    }
+    const smooth = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const faceted = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    (['flat', 'pebble', 'angular'] as StoneFamily[]).forEach((family, fi) => {
+      const meshes: THREE.InstancedMesh[] = [];
+      for (let k = 0; k < SHAPES_PER_FAMILY; k++) {
+        const mesh = new THREE.InstancedMesh(stoneGeometry(family, 100 + fi * 50 + k * 7), family === 'angular' ? faceted : smooth, CAPACITY);
+        mesh.count = 0;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.frustumCulled = false;
+        meshes.push(mesh);
+        this.group.add(mesh);
+      }
+      this.families.set(family, meshes);
+    });
   }
 
-  /** Is there already a stone within `r` of (x, z)? Keeps crossing paths from piling up. */
+  private key(x: number, z: number) {
+    return `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+  }
+
+  /** Would a stone of radius `r` at (x, z) overlap an existing one? Keeps paths from piling up. */
   isOccupied(x: number, z: number, r: number): boolean {
-    const r2 = r * r;
-    for (const p of this.placed) {
-      const dx = p.x - x;
-      const dz = p.y - z;
-      if (dx * dx + dz * dz < r2) return true;
+    const cx = Math.floor(x / CELL);
+    const cz = Math.floor(z / CELL);
+    const reach = Math.ceil((r + 0.4) / CELL);
+    for (let i = cx - reach; i <= cx + reach; i++) {
+      for (let j = cz - reach; j <= cz + reach; j++) {
+        const cell = this.grid.get(`${i},${j}`);
+        if (!cell) continue;
+        for (const s of cell) {
+          const min = r + s.r;
+          if ((s.x - x) ** 2 + (s.z - z) ** 2 < min * min) return true;
+        }
+      }
     }
     return false;
   }
 
-  add(x: number, y: number, z: number, size: number, delay: number) {
-    const mesh = this.meshes[Math.floor(this.rng() * this.meshes.length)];
+  add(family: StoneFamily, x: number, y: number, z: number, size: number, tone: THREE.Color, delay: number) {
+    const meshes = this.families.get(family)!;
+    const mesh = meshes[Math.floor(this.rng() * meshes.length)];
     if (mesh.count >= CAPACITY) return;
     const index = mesh.count++;
-    const tone = new THREE.Color(STONE_TONES[Math.floor(this.rng() * STONE_TONES.length)]).multiplyScalar(lerp(0.94, 1.06, this.rng()));
     mesh.setColorAt(index, tone);
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     const f: Falling = { mesh, index, pos: new THREE.Vector3(x, y, z), yaw: this.rng() * Math.PI * 2, size, delay, t: 0, landed: false };
-    this.placed.push(new THREE.Vector2(x, z));
+    const k = this.key(x, z);
+    if (!this.grid.has(k)) this.grid.set(k, []);
+    this.grid.get(k)!.push({ x, z, r: size * 0.85 });
     this.falling.push(f);
     this.write(f, 0, 0.0001); // hidden until its turn
   }
@@ -119,11 +139,11 @@ export class Stones {
         continue;
       }
       f.t += dt;
-      const fallTime = 0.32;
+      const fallTime = 0.3;
+      const drop = 0.4 + f.size * 2.2; // small pebbles drop from lower down
       if (f.t < fallTime) {
-        // Drop in from a little above, growing to full size as it falls.
         const k = f.t / fallTime;
-        this.write(f, (1 - k * k) * 1.1, lerp(0.6, 1, k));
+        this.write(f, (1 - k * k) * drop, lerp(0.6, 1, k));
       } else {
         if (!f.landed) {
           f.landed = true;
@@ -131,8 +151,8 @@ export class Stones {
         }
         // Damped squash-and-stretch as it settles into the soil.
         const s = f.t - fallTime;
-        const squash = Math.exp(-s * 9) * Math.cos(s * 26) * 0.32;
-        const hop = Math.max(0, Math.exp(-s * 10) * Math.sin(s * 20)) * 0.06;
+        const squash = Math.exp(-s * 9) * Math.cos(s * 26) * 0.3;
+        const hop = Math.max(0, Math.exp(-s * 10) * Math.sin(s * 20)) * f.size * 0.18;
         this.write(f, hop, 1, squash);
         if (s > 0.7) {
           this.write(f, 0, 1, 0);

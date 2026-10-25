@@ -121,7 +121,7 @@ let tools: ToolController | null = null;
 const dust = new Dust();
 scene.add(dust.points);
 const stones = new Stones((p, size) => {
-  dust.puff(p, 7, size * 1.4);
+  if (size > 0.09) dust.puff(p, Math.round(4 + size * 12), size * 1.4);
   ambience.stone(size);
 });
 scene.add(stones.group);

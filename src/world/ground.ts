@@ -120,7 +120,9 @@ function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
         float grain = texture2D(uGrain, vWorld.xz * 0.55).r * 0.6 + texture2D(uGrain, vWorld.xz * 0.13 + 0.37).r * 0.4;
         diffuseColor.rgb *= mix(1.0, 0.88 + grain * 0.24, vMeadow);
         // Worn earth under paths, with a ragged, organic edge and a lusher rim of grass.
-        float wear = texture2D(uPaint, paintUv(vWorld.xz)).r;
+        vec4 paintTex = texture2D(uPaint, paintUv(vWorld.xz));
+        float wear = paintTex.r;
+        float sandy = clamp(paintTex.g / max(paintTex.r, 0.02), 0.0, 1.0);
         // Ragged edge: three octaves of noise nibble the boundary into tufts and bare bites.
         float rough = lawnNoise(vWorld.xz * 0.9 + 2.1) * 0.35 + lawnNoise(vWorld.xz * 2.2) * 0.3 + lawnNoise(vWorld.xz * 5.5 + 7.3) * 0.22 + lawnNoise(vWorld.xz * 13.0 - 3.1) * 0.13;
         float ragged = (rough - 0.5) * 0.75;
@@ -131,6 +133,8 @@ function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
         float rim = smoothstep(0.1, 0.38, wear) * (1.0 - earth);
         diffuseColor.rgb *= 1.0 - rim * 0.12;
         vec3 soil = mix(vec3(0.24, 0.16, 0.09), vec3(0.34, 0.24, 0.14), grain);
+        // Gravel paths: pale, sandy grit.
+        soil = mix(soil, mix(vec3(0.45, 0.38, 0.27), vec3(0.6, 0.52, 0.39), grain), sandy);
         soil *= 1.0 - lip * 0.28;
         diffuseColor.rgb = mix(diffuseColor.rgb, soil, earth);
         // Gust sheen: the meadow brightens softly as wind passes, like grass bowing in waves.

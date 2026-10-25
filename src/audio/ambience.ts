@@ -173,7 +173,9 @@ export class Ambience {
     const ctx = this.ctx;
     if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
     const t = ctx.currentTime;
-    if (t - this.lastStone < 0.06) return;
+    if (t - this.lastStone < (size < 0.1 ? 0.11 : 0.06)) return;
+    // Pebbles tick softly; bigger stones get the fuller "tok".
+    const loud = Math.min(1, Math.max(0.22, size / 0.22));
     this.lastStone = t;
     const pitch = (0.85 + Math.random() * 0.3) * (0.32 / Math.max(0.12, size)) ** 0.4;
     const osc = ctx.createOscillator();
@@ -185,10 +187,10 @@ export class Ambience {
     click.frequency.value = 1150 * pitch;
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, t);
-    env.gain.linearRampToValueAtTime(0.42, t + 0.004);
+    env.gain.linearRampToValueAtTime(0.42 * loud, t + 0.004);
     env.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
     const clickEnv = ctx.createGain();
-    clickEnv.gain.setValueAtTime(0.05, t);
+    clickEnv.gain.setValueAtTime(0.05 * loud, t);
     clickEnv.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
