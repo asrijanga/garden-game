@@ -20,14 +20,37 @@ function icon(sp: FlowerSpecies | null): string {
     const dots = Array.from({ length: 6 }, (_, i) => `<ellipse cx="${20 + (i % 2 ? 3 : -3)}" cy="${7 + i * 3.2}" rx="${f.bell ? 3.4 : 2.4}" ry="${f.bell ? 2.6 : 2}" fill="${c}"/>`).join('');
     return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 38V8" stroke="#5f8f3e" stroke-width="2" stroke-linecap="round"/>${dots}</svg>`;
   }
+  const svg = (inner: string) => `<svg viewBox="0 0 40 40" aria-hidden="true">${stem}${inner}</svg>`;
+  if (f.kind === 'cluster') {
+    // Sedum: a flat dome of tiny florets.
+    const dots = Array.from({ length: 14 }, (_, i) => {
+      const a = i * 2.4;
+      const r = Math.sqrt(i / 14) * 9;
+      return `<circle cx="${(20 + Math.cos(a) * r).toFixed(1)}" cy="${(15 + Math.sin(a) * r * 0.55).toFixed(1)}" r="2" fill="${c}"/>`;
+    }).join('');
+    return svg(dots);
+  }
+  if (f.domed) {
+    // Pom-pom: rings of petals building up to a crown.
+    return svg(`${bloom(20, 15, c, 12, 5, c)}${bloom(20, 14, c, 9, 4, c, 3.6)}<circle cx="20" cy="13.5" r="3.4" fill="${c}" stroke="rgba(0,0,0,.2)" stroke-width=".6"/>`);
+  }
+  if (f.cone) {
+    // Black-eyed Susan: drooping golden petals round a dark cone.
+    const petals = Array.from({ length: 11 }, (_, i) => `<ellipse cx="20" cy="20" rx="1.8" ry="6" fill="${c}" transform="rotate(${-80 + i * 16} 20 14)"/>`).join('');
+    return svg(`${petals}<ellipse cx="20" cy="13" rx="4" ry="3.6" fill="${f.center}"/>`);
+  }
+  if (f.tilt) {
+    // Pansy: a face of five broad petals with a dark heart.
+    return svg(`${bloom(20, 15, c, 5, 9, '#2d1f3d', 6)}<circle cx="20" cy="15" r="1.4" fill="#f6d24a"/>`);
+  }
   const n = Math.min(14, Math.round(f.petals[0]));
-  return `<svg viewBox="0 0 40 40" aria-hidden="true">${stem}${bloom(20, 15, c, n, f.width > 0.025 ? 6 : 4, f.center)}</svg>`;
+  return svg(bloom(20, 15, c, n, f.width > 0.025 ? 6 : 4, f.stamens ?? f.center));
 }
 
-function bloom(cx: number, cy: number, color: string, n: number, w = 4, center = '#f2c94c'): string {
+function bloom(cx: number, cy: number, color: string, n: number, w = 4, center = '#f2c94c', len = 5): string {
   const petals = Array.from({ length: n }, (_, i) => {
     const a = (i / n) * 360;
-    return `<ellipse cx="${cx}" cy="${cy - 5}" rx="${w / 2}" ry="5" fill="${color}" stroke="rgba(0,0,0,.18)" stroke-width=".6" transform="rotate(${a} ${cx} ${cy})"/>`;
+    return `<ellipse cx="${cx}" cy="${cy - len}" rx="${w / 2}" ry="${len}" fill="${color}" stroke="rgba(0,0,0,.18)" stroke-width=".6" transform="rotate(${a} ${cx} ${cy})"/>`;
   }).join('');
   return `${petals}<circle cx="${cx}" cy="${cy}" r="2.6" fill="${center}"/>`;
 }

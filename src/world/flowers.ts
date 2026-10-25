@@ -3,7 +3,7 @@ import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
 import type { FlowerSpecies } from './flowerSpecies';
 
-const VARIANTS = 4; // geometry variants per species (plus per-plant scale, yaw, colour)
+const VARIANTS = 5; // geometry variants per species (plus per-plant scale, yaw, colour)
 const CAPACITY = 1500; // plants per variant
 const FOLIAGE_VARIANTS = 3;
 const FOLIAGE_CAPACITY = 4000;
@@ -28,19 +28,38 @@ class FlowerMesh {
   axis: number[] = [];
   close: number[] = [];
   glow: number[] = [];
+  /** Optional rotation applied to everything added (used to tilt a whole bloom, e.g. pansies). */
+  private xo: THREE.Vector3 | null = null;
+  private xq: THREE.Quaternion | null = null;
+
+  setTilt(origin: THREE.Vector3 | null, q: THREE.Quaternion | null) {
+    this.xo = origin;
+    this.xq = q;
+  }
+
+  private tp(v: THREE.Vector3): THREE.Vector3 {
+    return this.xo && this.xq ? v.clone().sub(this.xo).applyQuaternion(this.xq).add(this.xo) : v;
+  }
+
+  private td(v: THREE.Vector3): THREE.Vector3 {
+    return this.xq ? v.clone().applyQuaternion(this.xq) : v;
+  }
 
   tri(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, opts: { n?: THREE.Vector3; shade?: [number, number, number]; color: THREE.Color; petal?: boolean; hinge?: THREE.Vector3; axis?: THREE.Vector3; close?: number; glow?: number }) {
-    const n = opts.n ?? new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
+    let n = opts.n ?? new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
     if (n.y < 0 && !opts.n) n.negate();
+    n = this.td(n);
     const shade = opts.shade ?? [1, 1, 1];
-    [a, b, c].forEach((v, i) => {
+    const hinge = opts.hinge ? this.tp(opts.hinge) : null;
+    const ax = this.td(opts.axis ?? UP);
+    [a, b, c].forEach((v0, i) => {
+      const v = this.tp(v0);
       this.pos.push(v.x, v.y, v.z);
       this.nrm.push(n.x, n.y, n.z);
       this.col.push(opts.color.r * shade[i], opts.color.g * shade[i], opts.color.b * shade[i]);
       this.petal.push(opts.petal ? 1 : 0);
-      const h = opts.hinge ?? v;
+      const h = hinge ?? v;
       this.hinge.push(h.x, h.y, h.z);
-      const ax = opts.axis ?? UP;
       this.axis.push(ax.x, ax.y, ax.z);
       this.close.push(opts.close ?? 0);
       this.glow.push(opts.glow ?? (opts.petal ? 1 : 0));
@@ -48,14 +67,19 @@ class FlowerMesh {
   }
 
   /** Append a stock three.js geometry (e.g. a floret), translated/oriented, as petal or not. */
-  addGeometry(g: THREE.BufferGeometry, color: THREE.Color, petal: boolean, hinge: THREE.Vector3) {
+  addGeometry(g: THREE.BufferGeometry, color: THREE.Color, petal: boolean, hinge0: THREE.Vector3) {
     const ng = g.index ? g.toNonIndexed() : g;
     ng.computeVertexNormals();
     const p = ng.attributes.position;
     const n = ng.attributes.normal;
+    const hinge = this.tp(hinge0);
+    const v = new THREE.Vector3();
+    const nn = new THREE.Vector3();
     for (let i = 0; i < p.count; i++) {
-      this.pos.push(p.getX(i), p.getY(i), p.getZ(i));
-      this.nrm.push(n.getX(i), n.getY(i), n.getZ(i));
+      const tv = this.tp(v.fromBufferAttribute(p, i));
+      const tn = this.td(nn.fromBufferAttribute(n, i));
+      this.pos.push(tv.x, tv.y, tv.z);
+      this.nrm.push(tn.x, tn.y, tn.z);
       this.col.push(color.r, color.g, color.b);
       this.petal.push(petal ? 1 : 0);
       this.hinge.push(hinge.x, hinge.y, hinge.z);
@@ -129,7 +153,13 @@ function stem(m: FlowerMesh, height: number, lean: THREE.Vector3, rng: () => num
  * gentle centre crease (light catches each half differently), a curl of its own, a rounded tip,
  * and shading that deepens toward the heart of the flower.
  */
-function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, len: number, width: number, cupIn: number, closeTo: number, rng: () => number) {
+interface PetalStyle {
+  notch?: boolean;
+  pointed?: boolean;
+  blotch?: number;
+}
+
+function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, len: number, width: number, cupIn: number, closeTo: number, rng: () => number, style: PetalStyle = {}) {
   const d = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
   const v = d.clone().multiplyScalar(Math.sin(open)).addScaledVector(UP, Math.cos(open));
   const s = new THREE.Vector3(-d.z, 0, d.x);
@@ -139,15 +169,37 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
   const curl = lerp(0.06, 0.2, rng()); // each petal curls a little differently
   const twist = (rng() - 0.5) * 0.25;
   // Smooth, rounded outline: narrow at the base, fullest past the middle, softly rounded tip.
-  const rows: [number, number][] = [
-    [0, 0.22],
-    [0.18, 0.62],
-    [0.4, 0.92],
-    [0.62, 1.0],
-    [0.8, 0.86],
-    [0.93, 0.55],
-    [1, 0.12],
-  ];
+  const rows: [number, number][] = style.pointed
+    ? [
+        [0, 0.2],
+        [0.2, 0.62],
+        [0.42, 0.92],
+        [0.62, 0.86],
+        [0.8, 0.55],
+        [0.93, 0.22],
+        [1, 0.02],
+      ]
+    : style.notch
+      ? [
+          [0, 0.22],
+          [0.2, 0.6],
+          [0.42, 0.88],
+          [0.65, 1.0],
+          [0.85, 0.98],
+          [0.97, 0.9],
+          [1, 0.72],
+        ]
+      : [
+          [0, 0.22],
+          [0.18, 0.62],
+          [0.4, 0.92],
+          [0.62, 1.0],
+          [0.8, 0.86],
+          [0.93, 0.55],
+          [1, 0.12],
+        ];
+  // Notched petals dip in the middle of the tip (a cosmos's little serrations).
+  const centreT = (t: number) => (style.notch && t > 0.95 ? t - 0.1 : t);
   const at = (t: number, w: number) =>
     hinge
       .clone()
@@ -158,15 +210,20 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
       .addScaledVector(crease, (1 - Math.abs(w)) * width * 0.08 * Math.sin(t * Math.PI)); // soft centre crease
   const opts = (sh: [number, number, number]) => ({ color: WHITE, petal: true, hinge, axis, close: Math.max(0, open - closeTo), shade: sh });
   // Deeper colour at the heart, glowing toward the tip.
-  const shadeAt = (t: number, edge: number) => lerp(0.78, 1.12, Math.pow(t, 0.7)) * (1 - edge * 0.06);
+  // A dark "face" toward the heart (pansies, poppies) when blotch > 0.
+  const blotch = style.blotch ?? 0;
+  const shadeAt = (t: number, edge: number) => {
+    const face = blotch > 0 ? lerp(1 - blotch, 1, Math.min(1, Math.max(0, (t - 0.12) / 0.38))) : 1;
+    return lerp(0.78, 1.12, Math.pow(t, 0.7)) * (1 - edge * 0.06) * face;
+  };
   for (let i = 0; i < rows.length - 1; i++) {
     const [t0, w0] = rows[i];
     const [t1, w1] = rows[i + 1];
     const l0 = at(t0, -w0);
-    const c0 = at(t0, 0);
+    const c0 = at(centreT(t0), 0);
     const r0 = at(t0, w0);
     const l1 = at(t1, -w1);
-    const c1 = at(t1, 0);
+    const c1 = at(centreT(t1), 0);
     const r1 = at(t1, w1);
     m.tri(l0, l1, c1, opts([shadeAt(t0, 1), shadeAt(t1, 1), shadeAt(t1, 0)]));
     m.tri(l0, c1, c0, opts([shadeAt(t0, 1), shadeAt(t1, 0), shadeAt(t0, 0)]));
@@ -246,29 +303,82 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number): THREE.BufferGeo
   const f: typeof base =
     base.kind === 'spike'
       ? { ...base, floretSize: base.floretSize * HEAD, spikeLength: base.spikeLength * 1.5 }
-      : base.kind === 'cup'
-        ? { ...base, length: base.length * HEAD, width: base.width * HEAD }
-        : { ...base, length: base.length * HEAD, width: base.width * HEAD, centerSize: base.centerSize * HEAD };
+      : base.kind === 'cluster'
+        ? { ...base, floretSize: base.floretSize * HEAD, radius: base.radius * HEAD * 0.7 }
+        : base.kind === 'cup'
+          ? { ...base, length: base.length * HEAD, width: base.width * HEAD }
+          : { ...base, length: base.length * HEAD, width: base.width * HEAD, centerSize: base.centerSize * HEAD, cone: base.cone ? base.cone * HEAD : undefined };
 
   if (f.kind === 'radial') {
+    sepals(m, top, f.length * (f.domed ? 0.45 : 0.35), rng);
+    // Tilted blooms (pansies) turn their faces outward.
+    if (f.tilt) {
+      const az = rng() * Math.PI * 2;
+      m.setTilt(top, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(Math.cos(az), 0, Math.sin(az)), f.tilt * lerp(0.85, 1.1, rng())));
+    }
     const n = Math.round(lerp(f.petals[0], f.petals[1], rng()));
-    for (let layer = 0; layer < f.layers; layer++) {
-      const k = layer / Math.max(1, f.layers);
-      const count = Math.max(4, Math.round(n * (1 - k * 0.3)));
+    const layers = Math.max(1, f.layers + (f.layers > 1 ? Math.round((rng() - 0.5) * 2) : 0));
+    const style = { notch: f.notch, pointed: f.pointed, blotch: f.blotch };
+    for (let layer = 0; layer < layers; layer++) {
+      const k = layers > 1 ? layer / (layers - 1) : 0;
+      // Domed blooms build up from wide outer petals to small upright ones at the crown.
+      const open = f.domed ? lerp(f.open, 0.25, k) : f.open * (1 - k * 0.45);
+      const lenK = f.domed ? lerp(1, 0.5, k) : 1 - k * 0.22;
+      const count = Math.max(4, Math.round(n * (f.domed ? lerp(1, 0.55, k) : 1 - k * 0.3)));
+      const lift = f.domed ? k * f.length * 0.55 : layer * 0.004;
+      const ring = f.domed ? f.centerSize * lerp(1.6, 0.4, k) : f.centerSize * 0.5;
       const off = rng() * Math.PI * 2;
       for (let i = 0; i < count; i++) {
-        const az = off + (i / count) * Math.PI * 2 + (rng() - 0.5) * 0.15;
-        const open = f.open * (1 - k * 0.45) + (rng() - 0.5) * 0.12;
-        const len = f.length * (1 - k * 0.22) * lerp(0.9, 1.1, rng());
-        const hinge = top.clone().add(new THREE.Vector3(Math.cos(az), 0, Math.sin(az)).multiplyScalar(f.centerSize * 0.5)).add(new THREE.Vector3(0, layer * 0.004, 0));
-        petal(m, hinge, az, open, len, f.width * lerp(0.9, 1.1, rng()), 0, 0.12, rng);
+        const az = off + (i / count) * Math.PI * 2 + (rng() - 0.5) * 0.18;
+        // Pansies: the two upper petals are a little larger.
+        const big = f.tilt ? 1 + 0.18 * Math.max(0, Math.sin(az)) : 1;
+        const len = f.length * lenK * lerp(0.88, 1.12, rng()) * big;
+        const hinge = top.clone().add(new THREE.Vector3(Math.cos(az) * ring, lift, Math.sin(az) * ring));
+        const cup = f.domed ? lerp(0.05, 0.3, k) : 0;
+        petal(m, hinge, az, open + (rng() - 0.5) * 0.12, len, f.width * lerp(0.88, 1.12, rng()) * (f.domed ? lerp(1, 0.75, k) : 1), cup, 0.12, rng, style);
       }
     }
-    sepals(m, top, f.length * 0.35, rng);
-    const centre = new THREE.IcosahedronGeometry(f.centerSize, 1);
-    centre.scale(1, 0.55, 1);
-    centre.translate(top.x, top.y + f.centerSize * 0.25, top.z);
-    m.addGeometry(centre, new THREE.Color(f.center), false, top);
+    if (f.cone) {
+      // Black-eyed Susan: a dark, raised cone.
+      const cone = new THREE.ConeGeometry(f.centerSize, f.cone, 10, 2);
+      cone.translate(top.x, top.y + f.cone * 0.5, top.z);
+      m.addGeometry(cone, new THREE.Color(f.center), false, top);
+    } else if (!f.domed) {
+      const centre = new THREE.IcosahedronGeometry(f.centerSize, 1);
+      centre.scale(1, 0.55, 1);
+      centre.translate(top.x, top.y + f.centerSize * 0.25, top.z);
+      m.addGeometry(centre, new THREE.Color(f.center), false, top);
+    }
+    if (f.stamens) {
+      // Anemone: a ring of golden stamens round the green centre.
+      const c = new THREE.Color(f.stamens);
+      for (let i = 0; i < 16; i++) {
+        const az = (i / 16) * Math.PI * 2;
+        const dot = new THREE.IcosahedronGeometry(f.centerSize * 0.28, 0);
+        dot.translate(top.x + Math.cos(az) * f.centerSize * 1.5, top.y + f.centerSize * 0.4, top.z + Math.sin(az) * f.centerSize * 1.5);
+        m.addGeometry(dot, c, false, top);
+      }
+    }
+    m.setTilt(null, null);
+  } else if (f.kind === 'cluster') {
+    // Sedum: a flat-topped dome of tiny star florets.
+    for (let i = 0; i < f.florets; i++) {
+      const r = Math.sqrt(rng()) * f.radius;
+      const a = rng() * Math.PI * 2;
+      const y = top.y + (1 - (r / f.radius) ** 2) * f.radius * 0.35;
+      const attach = new THREE.Vector3(top.x + Math.cos(a) * r, y, top.z + Math.sin(a) * r);
+      const g = new THREE.OctahedronGeometry(f.floretSize * lerp(0.8, 1.2, rng()), 0);
+      g.scale(1, 0.5, 1);
+      g.translate(attach.x, attach.y, attach.z);
+      m.addGeometry(g, WHITE, true, top);
+    }
+    // Short branching stalks under the dome.
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const tip = top.clone().add(new THREE.Vector3(Math.cos(a) * f.radius * 0.6, f.radius * 0.1, Math.sin(a) * f.radius * 0.6));
+      const side = new THREE.Vector3(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(0.004);
+      m.tri(top.clone().sub(side), tip, top.clone().add(side), { color: STEM });
+    }
   } else if (f.kind === 'cup') {
     for (let i = 0; i < f.petals; i++) {
       const inner = i % 2 === 1;
