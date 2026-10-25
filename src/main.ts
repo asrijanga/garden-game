@@ -4,7 +4,12 @@ import { Ground, CLEARING_RADIUS } from './world/ground';
 import { createForest } from './world/trees';
 import { CameraRig } from './core/cameraRig';
 import { Cottage } from './world/cottage';
-import { createWildflowers } from './world/wildflowers';
+import { Wildflowers } from './world/wildflowers';
+import { GroundPaint } from './world/groundPaint';
+import { Stones } from './world/stones';
+import { EdgePlants } from './world/edgePlants';
+import { Dust } from './world/dust';
+import { PathBuilder } from './game/pathBuilder';
 import { createMotes } from './world/motes';
 import { FlyingBirds } from './world/flyingBirds';
 import { currentSeason, PALETTES } from './world/season';
@@ -68,7 +73,8 @@ sun.shadow.normalBias = 0.03;
 sun.shadow.radius = 4;
 scene.add(sun);
 
-const ground = new Ground(WORLD_SEED, palette);
+const paint = new GroundPaint();
+const ground = new Ground(WORLD_SEED, palette, paint.texture);
 scene.add(ground.mesh);
 
 // The cottage sits at the back of the clearing, tucked against the trees, facing the player.
@@ -80,7 +86,8 @@ scene.add(cottage.smokePoints);
 
 scene.add(createForest(ground, palette, season, WORLD_SEED + 40, (x, z) => cottage.contains(x, z, 1.2)));
 
-scene.add(createWildflowers(ground, palette.wildflowers, 1600, WORLD_SEED + 11, (x, z) => cottage.contains(x, z, 0.4)));
+const wildflowers = new Wildflowers(ground, palette.wildflowers, 1600, WORLD_SEED + 11, (x, z) => cottage.contains(x, z, 0.4));
+scene.add(wildflowers.mesh);
 
 const debug = new URLSearchParams(location.search).has('debug');
 const flyingBirds = new FlyingBirds((x, z) => ground.heightAt(x, z), 60, debug ? 2 : 15);
@@ -104,18 +111,30 @@ function fitDistance(aspect: number): number {
 // --- Sound: the wind you can hear ------------------------------------------------------------
 const ambience = new Ambience(season);
 mountSoundControls(ambience);
-if (debug) Object.assign(window, { ambience, wind, flyingBirds });
+
 
 // --- Tools: what your finger does -----------------------------------------------------------
 const marker = new TouchMarker();
 scene.add(marker.mesh);
 const TOOL_PITCH = { move: 1, path: 0.9, flowers: 1.2, pond: 0.8, erase: 1.05 };
 let tools: ToolController | null = null;
+const dust = new Dust();
+scene.add(dust.points);
+const stones = new Stones((p, size) => {
+  dust.puff(p, 7, size * 1.4);
+  ambience.stone(size);
+});
+scene.add(stones.group);
+const edgePlants = new EdgePlants(palette.wildflowers);
+scene.add(edgePlants.group);
+const paths = new PathBuilder(ground, paint, stones, edgePlants, wildflowers, (x, z) => cottage.contains(x, z, 0.1) || ground.forestness(x, z) > 0.45, cottage.doorstep);
+
 const toolbar = new Toolbar((tool) => {
   ambience.tap(TOOL_PITCH[tool]);
   tools?.setTool(tool);
 });
-tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker);
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar });
+tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker, paths);
 
 // --- Post-processing ----------------------------------------------------------------------
 const post = new PostFX(renderer, scene, camera);
@@ -135,6 +154,7 @@ function resize() {
   post.setSize(w, h, pixelRatio());
   (motes.material as THREE.ShaderMaterial).uniforms.uPixelRatio.value = pixelRatio();
   cottage.setPixelRatio(pixelRatio());
+  dust.setPixelRatio(pixelRatio(), h);
 }
 window.addEventListener('resize', resize);
 resize();
@@ -153,6 +173,11 @@ function frame(time: number) {
   cottage.update(dt, wind);
   flyingBirds.update(dt);
   marker.update(dt, rig.distance);
+  stones.update(dt);
+  edgePlants.update(dt);
+  wildflowers.update(dt);
+  dust.update(dt);
+  paint.update();
   (motes.material as THREE.ShaderMaterial).uniforms.uTime.value = elapsed;
   rig.update(dt);
   ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));

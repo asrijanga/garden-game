@@ -193,6 +193,12 @@ export class Cottage {
     this.smoke = new Smoke(this.group.localToWorld(chimneyLocal.clone()), seed + 3);
   }
 
+  /** Ground point just in front of the doorstep, where garden paths should arrive. */
+  get doorstep(): THREE.Vector2 {
+    const p = this.group.localToWorld(new THREE.Vector3(-0.55, 0, D / 2 + 1.15));
+    return new THREE.Vector2(p.x, p.z);
+  }
+
   get smokePoints(): THREE.Points {
     return this.smoke.points;
   }

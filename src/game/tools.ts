@@ -3,6 +3,7 @@ import type { CameraRig } from '../core/cameraRig';
 import type { GroundPicker } from '../core/groundPicker';
 import type { Toolbar, Tool } from '../ui/toolbar';
 import type { TouchMarker } from '../world/touchMarker';
+import type { PathBuilder } from './pathBuilder';
 
 const MARKER_COLORS: Record<Tool, string> = {
   move: '#fff2cf',
@@ -13,7 +14,6 @@ const MARKER_COLORS: Record<Tool, string> = {
 };
 
 const COMING_SOON: Partial<Record<Tool, string>> = {
-  path: 'Paths bloom in the next update',
   flowers: 'Flowers are on their way',
   pond: 'The pond is coming soon',
   erase: 'Tidying up comes later',
@@ -34,6 +34,7 @@ export class ToolController {
     private readonly rig: CameraRig,
     private readonly picker: GroundPicker,
     private readonly marker: TouchMarker,
+    private readonly paths: PathBuilder,
   ) {
     el.addEventListener('pointerdown', this.onDown);
     el.addEventListener('pointermove', this.onMove);
@@ -64,12 +65,15 @@ export class ToolController {
     if (!hit) return;
     this.stroking = true;
     this.marker.down(hit);
+    if (this.tool === 'path') this.paths.begin(hit);
   };
 
   private onMove = (e: PointerEvent) => {
     if (!this.stroking || this.pointers.size > 1) return;
     const hit = this.picker.pick(e.clientX, e.clientY, this.p);
-    if (hit) this.marker.move(hit);
+    if (!hit) return;
+    this.marker.move(hit);
+    if (this.tool === 'path') this.paths.extend(hit);
   };
 
   private onUp = (e: PointerEvent) => {
@@ -77,6 +81,7 @@ export class ToolController {
     if (!this.stroking) return;
     this.stroking = false;
     this.marker.up();
+    if (this.tool === 'path') this.paths.end();
     const soon = COMING_SOON[this.tool];
     if (soon) this.toolbar.showLabel(soon, 2200);
   };
@@ -85,5 +90,6 @@ export class ToolController {
     if (!this.stroking) return;
     this.stroking = false;
     this.marker.up();
+    this.paths.end(false);
   }
 }

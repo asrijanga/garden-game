@@ -10,7 +10,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current story:** 1.4 — Thumb-reach toolbar (built, awaiting review). Next: 1.5 paths.
+**Current story:** 1.5 — Draw a winding path (built, awaiting review). Next: 1.6 flowers.
 **Preview URL:** https://asrijanga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
@@ -18,8 +18,8 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 1.1 A cozy clearing in the forest | ✅ Done | v3: procedural branching trees with leaf-cluster crowns, firs with jagged tiers, birches; tilt-shift blur removed. Wind and mood approved. |
 | 1.2 Hear the wind | ✅ Done | Procedural Web Audio: air bed, gust whoosh, canopy rush, leaf flurries, all driven by the wind field at the view centre. A whisper (calm about −40 dBFS) plus rare distant synthesised birdsong, seasonal pace. Limiter, 4 s fade-in. Sound toggle top-right (remembered) and a one-time hint. |
 | 1.3 Hold the world in my hand | ✅ Done | Pulled forward (player asked to zoom). Pinch zoom, drag pan, twist rotate, inertia; camera lowers as you zoom in. |
-| 1.4 Thumb-reach toolbar | 👀 Awaiting feedback | Frosted tray with 5 illustrated tactile buttons (Look around, Path, Flowers, Pond, Tidy up), squash/bounce and lift/glow, floating label, soft wooden tap sound. Build tools: one finger touches the lawn (glowing ring, ripple on release), two fingers move the camera. Unbuilt tools say "coming soon". |
-| 1.5 Draw a winding path | ⬜ Not started | |
+| 1.4 Thumb-reach toolbar | ✅ Done | Frosted tray with 5 illustrated tactile buttons (Look around, Path, Flowers, Pond, Tidy up), squash/bounce and lift/glow, floating label, soft wooden tap sound. Build tools: one finger touches the lawn (glowing ring, ripple on release), two fingers move the camera. Unbuilt tools say "coming soon". |
+| 1.5 Draw a winding path | 👀 Awaiting feedback | Smoothed "walker" follows the finger. 7 procedural stone shapes drop in with squash/bounce, dust puff and a soft stone "tok". Worn earth painted into a ground texture with breathing width and scuffs. Clover and daisies grow along the edges, and wildflowers shrink aside. No stone overlap where paths cross. Paths stay in the meadow, and paths near the cottage finish at the doorstep. |
 | 1.6 Plant flowers that bloom fast | ⬜ Not started | |
 | 1.7 A cozy garden pond | ⬜ Not started | |
 | 1.8 Gently erase | ⬜ Not started | |
@@ -31,6 +31,7 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **1.4 review 2:** "That looks awesome." 1.4 done.
 - **1.4 review:** "Buttons work, looks great!" *Feedback:* The tap feedback on the grass is too big; it suggests the workable area is a small section. *Changes:* Touch ring shrunk about 60% (radius 0.017× camera distance), thinner ring with a tiny bright centre glint, smaller ripple on release.
 - **Lawn + birds review:** "Perfect, next story." Lawn and 1.2b done.
 - **Grass review 4:** *Feedback:* Remove the blade texture entirely; make it so fine it's just noise. *Changes:* Grass blade geometry removed. The lawn is now a painted ground shader: mip-mapped two-scale fine grain (melts to smooth colour at distance, never shimmers) plus a soft gust sheen driven by the shared wind field. Wildflowers sit low on the lawn. Big GPU saving (about 190k blades gone).
@@ -128,6 +129,7 @@ _Feedback from each review, newest first, and what we changed because of it._
 | Vegetation | Lawn is a painted ground shader (fine grain + wind sheen), no blade geometry. GPU-instanced wildflowers. Trees are procedural archetypes (branching wood + alpha-tested leaf-cluster cards from canvas textures), instanced with per-tree size, lean, yaw and color, with near/far detail levels. Wind in the vertex shader | Tens of thousands of swaying blades at 60fps on a phone. |
 | Look | Soft Lambert lighting, neutral tone mapping, bloom, warm grade. **No blur effects** (player feedback) | Storybook diorama feel, crisp everywhere. |
 | Audio | Web Audio API, procedural (filtered noise for wind and leaves; synthesized chimes later) | Nothing to download. Unlocks on the first touch. Driven by `WindField`. |
+| Ground paint | `GroundPaint`: a 512² canvas texture over the clearing (R = worn path earth; G/B reserved for flower beds and the pond) read by the lawn shader | Cheap live painting with organic edges, and one texture for every ground change. |
 | Persistence | `localStorage`/IndexedDB with a **versioned, compact save format** | The share link (later) is the same data, compressed. |
 
 ---

@@ -166,6 +166,41 @@ export class Ambience {
     osc.stop(t + 0.2);
   }
 
+  private lastStone = 0;
+
+  /** A soft, earthy "tok" as a stone settles into the soil. */
+  stone(size = 0.3) {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    if (t - this.lastStone < 0.06) return;
+    this.lastStone = t;
+    const pitch = (0.85 + Math.random() * 0.3) * (0.32 / Math.max(0.12, size)) ** 0.4;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(230 * pitch, t);
+    osc.frequency.exponentialRampToValueAtTime(120 * pitch, t + 0.08);
+    const click = ctx.createOscillator();
+    click.type = 'triangle';
+    click.frequency.value = 1150 * pitch;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.42, t + 0.004);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    const clickEnv = ctx.createGain();
+    clickEnv.gain.setValueAtTime(0.05, t);
+    clickEnv.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1800;
+    osc.connect(env).connect(lp).connect(this.master);
+    click.connect(clickEnv).connect(lp);
+    osc.start(t);
+    click.start(t);
+    osc.stop(t + 0.18);
+    click.stop(t + 0.05);
+  }
+
   suspend() {
     void this.ctx?.suspend();
   }

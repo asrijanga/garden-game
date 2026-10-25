@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createNoise2D } from '../core/noise';
 import { createRng, smoothstep } from '../core/random';
 import { uniforms as windUniforms, windSampleGLSL } from '../render/wind';
+import { paintUvGLSL } from './groundPaint';
 import type { SeasonPalette } from './season';
 
 /** Radius of the open meadow in the middle of the forest: the player's garden. */
@@ -16,7 +17,7 @@ export class Ground {
   private readonly floor: THREE.Color;
   readonly mesh: THREE.Mesh;
 
-  constructor(seed: number, palette: SeasonPalette) {
+  constructor(seed: number, palette: SeasonPalette, private readonly paint: THREE.Texture) {
     this.hNoise = createNoise2D(seed);
     this.edgeNoise = createNoise2D(seed + 1);
     this.colorNoise = createNoise2D(seed + 2);
@@ -81,7 +82,7 @@ export class Ground {
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.setAttribute('aMeadow', new THREE.BufferAttribute(meadowMask, 1));
     geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, lawnMaterial());
+    const mesh = new THREE.Mesh(geo, lawnMaterial(this.paint));
     mesh.receiveShadow = true;
     return mesh;
   }
@@ -92,26 +93,34 @@ export class Ground {
  * colour from afar and never shimmers) plus a gentle sheen where gusts roll across the meadow,
  * driven by the same wind field as everything else.
  */
-function lawnMaterial(): THREE.MeshLambertMaterial {
+function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
   const grain = grainTexture(256, 1234);
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
   mat.customProgramCacheKey = () => 'lawn';
   mat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, windUniforms, { uGrain: { value: grain } });
+    Object.assign(shader.uniforms, windUniforms, { uGrain: { value: grain }, uPaint: { value: paint } });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aMeadow;\nvarying float vMeadow;\nvarying vec3 vWorld;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMeadow = aMeadow;\nvWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nuniform sampler2D uGrain;\nvarying float vMeadow;\nvarying vec3 vWorld;\n${windSampleGLSL}`)
+      .replace('#include <common>', `#include <common>\nuniform sampler2D uGrain;\nuniform sampler2D uPaint;\nvarying float vMeadow;\nvarying vec3 vWorld;\n${windSampleGLSL}\n${paintUvGLSL}`)
       .replace(
         '#include <color_fragment>',
         /* glsl */ `#include <color_fragment>
         // Two scales of fine grain so the pattern never visibly repeats.
         float grain = texture2D(uGrain, vWorld.xz * 0.55).r * 0.6 + texture2D(uGrain, vWorld.xz * 0.13 + 0.37).r * 0.4;
         diffuseColor.rgb *= mix(1.0, 0.88 + grain * 0.24, vMeadow);
+        // Worn earth under paths, with a ragged, organic edge and a lusher rim of grass.
+        float wear = texture2D(uPaint, paintUv(vWorld.xz)).r;
+        float ragged = (texture2D(uGrain, vWorld.xz * 0.9 + 0.71).r - 0.5) * 0.5;
+        float earth = smoothstep(0.32, 0.62, wear + ragged);
+        float rim = smoothstep(0.06, 0.3, wear) * (1.0 - earth);
+        diffuseColor.rgb *= 1.0 - rim * 0.12;
+        vec3 soil = mix(vec3(0.24, 0.16, 0.09), vec3(0.34, 0.24, 0.14), grain);
+        diffuseColor.rgb = mix(diffuseColor.rgb, soil, earth);
         // Gust sheen: the meadow brightens softly as wind passes, like grass bowing in waves.
         float gust = windAt(vWorld.xz, 0.0);
-        diffuseColor.rgb *= 1.0 + smoothstep(0.45, 1.1, gust) * 0.085 * vMeadow;`,
+        diffuseColor.rgb *= 1.0 + smoothstep(0.45, 1.1, gust) * 0.085 * vMeadow * (1.0 - earth);`,
       );
   };
   return mat;
