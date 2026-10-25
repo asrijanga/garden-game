@@ -26,6 +26,7 @@ import { FlyingBirds } from './world/flyingBirds';
 import { currentSeason, PALETTES } from './world/season';
 import { WindField, bindWind } from './render/wind';
 import { PostFX } from './render/post';
+import { Quality, TIERS, mountFpsMeter } from './render/quality';
 import { Ambience } from './audio/ambience';
 import { mountSoundControls } from './ui/soundButton';
 import { Toolbar } from './ui/toolbar';
@@ -56,11 +57,15 @@ renderer.toneMapping = THREE.NeutralToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+// The sun, trees and cottage stand still, so the shadow map is only redrawn when something
+// that casts a shadow moves (stones settling, reeds growing): a whole forest pass saved per frame.
+renderer.shadowMap.autoUpdate = false;
+renderer.shadowMap.needsUpdate = true;
 
-// Cap resolution: phones have 3x screens, but 1.75x plus post-processing looks just as soft
-// and keeps us at 60fps.
-const maxPixelRatio = 1.75;
-const pixelRatio = () => Math.min(window.devicePixelRatio || 1, maxPixelRatio);
+// Render resolution comes from the adaptive quality tier (phones have 3x screens; ~1.5x plus
+// post-processing looks just as soft). Never above the screen's own.
+let tierPixelRatio = 1.5;
+const pixelRatio = () => Math.min(window.devicePixelRatio || 1, tierPixelRatio);
 
 // --- World ------------------------------------------------------------------------------
 const season = currentSeason();
@@ -224,7 +229,7 @@ const eraser = new EraseBrush(
   },
   (amount) => ambience.erase(amount),
 );
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, renderer, scene });
 tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker, paths, flowerBrush, pondBrush, eraser, (tool) => {
   picker.setVisible(tool === 'flowers');
   document.body.classList.toggle('picking', tool === 'flowers');
@@ -232,6 +237,7 @@ tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas
 
 // --- Post-processing ----------------------------------------------------------------------
 const post = new PostFX(renderer, scene, camera);
+if (debug) Object.assign(window, { post });
 
 let started = false;
 function resize() {
@@ -255,13 +261,36 @@ window.addEventListener('resize', resize);
 resize();
 started = true;
 
+// --- Adaptive quality: hold 60fps ------------------------------------------------------------
+const params = new URLSearchParams(location.search);
+const fixedTier = params.get('q');
+const quality = new Quality(
+  fixedTier !== null ? +fixedTier : 1,
+  (tier) => {
+    tierPixelRatio = tier.pixelRatio;
+    post.setSamples(tier.samples);
+    post.bloomEnabled = tier.bloom;
+    resize();
+  },
+  fixedTier !== null,
+);
+const fpsMeter = params.has('fps') ? mountFpsMeter(quality) : null;
+if (debug) Object.assign(window, { quality, TIERS });
+
+// Compile every shader up front (in parallel where supported), so the first pond or bed
+// doesn't hitch while its material compiles.
+void renderer.compileAsync(scene, camera);
+
 // --- Loop -----------------------------------------------------------------------------------
 const timer = new THREE.Timer();
 let elapsed = 0;
 
 function frame(time: number) {
   timer.update(time);
-  const dt = Math.min(timer.getDelta(), 1 / 20);
+  const raw = timer.getDelta();
+  const dt = Math.min(raw, 1 / 20);
+  quality.frame(raw);
+  fpsMeter?.(raw);
   elapsed += dt;
 
   wind.update(dt);
@@ -284,6 +313,7 @@ function frame(time: number) {
   ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));
   const buzz = bees.buzzNear(camera.position);
   ambience.buzz(buzz.level, buzz.pitch);
+  if (stones.busy || pondPlants.busy) renderer.shadowMap.needsUpdate = true;
   post.render(dt);
 }
 

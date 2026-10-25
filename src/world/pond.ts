@@ -17,7 +17,7 @@ export const POND_MAX_DEPTH = 1.2;
 export const POND_WATERLINE_RANGE = 0.4;
 const DEPTH = 0.62; // deepest dig, reached ~1.8 m in from the edge
 const SHORE_HALO = 0.6; // damp grass this far round the water (and where the lawn steps aside)
-const BANK_MARGIN = 3.0; // the basin mesh covers this much lawn round a pond
+const BANK_MARGIN = 2.4; // the basin mesh covers this much lawn round a pond (lowered lawn reaches ~2.1 m)
 const BLEND = 1.0; // radius of the soft curve where separate ponds meet
 const NONE = -99;
 const FILL_TIME = 3.2;
@@ -86,6 +86,8 @@ export class Ponds {
   private readonly B = new Float32Array(N * N).fill(NaN);
   private comp = new Int32Array(N * N).fill(-1);
   private readonly chunks = new Map<number, Chunk>();
+  private readonly spare = new Map<number, Chunk>();
+  private prebuildNext = 0;
   private readonly digging = new Set<number>();
   private readonly data: Uint8Array;
   private readonly noise = createNoise2D(913);
@@ -93,6 +95,9 @@ export class Ponds {
   private readonly index: THREE.BufferAttribute[] = [];
   private nextId = 1;
   private compsDirty = false;
+  private sinceBodies = 0;
+  /** Bounds of every field vertex that has ever been inside a pond (the flood fill's search area). */
+  private bounds = { i0: N, i1: -1, j0: N, j1: -1 };
   private texDirty = false;
   private stroking = false;
   private time = 0;
@@ -107,6 +112,16 @@ export class Ponds {
   ) {
     this.data = texture.image.data as Uint8Array;
     this.waterMat = waterMaterial(palette);
+    // Hidden stand-ins, so the basin and water shaders are compiled at load, not on first dig.
+    const geo = new THREE.BufferGeometry();
+    for (const [name, size] of [['position', 3], ['normal', 3], ['color', 3], ['aMeadow', 1], ['aDepth', 1], ['aWet', 1]] as const) {
+      geo.setAttribute(name, new THREE.BufferAttribute(new Float32Array(3 * size), size));
+    }
+    for (const mat of [this.ground.basinMaterial, this.waterMat]) {
+      const warm = new THREE.Mesh(geo, mat);
+      warm.visible = false;
+      this.group.add(warm);
+    }
   }
 
   // --- Field helpers ---------------------------------------------------------------------------
@@ -165,7 +180,18 @@ export class Ponds {
 
   /** Height of the finished pond bed at (x, z) (the lawn, away from ponds). */
   bedHeight(x: number, z: number): number {
-    return this.ground.heightAt(x, z) - Math.max(0, this.bilinear(this.O, x, z, 0));
+    // From the cached lawn heights near ponds (cheap), the analytic lawn elsewhere.
+    const fx = this.gi(x);
+    const fz = this.gi(z);
+    const i = Math.floor(fx);
+    const j = Math.floor(fz);
+    if (i < 0 || j < 0 || i >= N - 1 || j >= N - 1) return this.ground.heightAt(x, z);
+    const v = j * N + i;
+    const h = (c: number) => this.groundAt(c) - this.O[c];
+    const tx = fx - i;
+    const a = h(v) + (h(v + 1) - h(v)) * tx;
+    const b = h(v + N) + (h(v + N + 1) - h(v + N)) * tx;
+    return a + (b - a) * (fz - j);
   }
 
   bodyAt(x: number, z: number): PondBody | undefined {
@@ -245,8 +271,11 @@ export class Ponds {
         const px = this.wx(i);
         const v = j * N + i;
         // A hand-dug outline: gently lobed, never a perfect circle.
+        const raw = shape(px, pz);
+        // Already dug at least this deep by an earlier dab of this stroke (wobble is at most ±0.27).
+        if (raw + 0.28 <= this.strokeS[v]) continue;
         const wob = this.noise(px * 0.55, pz * 0.55) * 0.2 + this.noise(px * 1.7 + 7, pz * 1.7) * 0.07;
-        const s = shape(px, pz) + wob;
+        const s = raw + wob;
         if (s <= this.strokeS[v]) continue;
         this.strokeS[v] = s;
         // Separate ponds (earlier strokes) meet in a soft, rounded curve.
@@ -256,6 +285,11 @@ export class Ponds {
         if (S <= this.S[v] + 1e-4) continue;
         this.S[v] = S;
         this.setDepth(v, px, pz);
+        if (S > 0) {
+          const b = this.bounds;
+          b.i0 = Math.min(b.i0, i); b.i1 = Math.max(b.i1, i);
+          b.j0 = Math.min(b.j0, j); b.j1 = Math.max(b.j1, j);
+        }
       }
     }
     // Make sure basin meshes cover the dig and the lowered lawn round it.
@@ -391,12 +425,17 @@ export class Ponds {
   /** Re-find the separate bodies of water (flood fill), carrying levels over from before. */
   private recomputeBodies() {
     this.compsDirty = false;
+    this.sinceBodies = 0;
+    const wet = new Set<number>(); // chunks whose water may change
     const old = this.comp;
     const comp = new Int32Array(N * N).fill(-1);
     const oldBodies = new Map(this.bodies);
+    for (const b of oldBodies.values()) if (b.filled) for (const k of b.chunks) wet.add(k);
     this.bodies.clear();
     const stack: number[] = [];
-    for (let v = 0; v < N * N; v++) {
+    const { i0, i1, j0, j1 } = this.bounds;
+    for (let v = j0 * N + i0; v <= j1 * N + i1; v++) {
+      if (v % N < i0 || v % N > i1) continue;
       if (this.S[v] <= 0 || comp[v] !== -1) continue;
       const id = this.nextId++;
       const cells: number[] = [];
@@ -443,17 +482,56 @@ export class Ponds {
       });
     }
     this.comp = comp;
-    for (const ch of this.chunks.values()) ch.water.visible = false;
-    for (const ch of this.chunks.values()) this.writeChunk(ch);
+    for (const b of this.bodies.values()) if (b.filled) for (const k of b.chunks) wet.add(k);
+    for (const k of wet) {
+      const ch = this.chunks.get(k);
+      if (!ch) continue;
+      ch.water.visible = false;
+      this.writeChunk(ch);
+    }
     for (const body of this.bodies.values()) if (body.filled) this.showWater(body);
   }
 
   // --- Meshes ----------------------------------------------------------------------------------
 
+  /** Build one more hidden chunk in a quiet frame, so digging rarely has to build any. */
+  private prebuild() {
+    while (this.prebuildNext < CHUNKS * CHUNKS) {
+      const key = this.prebuildNext++;
+      const ci = key % CHUNKS;
+      const cj = Math.floor(key / CHUNKS);
+      if (this.chunks.has(key) || this.spare.has(key)) continue;
+      // Only where a pond could ever be (the clearing, give or take the banks).
+      const x = this.wx(ci * CH + CH / 2);
+      const z = this.wx(cj * CH + CH / 2);
+      if (Math.hypot(x, z) > 21 + CH * CELL) continue;
+      const ch = this.build(ci, cj);
+      ch.basin.visible = false;
+      this.spare.set(key, ch);
+      return;
+    }
+  }
+
   private chunk(ci: number, cj: number): Chunk {
     const key = cj * CHUNKS + ci;
     const have = this.chunks.get(key);
     if (have) return have;
+    const spare = this.spare.get(key);
+    if (spare) {
+      this.spare.delete(key);
+      spare.basin.visible = true;
+      this.chunks.set(key, spare);
+      this.writeChunk(spare);
+      return spare;
+    }
+    const ch = this.build(ci, cj);
+    this.chunks.set(key, ch);
+    this.writeChunk(ch);
+    return ch;
+  }
+
+  private build(ci: number, cj: number): Chunk {
+    const key = cj * CHUNKS + ci;
     const i0 = ci * CH;
     const j0 = cj * CH;
     const nx = Math.min(CH, N - 1 - i0) + 1;
@@ -475,17 +553,41 @@ export class Ponds {
     const pos = new Float32Array(count * 3);
     const col = new Float32Array(count * 3);
     const meadow = new Float32Array(count);
+    // The lawn's base colour only drifts over metres: sample it every 4th vertex and blend between.
+    const C = 4;
+    const cx = Math.ceil((nx - 1) / C) + 1;
+    const cz = Math.ceil((nz - 1) / C) + 1;
+    const coarse = new Float32Array(cx * cz * 4);
+    for (let b = 0; b < cz; b++) {
+      for (let a = 0; a < cx; a++) {
+        const k = (b * cx + a) * 4;
+        coarse[k + 3] = this.ground.vertexColor(this.wx(i0 + a * C), this.wx(j0 + b * C), this.tmp);
+        coarse[k] = this.tmp.r;
+        coarse[k + 1] = this.tmp.g;
+        coarse[k + 2] = this.tmp.b;
+      }
+    }
     for (let b = 0; b < nz; b++) {
+      const fb = b / C;
+      const b0 = Math.min(cz - 2, Math.floor(fb));
+      const tb = fb - b0;
       for (let a = 0; a < nx; a++) {
         const p = b * nx + a;
-        const x = this.wx(i0 + a);
-        const z = this.wx(j0 + b);
-        pos[p * 3] = x;
-        pos[p * 3 + 2] = z;
-        meadow[p] = this.ground.vertexColor(x, z, this.tmp);
-        col[p * 3] = this.tmp.r;
-        col[p * 3 + 1] = this.tmp.g;
-        col[p * 3 + 2] = this.tmp.b;
+        pos[p * 3] = this.wx(i0 + a);
+        pos[p * 3 + 2] = this.wx(j0 + b);
+        const fa = a / C;
+        const a0 = Math.min(cx - 2, Math.floor(fa));
+        const ta = fa - a0;
+        const k00 = (b0 * cx + a0) * 4;
+        const k10 = k00 + 4;
+        const k01 = k00 + cx * 4;
+        const k11 = k01 + 4;
+        const mix = (o: number) =>
+          (coarse[k00 + o] * (1 - ta) + coarse[k10 + o] * ta) * (1 - tb) + (coarse[k01 + o] * (1 - ta) + coarse[k11 + o] * ta) * tb;
+        col[p * 3] = mix(0);
+        col[p * 3 + 1] = mix(1);
+        col[p * 3 + 2] = mix(2);
+        meadow[p] = mix(3);
       }
     }
     basinGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -508,21 +610,23 @@ export class Ponds {
     water.visible = false;
     water.renderOrder = 1;
     this.group.add(basin, water);
-    const ch: Chunk = { key, i0, j0, nx, nz, basin, water };
-    this.chunks.set(key, ch);
-    this.writeChunk(ch);
-    return ch;
+    return { key, i0, j0, nx, nz, basin, water };
   }
 
-  private writeChunk(ch: Chunk) {
+  /** Copy field state into a chunk's meshes, optionally only the vertices in [i0..i1] × [j0..j1]. */
+  private writeChunk(ch: Chunk, i0 = 0, i1 = N, j0 = 0, j1 = N) {
     const bPos = ch.basin.geometry.attributes.position as THREE.BufferAttribute;
     const nrm = ch.basin.geometry.attributes.normal as THREE.BufferAttribute;
     const wPos = ch.water.geometry.attributes.position as THREE.BufferAttribute;
     const wDepth = ch.water.geometry.attributes.aDepth as THREE.BufferAttribute;
     const wWet = ch.water.geometry.attributes.aWet as THREE.BufferAttribute;
-    for (let b = 0; b < ch.nz; b++) {
+    const a0 = Math.max(0, i0 - ch.i0);
+    const a1 = Math.min(ch.nx - 1, i1 - ch.i0);
+    const b0 = Math.max(0, j0 - ch.j0);
+    const b1 = Math.min(ch.nz - 1, j1 - ch.j0);
+    for (let b = b0; b <= b1; b++) {
       const j = ch.j0 + b;
-      for (let a = 0; a < ch.nx; a++) {
+      for (let a = a0; a <= a1; a++) {
         const i = ch.i0 + a;
         const v = j * N + i;
         const p = b * ch.nx + a;
@@ -552,13 +656,17 @@ export class Ponds {
 
   update(dt: number) {
     this.time += dt;
+    if (!this.stroking && this.time > 1.5) this.prebuild();
     this.waterMat.uniforms.uTime.value = this.time;
-    if (this.compsDirty) this.recomputeBodies();
+    // While digging, the (whole-field) flood fill runs a few times a second, not every frame.
+    this.sinceBodies += dt;
+    if (this.compsDirty && (!this.stroking || this.sinceBodies > 0.25)) this.recomputeBodies();
     if (this.texDirty) {
       this.texture.needsUpdate = true;
       this.texDirty = false;
     }
     const refresh = new Set<number>();
+    const strips: { ch: Chunk; i0: number; i1: number; j0: number; j1: number }[] = [];
     // The ground sinks softly into its new shape.
     const k = 1 - Math.exp(-dt * 2.2);
     for (const key of [...this.digging]) {
@@ -579,7 +687,20 @@ export class Ponds {
         }
       }
       if (!moving) this.digging.delete(key);
-      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) refresh.add(key + dj * CHUNKS + di);
+      refresh.add(key);
+      // Neighbours share this chunk's edge vertices (and their normals look one vertex across):
+      // refresh just that thin strip of theirs.
+      const ri0 = ci * CH - 1;
+      const ri1 = ci * CH + CH;
+      const rj0 = cj * CH - 1;
+      const rj1 = cj * CH + CH;
+      for (let dj = -1; dj <= 1; dj++) {
+        for (let di = -1; di <= 1; di++) {
+          if (!di && !dj) continue;
+          const ch = this.chunks.get(key + dj * CHUNKS + di);
+          if (ch) strips.push({ ch, i0: ri0, i1: ri1, j0: rj0, j1: rj1 });
+        }
+      }
     }
     // Water rises gently to its level.
     for (const body of this.bodies.values()) {
@@ -598,6 +719,7 @@ export class Ponds {
       const ch = this.chunks.get(key);
       if (ch) this.writeChunk(ch);
     }
+    for (const s of strips) if (!refresh.has(s.ch.key)) this.writeChunk(s.ch, s.i0, s.i1, s.j0, s.j1);
   }
 
   /** The water level (now) at (x, z), or null on dry land. */

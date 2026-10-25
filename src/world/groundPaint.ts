@@ -18,7 +18,8 @@ export class GroundPaint {
   constructor() {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = SIZE;
-    this.ctx = canvas.getContext('2d', { willReadFrequently: false })!;
+    // CPU-backed: on iOS a GPU canvas must be read back before every upload to WebGL, which stalls.
+    this.ctx = canvas.getContext('2d', { willReadFrequently: true })!;
     this.ctx.fillStyle = '#000';
     this.ctx.fillRect(0, 0, SIZE, SIZE);
     this.texture = new THREE.CanvasTexture(canvas);

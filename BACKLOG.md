@@ -10,7 +10,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current story:** 1.8 — Gently erase (built, awaiting review). Next: 1.9 autosave + seed sprouting.
+**Current story:** Performance pass for smooth 60fps (built, awaiting review on iPhone; add `?fps` to the URL for a frame-rate readout). 1.8 erase is also awaiting review. Next: 1.9 autosave + seed sprouting.
 **Preview URL:** https://asrijanga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
@@ -24,6 +24,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 1.7 A cozy garden pond | ✅ Done | Pond tool: drag to dig a pond along your finger, tap for a round pool, or draw a loop to fill the shape. The ground sinks into a soft basin, then water wells up (with a gentle trickle). On slopes the bed is levelled so water reaches the far bank. Stylized water: clear shallows to teal deep, sky and treeline reflection, gust-driven wavelets, sun glints, soft foam at the shore. Mossy rocks gather in groups at the waterline, with reeds and bulrushes in the gaps. Lily pads (flowering in spring/summer) and koi/goldfish arrive over the next seconds. Fish glide, pause, kiss the surface, and leap with a splash, rings and a plop. Ponds join with soft curves and avoid paths, beds and the cottage. |
 | 1.8 Gently erase | 👀 Awaiting feedback | Tidy-up tool: a soft brush ring shows exactly what it covers (bigger when zoomed out, finer up close). Under it, stones shrug and sink into the soil with little puffs, flowers, foliage, clover, reeds and lily pads wilt away, and ponds fill back in as the bed rises and fish slip away. Worn earth, gravel and mulch fade softly over a moment, with a soft edge, and wildflowers grow back one by one. Beds that are cut get a stone border round their new end, a pond that loses a bank settles to its new level, and erased ground is free to build on again. A soft earthy "shff" sound. |
 | 1.9 Autosave + seed sprouting | ⬜ Not started | |
+| ⚡ Perf pass (pulled from 6.4) | 👀 Awaiting feedback | Lean post pipeline (scene + quarter-res bloom + one final pass, replacing several full-screen passes on 4× MSAA targets). Shadows redrawn only when something casting moves. Adaptive quality tiers (1.75×→0.85×; MSAA, then bloom drop last) that hold 60fps and never see-saw. Shaders compiled at load. Bed borders ~5× faster to lay, pond digging rarely hitches (pre-built basin chunks, strip refreshes, throttled flood fill), numeric spatial hashes, a CPU-backed paint canvas. `?fps` readout; `?q=0..5` pins a tier. |
 | 2.x – 6.x | ⬜ Not started | See milestones below |
 
 Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · ✅ Done
@@ -31,6 +32,14 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **Performance (after 1.8):** *Feedback:* "It's very janky, can you first work on achieving 60fps." *Measured:* ~360 draw calls and 520k triangles a frame. The forest (300k triangles, alpha-tested leaf cards) was also redrawn into the 2048² shadow map every frame. Post-processing ran four full-screen passes on 4× MSAA half-float targets at 1.75× resolution. Lifting your finger from a bed stalled ~170 ms while its border was laid; pond digging took up to ~25 ms per frame. *Changes:*
+  - Custom post pipeline: the scene is drawn once into an MSAA target; bloom is built at ¼ resolution and below (dual-filter blur); one final pass does bloom, Neutral tone mapping, sRGB, grade and vignette. Same look, far less bandwidth.
+  - Shadow map redrawn only while stones settle or sink, or reeds grow (trees, cottage and sun are static; birds no longer cast). Draw calls are now ~210 a frame.
+  - Adaptive quality: watches real frame times (75th percentile) and steps resolution down from 1.5× (then fewer MSAA samples, then no bloom) until 60fps holds; steps back up only with clear headroom and never to a tier that failed. Gives up if a step down doesn't help (Low Power Mode caps at 30fps).
+  - Every shader is compiled at load (including pond water and basin), so the first pond or bed doesn't hitch.
+  - Bed borders: distances are rasterised into the grid and the field is sampled once per cell (172 ms → ~30 ms on desktop). Path lookups use numeric keys (30× faster).
+  - Ponds: basin chunks are pre-built hidden in idle frames, neighbours get only their shared edge strip refreshed, the flood fill runs 4×/s while digging and only over the pond area, and lawn colours are sampled coarsely. Per-frame pond animation went 2.2 → 0.7 ms.
+  - Ground paint canvas is CPU-backed (`willReadFrequently`), avoiding a GPU read-back stall on every upload while drawing.
 - **1.7 → 1.8:** *Feedback:* "Okay build next story" (pond accepted). Also asked for two new stories: 3.6 ducks and ducklings, 4.1c lotus and water flowers. *Changes:* Story 1.8 built.
 - **1.6 → 1.7:** *Feedback:* "Okay build next story" (flowers, beds and bees accepted). *Changes:* Story 1.7 built.
 - **1.6 review 5:** *Feedback:* Handle two beds meeting with natural curves. *Changes:* Bed outlines come from a distance field: each stroke's own outline is exact, and separate beds join with a round fillet (radius 0.8 m) where they meet or nearly touch. Around a new stroke, a grid march fills the fillet curves with mulch (plus a little foliage), lifts border stones now inside, and lays new stones along the blended outline (oriented by the field gradient, in stroke order). Tested: crossing beds (plus shape), a bend from one bed's end, and two parallel beds with a small gap (merged into one wide bed with a single border).
@@ -155,6 +164,7 @@ _Feedback from each review, newest first, and what we changed because of it._
 | Audio | Web Audio API, procedural (filtered noise for wind and leaves; synthesized chimes later) | Nothing to download. Unlocks on the first touch. Driven by `WindField`. |
 | Ground paint | `GroundPaint`: a 512² canvas texture over the clearing (R = worn path earth; G = sandiness relative to R; B reserved for flower beds) read by the lawn shader | Cheap live painting with organic edges, and one texture for every ground change. |
 | Ponds | `Ponds`: a 256² signed "inside distance" field over the clearing (strokes merge with a smooth union) gives depth, levelling and banks. The coarse lawn mesh steps down out of sight near ponds and fine chunked basin meshes (same lawn shader, polygon offset) sink into shape. Flat water per connected body, with level = lowest bank − 7 cm. A pond texture (R depth, G shore halo, B height above the waterline) colours banks, pebbles and silt | Smooth organic shapes at any size, live digging, and no holes or seams, without re-meshing the whole lawn. |
+| Performance | Custom `PostFX` (scene MSAA → ¼-res dual-filter bloom → one final pass). Shadows on demand (`shadowMap.autoUpdate = false`). `Quality` tiers adapt resolution/MSAA/bloom to frame time. `compileAsync` at load. `?fps`, `?q=` | iPhone Safari at 60fps without giving up the look; fill rate is the scarce resource. |
 | Persistence | `localStorage`/IndexedDB with a **versioned, compact save format** | The share link (later) is the same data, compressed. |
 
 ---

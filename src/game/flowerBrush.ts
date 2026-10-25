@@ -34,6 +34,8 @@ export class FlowerBrush {
   private readonly beds: { c: THREE.Vector2; stroke: number }[] = [];
   private stroke: THREE.Vector2[] = [];
   private strokeId = 0;
+  private readonly fieldIds: number[] = [];
+  private readonly fieldMins: number[] = [];
 
   constructor(
     private readonly ground: Ground,
@@ -108,14 +110,21 @@ export class FlowerBrush {
    */
   private bedField(x: number, z: number, near: { c: THREE.Vector2; stroke: number }[]): number {
     // Each stroke's own outline is exact (a plain union of its dabs)...
-    const perStroke = new Map<number, number>();
+    // (Plain arrays rather than a Map: this runs tens of thousands of times per border.)
+    const ids = this.fieldIds;
+    const mins = this.fieldMins;
+    ids.length = mins.length = 0;
     for (const b of near) {
       const di = Math.hypot(x - b.c.x, z - b.c.y) - EDGE_RADIUS;
-      perStroke.set(b.stroke, Math.min(perStroke.get(b.stroke) ?? Infinity, di));
+      const k = ids.indexOf(b.stroke);
+      if (k < 0) {
+        ids.push(b.stroke);
+        mins.push(di);
+      } else if (di < mins[k]) mins[k] = di;
     }
     // ...and separate beds join with a round fillet of radius BLEND where they meet.
     let d = Infinity;
-    for (const di of perStroke.values()) {
+    for (const di of mins) {
       if (d === Infinity) d = di;
       else d = Math.max(BLEND, Math.min(d, di)) - Math.hypot(Math.max(BLEND - d, 0), Math.max(BLEND - di, 0));
     }
@@ -130,7 +139,6 @@ export class FlowerBrush {
    */
   private layBorder(stroke: THREE.Vector2[]) {
     const reach = 1.6;
-    const touches = (x: number, z: number, pad: number) => stroke.some((c) => Math.hypot(x - c.x, z - c.y) < EDGE_RADIUS + pad);
     // Beds that can influence the outline here.
     const near = this.beds.filter((b) => stroke.some((c) => b.c.distanceTo(c) < EDGE_RADIUS * 2 + BLEND + reach));
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -138,7 +146,35 @@ export class FlowerBrush {
       minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x);
       minZ = Math.min(minZ, c.y); maxZ = Math.max(maxZ, c.y);
     }
-    const field = (x: number, z: number) => this.bedField(x, z, near);
+    // Bucket beds and stroke dabs by 1 m cell, so each grid cell only looks at its neighbours.
+    const bucket = <T extends { x: number; y: number }>(list: T[]) => {
+      const map = new Map<number, T[]>();
+      for (const p of list) {
+        const k = Math.floor(p.x) * 4096 + Math.floor(p.y);
+        if (!map.has(k)) map.set(k, []);
+        map.get(k)!.push(p);
+      }
+      return (x: number, z: number, r: number, visit: (p: T) => void) => {
+        for (let i = Math.floor(x - r); i <= Math.floor(x + r); i++) {
+          for (let j = Math.floor(z - r); j <= Math.floor(z + r); j++) for (const p of map.get(i * 4096 + j) ?? []) visit(p);
+        }
+      };
+    };
+    const nearBeds = bucket(near.map((b) => Object.assign(b.c.clone(), { bed: b })));
+    const nearStroke = bucket(stroke);
+    const influence = EDGE_RADIUS + BLEND + 1;
+    const local: { c: THREE.Vector2; stroke: number }[] = [];
+    const field = (x: number, z: number) => {
+      local.length = 0;
+      nearBeds(x, z, influence, (p) => local.push(p.bed));
+      return local.length ? this.bedField(x, z, local) : Infinity;
+    };
+    const strokeDist = (x: number, z: number, r: number) => {
+      let best = Infinity;
+      nearStroke(x, z, r, (c) => (best = Math.min(best, Math.hypot(x - c.x, z - c.y))));
+      return best;
+    };
+    const touches = (x: number, z: number, pad: number) => strokeDist(x, z, EDGE_RADIUS + pad) < EDGE_RADIUS + pad;
 
     // Lift stones that the new (blended) outline has swallowed.
     const mid = new THREE.Vector2((minX + maxX) / 2, (minZ + maxZ) / 2);
@@ -146,16 +182,67 @@ export class FlowerBrush {
     this.stones.removeIf(mid.x, mid.y, span, 'rock', (x, z) => field(x, z) < -0.07 && touches(x, z, reach));
 
     // March a grid round the stroke: fill the blended curves with mulch and find the outline.
-    const step = 0.08;
+    // The field is sampled once per grid point and neighbours are read back from the grid.
+    const step = 0.1;
+    const x0 = minX - EDGE_RADIUS - reach;
+    const z0 = minZ - EDGE_RADIUS - reach;
+    const nx = Math.ceil((maxX + EDGE_RADIUS + reach - x0) / step) + 1;
+    const nz = Math.ceil((maxZ + EDGE_RADIUS + reach - z0) / step) + 1;
+    // Rasterise distances straight into the grid (each dab stamps the cells round it), rather than
+    // searching for the nearest dab from every cell.
+    const stamp = (points: { x: number; y: number }[], R: number, out: Float32Array) => {
+      for (const p of points) {
+        const i0 = Math.max(0, Math.floor((p.x - R - x0) / step));
+        const i1 = Math.min(nx - 1, Math.ceil((p.x + R - x0) / step));
+        const j0 = Math.max(0, Math.floor((p.y - R - z0) / step));
+        const j1 = Math.min(nz - 1, Math.ceil((p.y + R - z0) / step));
+        for (let i = i0; i <= i1; i++) {
+          const dx = x0 + i * step - p.x;
+          for (let j = j0; j <= j1; j++) {
+            const dz = z0 + j * step - p.y;
+            const d = Math.sqrt(dx * dx + dz * dz);
+            if (d < out[i * nz + j]) out[i * nz + j] = d;
+          }
+        }
+      }
+    };
+    const D = new Float32Array(nx * nz).fill(Infinity);
+    stamp(stroke, EDGE_RADIUS + reach + step, D);
+    // Bed field: exact union within each stroke, round fillet between strokes (as bedField).
+    const F = new Float32Array(nx * nz).fill(Infinity);
+    const P = new Float32Array(nx * nz).fill(Infinity); // plain distance to the nearest dab
+    const groups = new Map<number, THREE.Vector2[]>();
+    for (const b of near) {
+      if (!groups.has(b.stroke)) groups.set(b.stroke, []);
+      groups.get(b.stroke)!.push(b.c);
+    }
+    const G = new Float32Array(nx * nz);
+    let first = true;
+    for (const pts of groups.values()) {
+      G.fill(Infinity);
+      stamp(pts, influence, G);
+      for (let k = 0; k < G.length; k++) {
+        const di = G[k] - EDGE_RADIUS;
+        if (G[k] < P[k]) P[k] = G[k];
+        const d = F[k];
+        F[k] = first || d === Infinity ? Math.min(d, di) : di === Infinity ? d : Math.max(BLEND, Math.min(d, di)) - Math.hypot(Math.max(BLEND - d, 0), Math.max(BLEND - di, 0));
+      }
+      first = false;
+    }
+    const T = new Uint8Array(nx * nz);
+    for (let k = 0; k < T.length; k++) T[k] = D[k] < EDGE_RADIUS + reach ? 1 : 0;
+    const at = (i: number, j: number) => (i < 0 || j < 0 || i >= nx || j >= nz ? Infinity : F[i * nz + j]);
     const edge: { x: number; z: number; order: number }[] = [];
     const greens = this.season === 'autumn' ? FOLIAGE_AUTUMN : this.season === 'winter' ? FOLIAGE_WINTER : FOLIAGE_GREEN;
-    for (let x = minX - EDGE_RADIUS - reach; x <= maxX + EDGE_RADIUS + reach; x += step) {
-      for (let z = minZ - EDGE_RADIUS - reach; z <= maxZ + EDGE_RADIUS + reach; z += step) {
-        if (!touches(x, z, reach)) continue;
-        const f = field(x, z);
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < nz; j++) {
+        if (!T[i * nz + j]) continue;
+        const x = x0 + i * step;
+        const z = z0 + j * step;
+        const f = F[i * nz + j];
         if (f < 0) {
           // In a blended curve (inside the outline, outside every round dab): mulch it in.
-          const plain = Math.min(...near.map((b) => Math.hypot(x - b.c.x, z - b.c.y))) - EDGE_RADIUS;
+          const plain = P[i * nz + j] - EDGE_RADIUS;
           if (plain > -0.06 && !this.blocked(x, z) && this.distanceToPaths(x, z) > 0.75) {
             this.paint.bed(x, z, 0.32);
             if (this.rng() < 0.08) {
@@ -166,14 +253,14 @@ export class FlowerBrush {
           continue;
         }
         // Outline cells: outside, with an inside neighbour.
-        if (field(x + step, z) < 0 || field(x - step, z) < 0 || field(x, z + step) < 0 || field(x, z - step) < 0) {
+        if (at(i + 1, j) < 0 || at(i - 1, j) < 0 || at(i, j + 1) < 0 || at(i, j - 1) < 0) {
           let order = 0;
           let best = Infinity;
-          stroke.forEach((c, i) => {
+          stroke.forEach((c, k) => {
             const d = Math.hypot(x - c.x, z - c.y);
             if (d < best) {
               best = d;
-              order = i + Math.atan2(z - c.y, x - c.x) / (Math.PI * 2);
+              order = k + Math.atan2(z - c.y, x - c.x) / (Math.PI * 2);
             }
           });
           edge.push({ x, z, order });

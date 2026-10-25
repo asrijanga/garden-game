@@ -57,7 +57,7 @@ export class PathBuilder {
   private pathId = 0;
   private started = false;
   private readonly lastTarget = new THREE.Vector2();
-  private readonly lines = new Map<string, LinePoint[]>();
+  private readonly lines = new Map<number, LinePoint[]>();
 
   constructor(
     private readonly ground: Ground,
@@ -209,7 +209,7 @@ export class PathBuilder {
   }
 
   private addLinePoint(x: number, z: number) {
-    const key = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+    const key = Math.floor(x / CELL) * 4096 + Math.floor(z / CELL);
     if (!this.lines.has(key)) this.lines.set(key, []);
     this.lines.get(key)!.push({ x, z, id: this.pathId });
   }
@@ -218,8 +218,8 @@ export class PathBuilder {
   erase(x: number, z: number, r: number) {
     for (let i = Math.floor((x - r) / CELL); i <= Math.floor((x + r) / CELL); i++) {
       for (let j = Math.floor((z - r) / CELL); j <= Math.floor((z + r) / CELL); j++) {
-        const list = this.lines.get(`${i},${j}`);
-        if (list) this.lines.set(`${i},${j}`, list.filter((p) => (p.x - x) ** 2 + (p.z - z) ** 2 > r * r));
+        const list = this.lines.get(i * 4096 + j);
+        if (list) this.lines.set(i * 4096 + j, list.filter((p) => (p.x - x) ** 2 + (p.z - z) ** 2 > r * r));
       }
     }
   }
@@ -231,7 +231,7 @@ export class PathBuilder {
     const cz = Math.floor(z / CELL);
     for (let i = cx - reach; i <= cx + reach; i++) {
       for (let j = cz - reach; j <= cz + reach; j++) {
-        for (const p of this.lines.get(`${i},${j}`) ?? []) {
+        for (const p of this.lines.get(i * 4096 + j) ?? []) {
           if (othersOnly && p.id === this.pathId) continue;
           best = Math.min(best, (p.x - x) ** 2 + (p.z - z) ** 2);
         }

@@ -1,70 +1,216 @@
 import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-/** Final storybook grade in display space: warm lift, gentle saturation, soft vignette. */
-const GradeShader = {
-  uniforms: {
-    tDiffuse: { value: null as THREE.Texture | null },
+/**
+ * A lean post pipeline for phones. The scene is rendered once (with MSAA) into a half-float
+ * target, a soft bloom is built at quarter resolution or below (bright pass, then a short
+ * dual-filter blur chain), and one final full-screen pass adds the bloom, tone maps, converts to
+ * sRGB and applies the storybook grade. Only two passes touch every pixel.
+ */
+
+const fullscreenVert = /* glsl */ `
+varying vec2 vUv;
+void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+
+/** Bright pass + 4-tap downsample: keeps only what's brighter than the threshold. */
+const brightFrag = /* glsl */ `
+uniform sampler2D tSrc;
+uniform vec2 uTexel;
+uniform float uThreshold;
+varying vec2 vUv;
+vec3 bright(vec2 uv) {
+  vec3 c = texture2D(tSrc, uv).rgb;
+  float l = max(c.r, max(c.g, c.b));
+  return c * smoothstep(uThreshold, uThreshold + 0.25, l);
+}
+void main() {
+  vec2 o = uTexel * 1.0;
+  vec3 c = bright(vUv + vec2(-o.x, -o.y)) + bright(vUv + vec2(o.x, -o.y)) + bright(vUv + vec2(-o.x, o.y)) + bright(vUv + vec2(o.x, o.y));
+  gl_FragColor = vec4(c * 0.25, 1.0);
+}`;
+
+/** Dual-filter (Kawase) downsample. */
+const downFrag = /* glsl */ `
+uniform sampler2D tSrc;
+uniform vec2 uTexel;
+varying vec2 vUv;
+void main() {
+  vec2 o = uTexel;
+  vec3 c = texture2D(tSrc, vUv).rgb * 4.0;
+  c += texture2D(tSrc, vUv - o).rgb;
+  c += texture2D(tSrc, vUv + o).rgb;
+  c += texture2D(tSrc, vUv + vec2(o.x, -o.y)).rgb;
+  c += texture2D(tSrc, vUv - vec2(o.x, -o.y)).rgb;
+  gl_FragColor = vec4(c / 8.0, 1.0);
+}`;
+
+/** Dual-filter (Kawase) upsample, added onto the finer level. */
+const upFrag = /* glsl */ `
+uniform sampler2D tSrc;
+uniform sampler2D tBase;
+uniform vec2 uTexel;
+varying vec2 vUv;
+void main() {
+  vec2 o = uTexel;
+  vec3 c = texture2D(tSrc, vUv + vec2(-o.x * 2.0, 0.0)).rgb;
+  c += texture2D(tSrc, vUv + vec2(-o.x, o.y)).rgb * 2.0;
+  c += texture2D(tSrc, vUv + vec2(0.0, o.y * 2.0)).rgb;
+  c += texture2D(tSrc, vUv + vec2(o.x, o.y)).rgb * 2.0;
+  c += texture2D(tSrc, vUv + vec2(o.x * 2.0, 0.0)).rgb;
+  c += texture2D(tSrc, vUv + vec2(o.x, -o.y)).rgb * 2.0;
+  c += texture2D(tSrc, vUv + vec2(0.0, -o.y * 2.0)).rgb;
+  c += texture2D(tSrc, vUv + vec2(-o.x, -o.y)).rgb * 2.0;
+  gl_FragColor = vec4(c / 12.0 + texture2D(tBase, vUv).rgb, 1.0);
+}`;
+
+/** Bloom + Khronos PBR Neutral tone mapping + sRGB + warm grade and vignette, in one pass. */
+const finalFrag = /* glsl */ `
+uniform sampler2D tScene;
+uniform sampler2D tBloom;
+uniform float uBloom;
+uniform vec3 uLift, uGain;
+uniform float uSaturation, uVignette, uAspect;
+varying vec2 vUv;
+vec3 neutral(vec3 color) {
+  const float startCompression = 0.8 - 0.04;
+  const float desaturation = 0.15;
+  float x = min(color.r, min(color.g, color.b));
+  float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+  color -= offset;
+  float peak = max(color.r, max(color.g, color.b));
+  if (peak < startCompression) return color;
+  float d = 1.0 - startCompression;
+  float newPeak = 1.0 - d * d / (peak + d - startCompression);
+  color *= newPeak / peak;
+  float g = 1.0 - 1.0 / (desaturation * (peak - newPeak) + 1.0);
+  return mix(color, vec3(newPeak), g);
+}
+vec3 toSRGB(vec3 c) {
+  return mix(c * 12.92, pow(c, vec3(0.41666)) * 1.055 - 0.055, step(0.0031308, c));
+}
+void main() {
+  vec3 c = texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * uBloom;
+  c = toSRGB(clamp(neutral(c), 0.0, 1.0));
+  // Lift shadows toward a warm brown so darks never go dead black.
+  c = uLift * 0.35 + c * (uGain - uLift * 0.35);
+  float l = dot(c, vec3(0.299, 0.587, 0.114));
+  c = mix(vec3(l), c, uSaturation);
+  vec2 v = (vUv - 0.5) * vec2(uAspect, 1.0);
+  float vig = smoothstep(0.95, 0.25, length(v) * 1.1);
+  c *= mix(1.0 - uVignette, 1.0, vig);
+  gl_FragColor = vec4(c, 1.0);
+}`;
+
+const LEVELS = 3; // bloom chain: 1/4, 1/8, 1/16 of full resolution
+
+function target(w: number, h: number, samples = 0) {
+  return new THREE.WebGLRenderTarget(Math.max(1, w), Math.max(1, h), {
+    type: THREE.HalfFloatType,
+    samples,
+    depthBuffer: samples > 0,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+  });
+}
+
+function pass(frag: string, uniforms: Record<string, THREE.IUniform>) {
+  return new THREE.ShaderMaterial({ vertexShader: fullscreenVert, fragmentShader: frag, uniforms, depthTest: false, depthWrite: false, toneMapped: false });
+}
+
+export class PostFX {
+  private sceneRT: THREE.WebGLRenderTarget;
+  private readonly bloomRTs: THREE.WebGLRenderTarget[] = [];
+  private readonly upRTs: THREE.WebGLRenderTarget[] = [];
+  private readonly quad: THREE.Mesh;
+  private readonly cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  private readonly bright = pass(brightFrag, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() }, uThreshold: { value: 0.92 } });
+  private readonly down = pass(downFrag, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } });
+  private readonly up = pass(upFrag, { tSrc: { value: null }, tBase: { value: null }, uTexel: { value: new THREE.Vector2() } });
+  private readonly final = pass(finalFrag, {
+    tScene: { value: null },
+    tBloom: { value: null },
+    uBloom: { value: 0.55 },
     uLift: { value: new THREE.Color('#2a1a10') },
     uGain: { value: new THREE.Color('#fff4e6') },
     uSaturation: { value: 1.08 },
     uVignette: { value: 0.22 },
     uAspect: { value: 1 },
-  },
-  vertexShader: /* glsl */ `
-    varying vec2 vUv;
-    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse;
-    uniform vec3 uLift, uGain;
-    uniform float uSaturation, uVignette, uAspect;
-    varying vec2 vUv;
-    void main() {
-      vec3 c = texture2D(tDiffuse, vUv).rgb;
-      // Lift shadows toward a warm brown so darks never go dead black.
-      c = uLift * 0.35 + c * (uGain - uLift * 0.35);
-      float l = dot(c, vec3(0.299, 0.587, 0.114));
-      c = mix(vec3(l), c, uSaturation);
-      vec2 v = (vUv - 0.5) * vec2(uAspect, 1.0);
-      float vig = smoothstep(0.95, 0.25, length(v) * 1.1);
-      c *= mix(1.0 - uVignette, 1.0, vig);
-      gl_FragColor = vec4(c, 1.0);
-    }`,
-};
+  });
+  private samples = 4;
+  bloomEnabled = true;
+  private black = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
 
-export class PostFX {
-  readonly composer: EffectComposer;
-  private readonly bloom: UnrealBloomPass;
-  private readonly grade: ShaderPass;
+  constructor(
+    private readonly renderer: THREE.WebGLRenderer,
+    private readonly scene: THREE.Scene,
+    private readonly camera: THREE.Camera,
+  ) {
+    this.sceneRT = target(1, 1, this.samples);
+    for (let i = 0; i < LEVELS; i++) {
+      this.bloomRTs.push(target(1, 1));
+      this.upRTs.push(target(1, 1));
+    }
+    this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.final);
+    this.quad.frustumCulled = false;
+    this.black.needsUpdate = true;
+  }
 
-  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
-    const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-    const target = new THREE.WebGLRenderTarget(size.x, size.y, {
-      type: THREE.HalfFloatType,
-      samples: 4,
-    });
-    this.composer = new EffectComposer(renderer, target);
-    this.composer.addPass(new RenderPass(scene, camera));
-
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.35, 0.7, 0.92);
-    this.composer.addPass(this.bloom);
-
-    this.composer.addPass(new OutputPass());
-    this.grade = new ShaderPass(GradeShader);
-    this.composer.addPass(this.grade);
+  /** MSAA sample count for the scene (0 turns antialiasing off). */
+  setSamples(samples: number) {
+    if (samples === this.samples) return;
+    this.samples = samples;
+    const { width, height } = this.sceneRT;
+    this.sceneRT.dispose();
+    this.sceneRT = target(width, height, samples);
   }
 
   setSize(width: number, height: number, pixelRatio: number) {
-    this.composer.setPixelRatio(pixelRatio);
-    this.composer.setSize(width, height);
-    this.grade.uniforms.uAspect.value = width / height;
+    const w = Math.round(width * pixelRatio);
+    const h = Math.round(height * pixelRatio);
+    this.sceneRT.setSize(w, h);
+    for (let i = 0; i < LEVELS; i++) {
+      const k = 4 << i;
+      this.bloomRTs[i].setSize(Math.ceil(w / k), Math.ceil(h / k));
+      this.upRTs[i].setSize(Math.ceil(w / k), Math.ceil(h / k));
+    }
+    this.final.uniforms.uAspect.value = width / height;
   }
 
-  render(delta: number) {
-    this.composer.render(delta);
+  private blit(mat: THREE.ShaderMaterial, to: THREE.WebGLRenderTarget | null) {
+    this.quad.material = mat;
+    this.renderer.setRenderTarget(to);
+    this.renderer.render(this.quad, this.cam);
+  }
+
+  render(_delta: number) {
+    const r = this.renderer;
+    r.setRenderTarget(this.sceneRT);
+    r.render(this.scene, this.camera);
+
+    let bloomTex: THREE.Texture = this.black;
+    if (this.bloomEnabled) {
+      this.bright.uniforms.tSrc.value = this.sceneRT.texture;
+      this.bright.uniforms.uTexel.value.set(1 / this.sceneRT.width, 1 / this.sceneRT.height);
+      this.blit(this.bright, this.bloomRTs[0]);
+      for (let i = 1; i < LEVELS; i++) {
+        const src = this.bloomRTs[i - 1];
+        this.down.uniforms.tSrc.value = src.texture;
+        this.down.uniforms.uTexel.value.set(1 / src.width, 1 / src.height);
+        this.blit(this.down, this.bloomRTs[i]);
+      }
+      // Back up the chain, each level blurred and added onto the next finer one.
+      let src = this.bloomRTs[LEVELS - 1];
+      for (let i = LEVELS - 2; i >= 0; i--) {
+        this.up.uniforms.tSrc.value = src.texture;
+        this.up.uniforms.tBase.value = this.bloomRTs[i].texture;
+        this.up.uniforms.uTexel.value.set(0.5 / src.width, 0.5 / src.height);
+        this.blit(this.up, this.upRTs[i]);
+        src = this.upRTs[i];
+      }
+      bloomTex = src.texture;
+    }
+
+    this.final.uniforms.tScene.value = this.sceneRT.texture;
+    this.final.uniforms.tBloom.value = bloomTex;
+    this.blit(this.final, null);
   }
 }

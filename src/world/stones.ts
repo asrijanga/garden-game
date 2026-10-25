@@ -269,6 +269,11 @@ export class Stones {
     st.mesh.instanceMatrix.needsUpdate = true;
   }
 
+  /** Is anything still settling or sinking (so shadows need redrawing)? */
+  get busy(): boolean {
+    return this.falling.length > 0 || this.sinking.length > 0;
+  }
+
   update(dt: number) {
     for (let i = this.sinking.length - 1; i >= 0; i--) {
       const s = this.sinking[i];

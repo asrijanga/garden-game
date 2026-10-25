@@ -144,7 +144,7 @@ export class FlyingBirds {
 
     this.mesh = new THREE.InstancedMesh(geo, mat, MAX_BIRDS);
     this.mesh.count = 0;
-    this.mesh.castShadow = true;
+    this.mesh.castShadow = false; // far overhead; not worth redrawing shadows for
     this.mesh.frustumCulled = false;
     this.nextIn = firstIn;
   }

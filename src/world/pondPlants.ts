@@ -223,6 +223,11 @@ export class PondPlants {
     it.mesh.instanceMatrix.needsUpdate = true;
   }
 
+  /** Are reeds (which cast shadows) still growing or wilting? */
+  get busy(): boolean {
+    return this.growing.some((g) => g.reed) || this.wilting.some((w) => w.it.reed);
+  }
+
   update(dt: number) {
     for (let i = this.wilting.length - 1; i >= 0; i--) {
       const w = this.wilting[i];
