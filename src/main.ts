@@ -77,7 +77,7 @@ scene.add(createForest(ground, palette, season, WORLD_SEED + 40, (x, z) => cotta
 
 const isSmallGpu = Math.min(screen.width, screen.height) * (window.devicePixelRatio || 1) < 900;
 const blocked = (x: number, z: number) => cottage.contains(x, z, -0.3);
-scene.add(createGrass(ground, isSmallGpu ? 42000 : 62000, WORLD_SEED + 10, blocked));
+scene.add(createGrass(ground, isSmallGpu ? 30000 : 42000, WORLD_SEED + 10, blocked));
 scene.add(createWildflowers(ground, palette.wildflowers, 1600, WORLD_SEED + 11, (x, z) => cottage.contains(x, z, 0.4)));
 
 const motes = createMotes(140, WORLD_SEED + 12);

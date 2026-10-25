@@ -66,7 +66,8 @@ export class Ground {
       const z = pos.getZ(i);
       pos.setY(i, this.heightAt(x, z));
       const f = this.forestness(x, z);
-      this.meadowColor(x, z, c);
+      // Soil between the blades sits a little darker, so the grass reads as fine texture.
+      this.meadowColor(x, z, c).multiplyScalar(0.82);
       // Forest floor is darker and leaf-littered, with a soft shaded fringe at the treeline.
       shade.copy(this.floor).multiplyScalar(0.75 + this.colorNoise(x * 0.3, z * 0.3) * 0.15);
       c.lerp(shade, f);

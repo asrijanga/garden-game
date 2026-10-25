@@ -3,30 +3,48 @@ import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
 import type { Ground } from './ground';
 
-/** A tapered, slightly curved blade, 1 unit tall. Scaled per instance. */
-function bladeGeometry(): THREE.BufferGeometry {
-  const segments = 4;
+const BLADES_PER_TUFT = 5;
+
+/**
+ * A small tuft of fine, soft blades (1 unit tall, ~0.1 m across). Tufts rather than single
+ * blades give a dense, velvety meadow for a fraction of the instances.
+ */
+function tuftGeometry(): THREE.BufferGeometry {
+  const segments = 3;
   const pos: number[] = [];
   const nrm: number[] = [];
-  for (let i = 0; i < segments; i++) {
-    const v = i / segments;
-    const w = 0.5 * Math.pow(1 - v, 0.8);
-    const curl = v * v * 0.25;
-    pos.push(-w, v, curl, w, v, curl);
-  }
-  pos.push(0, 1, 0.25); // tip
-  // Normals point mostly up so blades shade like a soft carpet rather than flat cards.
-  const n = new THREE.Vector3(0, 1, 0.25).normalize();
-  for (let i = 0; i < pos.length / 3; i++) nrm.push(n.x, n.y, n.z);
-
   const idx: number[] = [];
-  for (let i = 0; i < segments - 1; i++) {
-    const a = i * 2;
-    idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+  const n = new THREE.Vector3(0, 1, 0.2).normalize();
+  for (let b = 0; b < BLADES_PER_TUFT; b++) {
+    const a = (b / BLADES_PER_TUFT) * Math.PI * 2 + b * 0.7;
+    const ox = Math.cos(a) * 0.06 * (b === 0 ? 0 : 1);
+    const oz = Math.sin(a) * 0.06 * (b === 0 ? 0 : 1);
+    const yaw = a * 1.7;
+    const cy = Math.cos(yaw);
+    const sy = Math.sin(yaw);
+    const h = b === 0 ? 1 : 0.7 + 0.25 * ((b * 37) % 10) / 10;
+    const lean = 0.12 + 0.06 * b;
+    const base = pos.length / 3;
+    for (let i = 0; i < segments; i++) {
+      const v = i / segments;
+      // Soft taper: stays full most of the way, then rounds off (no needle points).
+      const w = 0.03 * (1 - Math.pow(v, 2.2));
+      const curl = v * v * lean;
+      for (const side of [-1, 1]) {
+        const lx = side * w;
+        const lz = curl;
+        pos.push(ox + lx * cy - lz * sy, v * h, oz + lx * sy + lz * cy);
+      }
+    }
+    pos.push(ox - lean * sy, h, oz + lean * cy); // tip
+    for (let i = 0; i < segments * 2 + 1; i++) nrm.push(n.x, n.y, n.z);
+    for (let i = 0; i < segments - 1; i++) {
+      const a0 = base + i * 2;
+      idx.push(a0, a0 + 1, a0 + 2, a0 + 1, a0 + 3, a0 + 2);
+    }
+    const last = base + (segments - 1) * 2;
+    idx.push(last, last + 1, base + segments * 2);
   }
-  const last = (segments - 1) * 2;
-  idx.push(last, last + 1, segments * 2);
-
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
@@ -51,14 +69,14 @@ export function createGrass(ground: Ground, count: number, seed: number, blocked
         '#include <color_fragment>',
         /* glsl */ `#include <color_fragment>
         // Dark, cool roots rising to warm, sunlit tips.
-        diffuseColor.rgb *= mix(0.62, 1.15, smoothstep(0.0, 1.0, vBladeH));
-        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.18, 1.1, 0.72), smoothstep(0.6, 1.0, vBladeH) * 0.6);
+        diffuseColor.rgb *= mix(0.72, 1.12, smoothstep(0.0, 1.0, vBladeH));
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.12, 1.07, 0.82), smoothstep(0.6, 1.0, vBladeH) * 0.45);
         // Bent blades show their paler sides: this is what makes a gust visible as it rolls by.
         diffuseColor.rgb *= 1.0 + smoothstep(0.45, 1.1, vWindAmt) * 0.22 * vBladeH;`,
       );
   });
 
-  const mesh = new THREE.InstancedMesh(bladeGeometry(), material, count);
+  const mesh = new THREE.InstancedMesh(tuftGeometry(), material, count);
   mesh.receiveShadow = true;
   mesh.frustumCulled = false;
 
@@ -80,19 +98,19 @@ export function createGrass(ground: Ground, count: number, seed: number, blocked
     const f = ground.forestness(x, z);
     if (rng() < f * 1.15 || blocked(x, z)) continue;
 
-    const height = lerp(0.28, 0.6, rng() * rng()) * lerp(1, 0.75, f);
-    const width = lerp(0.09, 0.15, rng());
+    const height = lerp(0.2, 0.38, rng() * rng()) * lerp(1, 0.75, f);
+    const spread = lerp(0.85, 1.25, rng());
 
-    p.set(x, ground.heightAt(x, z) - 0.04, z);
-    e.set(lerp(-0.25, 0.25, rng()), rng() * Math.PI * 2, lerp(-0.25, 0.25, rng()));
+    p.set(x, ground.heightAt(x, z) - 0.02, z);
+    e.set(lerp(-0.1, 0.1, rng()), rng() * Math.PI * 2, lerp(-0.1, 0.1, rng()));
     q.setFromEuler(e);
-    s.set(width, height, width);
+    s.set(spread, height, spread);
     m.compose(p, q, s);
     mesh.setMatrixAt(placed, m);
 
     ground.meadowColor(x, z, color);
     tint.setHSL(0.22 + rng() * 0.08, 0.5, 0.5);
-    color.lerp(tint, 0.12).multiplyScalar(lerp(0.85, 1.15, rng()));
+    color.lerp(tint, 0.08).multiplyScalar(lerp(0.93, 1.07, rng()));
     mesh.setColorAt(placed, color);
     placed++;
   }
@@ -108,10 +126,10 @@ export function createWildflowers(ground: Ground, palette: string[], count: numb
   const rng = createRng(seed);
   const head = new THREE.IcosahedronGeometry(1, 0);
   head.scale(1, 0.55, 1);
-  head.translate(0, 9, 0); // head sits on an implied stem; scale below maps 9 → stem height
+  head.translate(0, 6.5, 0); // head sits on an implied stem just above the lawn
 
   const material = new THREE.MeshLambertMaterial();
-  addWind(material, '1.0', undefined, 9);
+  addWind(material, '1.0', undefined, 6.5);
   const mesh = new THREE.InstancedMesh(head, material, count);
   mesh.frustumCulled = false;
 

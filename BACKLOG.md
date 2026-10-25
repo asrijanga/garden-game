@@ -31,6 +31,9 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **Grass review:**
+  - *Feedback:* Grass should be much finer, denser and smaller; it looks like thorns.
+  - *Changes:* Single wide blades replaced by tufts of 5 fine blades (about 2.5× the blade count). Height 0.28–0.6 → 0.2–0.38 m. Blades about 6 cm wide with soft rounded tips. Less tilt, gentler root-to-tip contrast and colour variation. Soil under the lawn slightly darker so blades read as texture.
 - **1.2 review (sound):**
   - *Feedback:* The wind is too intense; it must be much, much calmer, very subtle and relaxing.
   - *Changes:* Master volume 0.75 → 0.3. Gust swell about 8 dB → about 4 dB. All layers low-passed lower (less hiss). Leaf rustle cut to a whisper. Parameter changes smoothed over about 2 s, so it ebbs and flows. Calm is now about −35 dBFS and a full gust about −30 dBFS (was −27 and −19).
