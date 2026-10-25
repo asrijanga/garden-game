@@ -10,14 +10,14 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current story:** 1.1 — A cozy clearing in the forest (v2 live; next: tree detail pass after the rest of the feedback)
+**Current story:** 1.1 v3 (detailed trees, no blur) + 1.3 camera, pulled forward on request. Awaiting review.
 **Preview URL:** https://asrijanga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
 |---|---|---|
-| 1.1 A cozy clearing in the forest | 👀 Awaiting feedback | v2: dense seasonal forest around a meadow clearing, cottage with chimney smoke, gust-field wind, seasonal wildflowers. (v1 floating island was replaced, see feedback log.) |
+| 1.1 A cozy clearing in the forest | 👀 Awaiting feedback | v3: procedural branching trees with leaf-cluster crowns, firs with jagged tiers, birches; tilt-shift blur removed. Wind and mood approved. |
 | 1.2 Hear the wind | ⬜ Not started | Moved up from Milestone 5 at the player's request |
-| 1.3 Hold the world in my hand | ⬜ Not started | |
+| 1.3 Hold the world in my hand | 👀 Awaiting feedback | Pulled forward (player asked to zoom). Pinch zoom, drag pan, twist rotate, inertia; camera lowers as you zoom in. |
 | 1.4 Thumb-reach toolbar | ⬜ Not started | |
 | 1.5 Draw a winding path | ⬜ Not started | |
 | 1.6 Plant flowers that bloom fast | ⬜ Not started | |
@@ -31,6 +31,12 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **1.1 v2 review, round 2:**
+  - *Feedback:* Wind effect is great. Overall mood is spot on. Wants to zoom. The edge blur is "really horrible": no blur at all. Trees lack detail, and they are the majority of the screen.
+  - *Changes:*
+    - Tilt-shift removed entirely (Definition of Done: no blur effects).
+    - Trees rebuilt: recursive branching wood (trunk → limbs → twigs, bent segments), crowns made of dense leaf-cluster cards with spherical normals and interior shading, and per-leaf shimmer in the wind. Firs with layered, drooping, jagged tiers plus needle tufts. White birches. Winter shows bare branches. Near and far detail levels.
+    - Story 1.3 camera pulled forward.
 - **1.1 v2 review (forest clearing):**
   - *Feedback:* Chimney smoke is a nice touch. The home should be simple but upgradable, with variations; the garden and its objects are the focus. "No island, just land." Wants a calm, soothing wind sound plus trees whooshing as the background, with wind-chime sounds only when chimes are placed. Relaxation and calm are the goal. Trees lack detail (message was cut off; waiting on the rest).
   - *Changes:*
@@ -88,8 +94,8 @@ _Feedback from each review, newest first, and what we changed because of it._
 | World model | Placed "features" (paths, flowers, pond…), each with a **seed** | Procedural uniqueness is reproducible: the same seed gives the same flower. Save and share stay small and exact. |
 | Wind | `WindField`: a tileable gust-noise texture scrolling with the wind, times a slow global calm/gust envelope. Sampled identically on GPU (`gardenWind()`) and CPU (`WindField.sample()`) | One airflow drives everything: grass waves now, and flags and chimes later. |
 | Seasons | `currentSeason()` from the device date and time zone (southern hemisphere flips). `?season=` overrides | "The season should reflect what the current season is." |
-| Vegetation | GPU-instanced grass, wildflowers, trees and bushes, with wind in the vertex shader | Tens of thousands of swaying blades at 60fps on a phone. |
-| Look | Soft Lambert lighting, neutral tone mapping, tilt-shift, bloom, warm grade | Storybook diorama feel. |
+| Vegetation | GPU-instanced grass and wildflowers. Trees are procedural archetypes (branching wood + alpha-tested leaf-cluster cards from canvas textures), instanced with per-tree size, lean, yaw and color, with near/far detail levels. Wind in the vertex shader | Tens of thousands of swaying blades at 60fps on a phone. |
+| Look | Soft Lambert lighting, neutral tone mapping, bloom, warm grade. **No blur effects** (player feedback) | Storybook diorama feel, crisp everywhere. |
 | Audio | Web Audio API, procedural (filtered noise for wind and leaves; synthesized chimes later) | Nothing to download. Unlocks on the first touch. Driven by `WindField`. |
 | Persistence | `localStorage`/IndexedDB with a **versioned, compact save format** | The share link (later) is the same data, compressed. |
 

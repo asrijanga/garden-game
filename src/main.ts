@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import './style.css';
 import { Ground, CLEARING_RADIUS } from './world/ground';
-import { createForest } from './world/forest';
+import { createForest } from './world/trees';
+import { CameraRig } from './core/cameraRig';
 import { Cottage } from './world/cottage';
 import { createGrass, createWildflowers } from './world/grass';
 import { createMotes } from './world/motes';
@@ -70,7 +71,7 @@ const cottage = new Cottage(cottagePos, -0.18, palette, WORLD_SEED + 30);
 scene.add(cottage.group);
 scene.add(cottage.smokePoints);
 
-scene.add(createForest(ground, palette, WORLD_SEED + 40, (x, z) => cottage.contains(x, z, 1.2)));
+scene.add(createForest(ground, palette, season, WORLD_SEED + 40, (x, z) => cottage.contains(x, z, 1.2)));
 
 const isSmallGpu = Math.min(screen.width, screen.height) * (window.devicePixelRatio || 1) < 900;
 const blocked = (x: number, z: number) => cottage.contains(x, z, -0.3);
@@ -80,13 +81,11 @@ scene.add(createWildflowers(ground, palette.wildflowers, 900, WORLD_SEED + 11, (
 const motes = createMotes(140, WORLD_SEED + 12);
 scene.add(motes);
 
-// --- Camera: looking down into the clearing like a diorama ------------------------------
-const camera = new THREE.PerspectiveCamera(30, 1, 1, 400);
-const target = new THREE.Vector3(0, 0.6, -1.2);
-const pitch = THREE.MathUtils.degToRad(57);
-let distance = 40;
-const baseAzimuth = THREE.MathUtils.degToRad(8);
+// --- Camera: a diorama you hold in your hand ----------------------------------------------
+const camera = new THREE.PerspectiveCamera(30, 1, 0.5, 400);
+const rig = new CameraRig(camera, canvas);
 
+/** Distance at which the whole clearing fits the screen (the zoomed-out view). */
 function fitDistance(aspect: number): number {
   const fitHalfWidth = CLEARING_RADIUS * 0.98;
   const vHalf = THREE.MathUtils.degToRad(camera.fov / 2);
@@ -94,36 +93,28 @@ function fitDistance(aspect: number): number {
   return Math.max(fitHalfWidth / Math.tan(hHalf), (fitHalfWidth * 0.9) / Math.tan(vHalf));
 }
 
-function placeCamera(time: number) {
-  // A slow, breathing sway so the scene feels alive (real camera controls arrive in Story 1.2).
-  const azimuth = baseAzimuth + Math.sin(time * 0.045) * 0.12;
-  camera.position.set(
-    target.x + Math.sin(azimuth) * Math.cos(pitch) * distance,
-    target.y + Math.sin(pitch) * distance,
-    target.z + Math.cos(azimuth) * Math.cos(pitch) * distance,
-  );
-  camera.lookAt(target);
-}
-
 // --- Post-processing ----------------------------------------------------------------------
 const post = new PostFX(renderer, scene, camera);
 
+let started = false;
 function resize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
   renderer.setPixelRatio(pixelRatio());
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
-  distance = fitDistance(camera.aspect);
+  const full = fitDistance(camera.aspect);
+  rig.fit(full);
+  if (!started) rig.distance = full;
   camera.updateProjectionMatrix();
-  scene.fog = new THREE.Fog(haze, distance * 0.95, distance * 2.3);
+  scene.fog = new THREE.Fog(haze, full * 0.95, full * 2.3);
   post.setSize(w, h, pixelRatio());
-  post.setFocus(0.48);
   (motes.material as THREE.ShaderMaterial).uniforms.uPixelRatio.value = pixelRatio();
   cottage.setPixelRatio(pixelRatio());
 }
 window.addEventListener('resize', resize);
 resize();
+started = true;
 
 // --- Loop -----------------------------------------------------------------------------------
 const timer = new THREE.Timer();
@@ -137,10 +128,10 @@ function frame(time: number) {
   wind.update(dt);
   cottage.update(dt, wind);
   (motes.material as THREE.ShaderMaterial).uniforms.uTime.value = elapsed;
-  placeCamera(elapsed);
+  rig.update(dt);
   post.render(dt);
 }
 
-placeCamera(0);
+rig.update(0);
 renderer.setAnimationLoop(frame);
 requestAnimationFrame(() => canvas.classList.add('ready'));
