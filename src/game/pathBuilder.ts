@@ -188,6 +188,11 @@ export class PathBuilder {
     }
   }
 
+  /** Distance from (x, z) to the nearest path centre line (for keeping beds off paths). */
+  distanceToPaths(x: number, z: number): number {
+    return this.distanceTo(x, z, false, 2);
+  }
+
   private addLinePoint(x: number, z: number) {
     const key = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
     if (!this.lines.has(key)) this.lines.set(key, []);

@@ -139,10 +139,17 @@ function lawnMaterial(paint: THREE.Texture): THREE.MeshLambertMaterial {
         gravel *= 1.0 - smoothstep(0.72, 0.9, speck) * 0.3 + smoothstep(0.25, 0.08, speck) * 0.15;
         soil = mix(soil, gravel, sandy);
         soil *= 1.0 - lip * 0.2;
+        // Flower beds: rich, dark, crumbly soil with a soft hand-dug edge.
+        float bedField = paintTex.b + ragged * 1.2;
+        float bed = smoothstep(0.32, 0.46, bedField) * (1.0 - earth);
+        float crumb = lawnNoise(vWorld.xz * 26.0);
+        vec3 bedSoil = mix(vec3(0.075, 0.05, 0.032), vec3(0.13, 0.09, 0.055), grain) * (0.85 + crumb * 0.3);
+        bedSoil *= 1.0 - (1.0 - smoothstep(0.46, 0.62, bedField)) * 0.25; // darker turned edge
         diffuseColor.rgb = mix(diffuseColor.rgb, soil, earth);
+        diffuseColor.rgb = mix(diffuseColor.rgb, bedSoil, bed);
         // Gust sheen: the meadow brightens softly as wind passes, like grass bowing in waves.
         float gust = windAt(vWorld.xz, 0.0);
-        diffuseColor.rgb *= 1.0 + smoothstep(0.45, 1.1, gust) * 0.085 * vMeadow * (1.0 - earth);`,
+        diffuseColor.rgb *= 1.0 + smoothstep(0.45, 1.1, gust) * 0.085 * vMeadow * (1.0 - earth) * (1.0 - bed);`,
       );
   };
   return mat;

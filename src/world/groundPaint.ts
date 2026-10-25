@@ -7,7 +7,7 @@ const SIZE = 512; // ~10 cm per texel
 /**
  * What the player has done to the ground, painted into a texture the lawn shader reads.
  * Red = worn earth under paths. Green = how sandy/gravelly that earth is (relative to red).
- * (Blue is reserved for flower beds.)
+ * Blue = flower-bed soil.
  */
 export class GroundPaint {
   readonly texture: THREE.CanvasTexture;
@@ -41,6 +41,23 @@ export class GroundPaint {
     g.addColorStop(0, `rgba(${c},${0.16 * strength})`);
     g.addColorStop(0.5, `rgba(${c},${0.1 * strength})`);
     g.addColorStop(1, `rgba(${c},0)`);
+    this.ctx.globalCompositeOperation = 'lighter';
+    this.ctx.fillStyle = g;
+    this.ctx.beginPath();
+    this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.globalCompositeOperation = 'source-over';
+    this.dirty = true;
+  }
+
+  /** Dig a soft dab of rich, dark bed soil (blue channel) at (x, z). */
+  bed(x: number, z: number, radius: number, strength = 1) {
+    const [cx, cy] = this.toCanvas(x, z);
+    const r = (radius / (PAINT_HALF * 2)) * SIZE;
+    const g = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, `rgba(0,0,255,${0.22 * strength})`);
+    g.addColorStop(0.5, `rgba(0,0,255,${0.14 * strength})`);
+    g.addColorStop(1, 'rgba(0,0,255,0)');
     this.ctx.globalCompositeOperation = 'lighter';
     this.ctx.fillStyle = g;
     this.ctx.beginPath();

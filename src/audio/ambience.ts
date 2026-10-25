@@ -166,6 +166,37 @@ export class Ambience {
     osc.stop(t + 0.2);
   }
 
+  private lastBloom = 0;
+
+  /** A tiny, soft pentatonic "pling" as a flower opens. Rate-limited so a bed shimmers, not chatters. */
+  bloom() {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    if (t - this.lastBloom < 0.16) return;
+    this.lastBloom = t;
+    const notes = [784, 880, 1047, 1175, 1319, 1568];
+    const f = notes[Math.floor(Math.random() * notes.length)];
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.07, t + 0.02);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2600;
+    for (const [mult, g] of [[1, 1], [2.01, 0.18]] as const) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = f * mult;
+      const og = ctx.createGain();
+      og.gain.value = g;
+      osc.connect(og).connect(env);
+      osc.start(t);
+      osc.stop(t + 0.75);
+    }
+    env.connect(lp).connect(this.master);
+  }
+
   private lastStone = 0;
 
   /** A soft, earthy "tok" as a stone settles into the soil. */

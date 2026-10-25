@@ -10,6 +10,10 @@ import { Stones } from './world/stones';
 import { EdgePlants } from './world/edgePlants';
 import { Dust } from './world/dust';
 import { PathBuilder } from './game/pathBuilder';
+import { FlowerBrush } from './game/flowerBrush';
+import { Flowers } from './world/flowers';
+import { SPECIES } from './world/flowerSpecies';
+import { FlowerPicker } from './ui/flowerPicker';
 import { createMotes } from './world/motes';
 import { FlyingBirds } from './world/flyingBirds';
 import { currentSeason, PALETTES } from './world/season';
@@ -28,7 +32,14 @@ const WORLD_SEED = 20261025;
 for (const type of ['gesturestart', 'gesturechange', 'gestureend', 'dblclick', 'contextmenu']) {
   document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
 }
-document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+document.addEventListener(
+  'touchmove',
+  (e) => {
+    // The flower picker scrolls sideways; everything else stays perfectly still.
+    if (!(e.target instanceof Element && e.target.closest('.flower-picker'))) e.preventDefault();
+  },
+  { passive: false },
+);
 
 // --- Renderer ---------------------------------------------------------------------------
 const canvas = document.getElementById('world') as HTMLCanvasElement;
@@ -128,12 +139,32 @@ const edgePlants = new EdgePlants(palette.wildflowers);
 scene.add(edgePlants.group);
 const paths = new PathBuilder(ground, paint, stones, edgePlants, wildflowers, (x, z) => cottage.contains(x, z, 0.1) || ground.forestness(x, z) > 0.45);
 
+const flowers = new Flowers(SPECIES, () => ambience.bloom());
+scene.add(flowers.group);
+const flowerBrush = new FlowerBrush(
+  ground,
+  paint,
+  flowers,
+  wildflowers,
+  season,
+  (x, z) => cottage.contains(x, z, 0.3) || ground.forestness(x, z) > 0.4,
+  (x, z) => paths.distanceToPaths(x, z),
+);
+
 const toolbar = new Toolbar((tool) => {
   ambience.tap(TOOL_PITCH[tool]);
   tools?.setTool(tool);
 });
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar });
-tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker, paths);
+const picker = new FlowerPicker(flowerBrush.ordered(), (sp) => flowerBrush.inSeason(sp), (id, label) => {
+  flowerBrush.selected = id;
+  ambience.tap(1.3);
+  toolbar.showLabel(label, 1800);
+});
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush });
+tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker, paths, flowerBrush, (tool) => {
+  picker.setVisible(tool === 'flowers');
+  document.body.classList.toggle('picking', tool === 'flowers');
+});
 
 // --- Post-processing ----------------------------------------------------------------------
 const post = new PostFX(renderer, scene, camera);
@@ -174,6 +205,7 @@ function frame(time: number) {
   marker.update(dt, rig.distance);
   stones.update(dt);
   edgePlants.update(dt);
+  flowers.update(dt);
   wildflowers.update(dt);
   dust.update(dt);
   paint.update();
