@@ -31,40 +31,38 @@ export class GroundPaint {
     return [((x + PAINT_HALF) / (PAINT_HALF * 2)) * SIZE, ((z + PAINT_HALF) / (PAINT_HALF * 2)) * SIZE];
   }
 
-  /** Wear a soft dab of earth into the lawn at (x, z). */
-  wear(x: number, z: number, radius: number, strength = 1, sand = 0) {
+  /**
+   * One soft, round dab. Paint is opaque and combined with a per-channel *maximum*, so going over
+   * the same spot again (slow strokes, holding still, doubling back) never makes it any wider:
+   * the width is set by `radius` alone.
+   */
+  private dab(x: number, z: number, radius: number, r: number, g: number, b: number) {
     const [cx, cy] = this.toCanvas(x, z);
-    const r = (radius / (PAINT_HALF * 2)) * SIZE;
-    const g = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    // Light dabs that build up gradually: a gentle ramp at the edge leaves room for roughness.
-    const c = `255,${Math.round(255 * sand)},0`;
-    g.addColorStop(0, `rgba(${c},${0.16 * strength})`);
-    g.addColorStop(0.5, `rgba(${c},${0.1 * strength})`);
-    g.addColorStop(1, `rgba(${c},0)`);
-    this.ctx.globalCompositeOperation = 'lighter';
-    this.ctx.fillStyle = g;
+    const rad = (radius / (PAINT_HALF * 2)) * SIZE;
+    const grad = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    const at = (k: number) => `rgb(${Math.round(255 * r * k)},${Math.round(255 * g * k)},${Math.round(255 * b * k)})`;
+    // Full strength in the middle, then a soft shoulder: the visible edge sits at about 80% of radius.
+    grad.addColorStop(0, at(1));
+    grad.addColorStop(0.55, at(0.9));
+    grad.addColorStop(0.8, at(0.45));
+    grad.addColorStop(1, at(0));
+    this.ctx.globalCompositeOperation = 'lighten';
+    this.ctx.fillStyle = grad;
     this.ctx.beginPath();
-    this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    this.ctx.arc(cx, cy, rad, 0, Math.PI * 2);
     this.ctx.fill();
     this.ctx.globalCompositeOperation = 'source-over';
     this.dirty = true;
   }
 
-  /** Dig a soft dab of rich, dark bed soil (blue channel) at (x, z). */
+  /** Wear a dab of path earth (or gravel, when `sand` is 1) into the lawn at (x, z). */
+  wear(x: number, z: number, radius: number, strength = 1, sand = 0) {
+    this.dab(x, z, radius, strength, strength * sand, 0);
+  }
+
+  /** Dig a dab of rich, dark bed soil (blue channel) at (x, z). */
   bed(x: number, z: number, radius: number, strength = 1) {
-    const [cx, cy] = this.toCanvas(x, z);
-    const r = (radius / (PAINT_HALF * 2)) * SIZE;
-    const g = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0, `rgba(0,0,255,${0.22 * strength})`);
-    g.addColorStop(0.5, `rgba(0,0,255,${0.14 * strength})`);
-    g.addColorStop(1, 'rgba(0,0,255,0)');
-    this.ctx.globalCompositeOperation = 'lighter';
-    this.ctx.fillStyle = g;
-    this.ctx.beginPath();
-    this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    this.ctx.fill();
-    this.ctx.globalCompositeOperation = 'source-over';
-    this.dirty = true;
+    this.dab(x, z, radius, 0, 0, strength);
   }
 
   /** Upload changes at most once per frame. */

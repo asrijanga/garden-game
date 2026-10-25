@@ -8,7 +8,7 @@ import type { Wildflowers } from '../world/wildflowers';
 
 const STEP = 0.12; // metres the path advances per smoothing step
 const STONE_SPACING = 0.8; // centre stones
-const GRAVEL_RADIUS = 0.9; // painted gravel; its edge sits under the edging
+const GRAVEL_RADIUS = 0.8; // painted gravel; its visible edge (~80% of this) sits under the edging
 const CURB_OFFSET = 0.62; // centre line → edging stone centre
 const INSIDE = CURB_OFFSET - 0.1; // closer than this to a centre line = inside that path
 const CELL = 1; // spatial hash for path centre lines
