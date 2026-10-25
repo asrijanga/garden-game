@@ -159,7 +159,7 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
 }
 
 /** Storybook proportions: blooms drawn about twice life size so they read from the garden camera. */
-const HEAD = 2.1;
+const HEAD = 2.8;
 
 /** Build one geometry variant of a species. */
 export function flowerGeometry(sp: FlowerSpecies, seed: number): THREE.BufferGeometry {

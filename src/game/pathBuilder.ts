@@ -12,7 +12,7 @@ const GRAVEL_RADIUS = 0.8; // painted gravel; its visible edge (~80% of this) si
 const CURB_OFFSET = 0.62; // centre line → edging stone centre
 const INSIDE = CURB_OFFSET - 0.1; // closer than this to a centre line = inside that path
 const CELL = 1; // spatial hash for path centre lines
-const LEAD = 0.4; // the finger leads the path by this much before it moves on (ignores jitter)
+const LEAD = 0.55; // the finger leads the path by this much before it moves on (ignores jitter)
 const FLARE_START = 1.6; // junction curve begins this far from another path's centre line…
 const FLARE_FULL = 0.75; // …and is fully flared by here
 
@@ -109,7 +109,7 @@ export class PathBuilder {
       if (this.heading.lengthSq() > 0 && this.heading.dot(dir) < -0.1 && dist < 1.2) break;
       // Light smoothing: the heading eases toward the finger, so jitter becomes gentle curves.
       if (this.heading.lengthSq() === 0) this.heading.copy(dir);
-      else this.heading.lerp(dir, 0.35).normalize();
+      else this.heading.lerp(dir, 0.25).normalize();
       if (!this.started) {
         // The very first stone sits exactly where the stroke began, facing the way you set off.
         this.started = true;

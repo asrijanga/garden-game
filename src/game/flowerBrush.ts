@@ -8,10 +8,10 @@ import type { Season } from '../world/season';
 import { MIX_ID, SPECIES, type FlowerSpecies } from '../world/flowerSpecies';
 
 const DAB_STEP = 0.3; // metres between brush dabs along a stroke
-const BED_RADIUS = 0.95; // painted soil
-const PLANT_RADIUS = 0.78; // flowers scatter this far from the stroke
-/** Storybook scale: real flower heads would be specks from the garden camera. */
-const FLOWER_SCALE = 1.6;
+const BED_RADIUS = 0.88; // painted soil (visible edge at ~80% of this)
+const PLANT_RADIUS = 0.8; // flowers scatter this far from the stroke, right to the bed's edge
+/** Plant scale. Heads are already drawn large (see HEAD); stems stay fairly short so blooms sit over their bed. */
+const FLOWER_SCALE = 1.2;
 
 /**
  * Paints flower beds. Each dab digs soft soil and scatters plants around it; their birth times
