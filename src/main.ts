@@ -133,7 +133,7 @@ const dust = new Dust();
 scene.add(dust.points);
 const stones = new Stones((p, r, kind) => {
   if (kind === 'step') dust.puff(p, 4, r * 1.2);
-  ambience.stone(kind === 'step' ? 0.3 : 0.18);
+  ambience.stone(kind === 'step' ? 0.3 : kind === 'rock' ? 0.14 : 0.18);
 });
 scene.add(stones.group);
 const edgePlants = new EdgePlants(palette.wildflowers);
@@ -161,6 +161,7 @@ const flowerBrush = new FlowerBrush(
   season,
   (x, z) => cottage.contains(x, z, 0.3) || ground.forestness(x, z) > 0.4,
   (x, z) => paths.distanceToPaths(x, z),
+  stones,
 );
 
 const toolbar = new Toolbar((tool) => {
@@ -172,7 +173,7 @@ const picker = new FlowerPicker(flowerBrush.ordered(), (sp) => flowerBrush.inSea
   ambience.tap(1.3);
   toolbar.showLabel(label, 1800);
 });
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones });
 tools = new ToolController(canvas, toolbar, rig, new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)), marker, paths, flowerBrush, (tool) => {
   picker.setVisible(tool === 'flowers');
   document.body.classList.toggle('picking', tool === 'flowers');

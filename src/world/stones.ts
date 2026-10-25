@@ -3,8 +3,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 
-export type StoneKind = 'curb' | 'step';
-const SHAPES: Record<StoneKind, number> = { curb: 5, step: 8 };
+export type StoneKind = 'curb' | 'step' | 'rock';
+const SHAPES: Record<StoneKind, number> = { curb: 5, step: 8, rock: 7 };
 const CAPACITY = 2000; // per shape
 const CELL = 0.5; // spatial hash cell, metres
 
@@ -63,6 +63,35 @@ function stepGeometry(seed: number): THREE.BufferGeometry {
   return merged;
 }
 
+/** A natural field stone: rounded and lumpy, flatter on the bottom, unit-sized (scaled per stone). */
+function rockGeometry(seed: number): THREE.BufferGeometry {
+  const rng = createRng(seed);
+  let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(0.5, 2);
+  g.deleteAttribute('normal');
+  g.deleteAttribute('uv');
+  g = mergeVertices(g);
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  const bumps = Array.from({ length: 5 }, () => new THREE.Vector3(rng() - 0.5, rng() - 0.5, rng() - 0.5).normalize());
+  const amp = bumps.map(() => lerp(-0.12, 0.14, rng()));
+  const sx = lerp(0.85, 1.3, rng());
+  const sz = lerp(0.75, 1.05, rng());
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const dir = v.clone().normalize();
+    let k = 1;
+    bumps.forEach((b, j) => (k += amp[j] * Math.max(0, dir.dot(b)) ** 2));
+    v.multiplyScalar(k);
+    v.x *= sx;
+    v.z *= sz;
+    v.y = v.y > 0 ? v.y * 0.62 : v.y * 0.35; // settled: a flatter bottom
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  colorByHeight(g, -0.1, 0.3);
+  g.computeVertexNormals();
+  return g;
+}
+
 /** Lighter, sun-bleached top faces; darker sides. */
 function colorByHeight(g: THREE.BufferGeometry, lo: number, hi: number) {
   const pos = g.attributes.position;
@@ -115,7 +144,7 @@ export class Stones {
     (Object.keys(SHAPES) as StoneKind[]).forEach((kind, ki) => {
       const list: THREE.InstancedMesh[] = [];
       for (let k = 0; k < SHAPES[kind]; k++) {
-        const geo = kind === 'curb' ? curbGeometry(300 + k * 11) : stepGeometry(500 + ki * 50 + k * 13);
+        const geo = kind === 'curb' ? curbGeometry(300 + k * 11) : kind === 'rock' ? rockGeometry(700 + k * 17) : stepGeometry(500 + ki * 50 + k * 13);
         const mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
         mesh.count = 0;
         mesh.castShadow = true;

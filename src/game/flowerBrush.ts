@@ -5,11 +5,15 @@ import type { GroundPaint } from '../world/groundPaint';
 import type { Flowers } from '../world/flowers';
 import type { Wildflowers } from '../world/wildflowers';
 import type { Season } from '../world/season';
+import type { Stones } from '../world/stones';
 import { MIX_ID, SPECIES, type FlowerSpecies } from '../world/flowerSpecies';
 
 const DAB_STEP = 0.3; // metres between brush dabs along a stroke
 const BED_RADIUS = 0.8; // painted soil (visible edge at ~80% of this), mostly hidden under foliage
-const PLANT_RADIUS = 0.8; // flowers scatter this far from the stroke, right to the bed's edge
+const PLANT_RADIUS = 0.62; // flowers scatter this far from the stroke, inside the bed's edge
+const EDGE_RADIUS = 0.67; // natural stone border sits just outside the mulch's visible edge
+const EDGE_SPACING = 0.24; // metres between border stones
+const ROCK_TONES = ['#a39b8f', '#8f877c', '#b3aa9b', '#9b8f80', '#7f786f', '#b8ad9c', '#a8a091'];
 /** Plant scale. Heads are already drawn large (see HEAD); stems stay fairly short so blooms sit over their bed. */
 const FLOWER_SCALE = 1.2;
 const FOLIAGE_GREEN = ['#4f8a36', '#5e9a3f', '#6aa548', '#47803a', '#578f3c'];
@@ -25,6 +29,9 @@ export class FlowerBrush {
   private readonly rng = createRng(4321);
   private last: THREE.Vector2 | null = null;
   private strokeTime = 0;
+  /** Every dab of every bed so far (centres), and the dabs of the stroke in progress. */
+  private readonly beds: THREE.Vector2[] = [];
+  private stroke: THREE.Vector2[] = [];
 
   constructor(
     private readonly ground: Ground,
@@ -34,6 +41,7 @@ export class FlowerBrush {
     private readonly season: Season,
     private readonly blocked: (x: number, z: number) => boolean,
     private readonly distanceToPaths: (x: number, z: number) => number,
+    private readonly stones: Stones,
   ) {}
 
   inSeason(sp: FlowerSpecies): boolean {
@@ -48,6 +56,7 @@ export class FlowerBrush {
   begin(p: THREE.Vector3) {
     this.last = new THREE.Vector2(p.x, p.z);
     this.strokeTime = 0;
+    this.stroke = [];
     this.dab(this.last);
   }
 
@@ -64,7 +73,42 @@ export class FlowerBrush {
   }
 
   end() {
+    if (this.stroke.length) this.layBorder(this.stroke);
+    this.stroke = [];
     this.last = null;
+  }
+
+  /**
+   * A hand-laid border of natural stones round the outside of the bed. It follows the outline
+   * of all beds together, so a bed that's extended or joins another gets one border round the
+   * outside; stones that end up inside the bed are lifted away.
+   */
+  private layBorder(stroke: THREE.Vector2[]) {
+    for (const c of stroke) this.stones.removeNear(c.x, c.y, EDGE_RADIUS - 0.08, 'rock');
+    const insideAnother = (p: THREE.Vector2, self: THREE.Vector2) => this.beds.some((c) => c !== self && c.distanceTo(p) < EDGE_RADIUS - 0.03);
+    let delay = 0.15;
+    for (const c of stroke) {
+      const steps = Math.ceil((Math.PI * 2 * EDGE_RADIUS) / EDGE_SPACING);
+      const start = this.rng() * Math.PI * 2;
+      for (let i = 0; i < steps; i++) {
+        const a = start + (i / steps) * Math.PI * 2;
+        // Hand-laid: each stone nudged in or out a little and spaced unevenly.
+        const r = EDGE_RADIUS + (this.rng() - 0.5) * 0.05;
+        const p = new THREE.Vector2(c.x + Math.cos(a) * r, c.y + Math.sin(a) * r);
+        if (insideAnother(p, c)) continue;
+        if (this.blocked(p.x, p.y) || this.distanceToPaths(p.x, p.y) < 0.7) continue;
+        const size = lerp(0.2, 0.3, this.rng() ** 1.3);
+        if (this.stones.isOccupied(p.x, p.y, size * 0.42, 'rock')) continue;
+        const tone = new THREE.Color(ROCK_TONES[Math.floor(this.rng() * ROCK_TONES.length)]).multiplyScalar(lerp(0.92, 1.08, this.rng()));
+        const scale = new THREE.Vector3(size, size * lerp(0.8, 1.15, this.rng()), size);
+        // Long side along the edge, with a little twist; set a touch high or low.
+        // (local +x maps to (cos yaw, -sin yaw); the tangent here is (-sin a, cos a))
+        const yaw = Math.atan2(-Math.cos(a), -Math.sin(a)) + (this.rng() - 0.5) * 0.6;
+        const y = this.ground.heightAt(p.x, p.y) - size * lerp(0.06, 0.16, this.rng());
+        this.stones.add('rock', p.x, y, p.y, scale, yaw, size * 0.42, tone, delay);
+        delay += 0.025;
+      }
+    }
   }
 
   private pickSpecies(): FlowerSpecies {
@@ -77,6 +121,9 @@ export class FlowerBrush {
   private dab(c: THREE.Vector2) {
     if (this.blocked(c.x, c.y) || this.distanceToPaths(c.x, c.y) < 0.7) return;
     this.paint.bed(c.x, c.y, BED_RADIUS);
+    const centre = c.clone();
+    this.beds.push(centre);
+    this.stroke.push(centre);
     this.wildflowers.clearNear(c.x, c.y, BED_RADIUS);
     // Leafy foliage first: the bed fills with green, then the flowers rise out of it.
     const greens = this.season === 'autumn' ? FOLIAGE_AUTUMN : this.season === 'winter' ? FOLIAGE_WINTER : FOLIAGE_GREEN;
@@ -106,7 +153,7 @@ export class FlowerBrush {
       const delay = this.strokeTime * 0.2 + 0.1 + (r / PLANT_RADIUS) * 0.9 + this.rng() * 0.25;
       this.flowers.plant(
         sp,
-        Math.floor(this.rng() * 4),
+        Math.floor(this.rng() * 5),
         x,
         this.ground.heightAt(x, z) - 0.01,
         z,
