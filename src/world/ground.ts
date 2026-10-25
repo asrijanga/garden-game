@@ -4,7 +4,7 @@ import { smoothstep } from '../core/random';
 import type { SeasonPalette } from './season';
 
 /** Radius of the open meadow in the middle of the forest: the player's garden. */
-export const CLEARING_RADIUS = 16;
+export const CLEARING_RADIUS = 21;
 const WORLD_HALF = 110;
 
 export class Ground {

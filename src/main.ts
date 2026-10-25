@@ -77,8 +77,8 @@ scene.add(createForest(ground, palette, season, WORLD_SEED + 40, (x, z) => cotta
 
 const isSmallGpu = Math.min(screen.width, screen.height) * (window.devicePixelRatio || 1) < 900;
 const blocked = (x: number, z: number) => cottage.contains(x, z, -0.3);
-scene.add(createGrass(ground, isSmallGpu ? 36000 : 56000, WORLD_SEED + 10, blocked));
-scene.add(createWildflowers(ground, palette.wildflowers, 1300, WORLD_SEED + 11, (x, z) => cottage.contains(x, z, 0.4)));
+scene.add(createGrass(ground, isSmallGpu ? 42000 : 62000, WORLD_SEED + 10, blocked));
+scene.add(createWildflowers(ground, palette.wildflowers, 1600, WORLD_SEED + 11, (x, z) => cottage.contains(x, z, 0.4)));
 
 const motes = createMotes(140, WORLD_SEED + 12);
 scene.add(motes);
@@ -89,7 +89,7 @@ const rig = new CameraRig(camera, canvas);
 
 /** Distance at which the whole clearing fits the screen (the zoomed-out view). */
 function fitDistance(aspect: number): number {
-  const fitHalfWidth = CLEARING_RADIUS * 0.98;
+  const fitHalfWidth = CLEARING_RADIUS * 0.94;
   const vHalf = THREE.MathUtils.degToRad(camera.fov / 2);
   const hHalf = Math.atan(Math.tan(vHalf) * aspect);
   return Math.max(fitHalfWidth / Math.tan(hHalf), (fitHalfWidth * 0.9) / Math.tan(vHalf));

@@ -13,7 +13,7 @@ export class CameraRig {
   minDistance = 9;
   maxDistance = 45;
   /** How far the view centre may wander from the middle of the clearing. */
-  panLimit = 12;
+  panLimit = 15;
 
   private readonly pointers = new Map<number, { x: number; y: number }>();
   private velPan = new THREE.Vector2();
@@ -120,7 +120,7 @@ export class CameraRig {
 
   private pitch(): number {
     const t = smoothstep(this.minDistance, this.maxDistance, this.distance);
-    return THREE.MathUtils.degToRad(lerp(34, 57, t));
+    return THREE.MathUtils.degToRad(lerp(34, 64, t));
   }
 
   update(dt: number) {

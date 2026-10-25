@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { createNoise2D } from '../core/noise';
 import { createRng, lerp, smoothstep } from '../core/random';
 import { addWind } from '../render/wind';
 import type { Ground } from './ground';
@@ -15,8 +16,8 @@ import type { Season, SeasonPalette } from './season';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const TREE_REF_HEIGHT = 10; // metres; wind height is measured against this
-const NEAR_RADIUS = CLEARING_RADIUS + 16; // detailed trees (and shadows) inside this
-const FOREST_RADIUS = 64;
+const NEAR_RADIUS = CLEARING_RADIUS + 12; // detailed trees (and shadows) inside this
+const FOREST_RADIUS = 72;
 const TREE_SWAY = 0.8; // how far crowns lean in a gust (scales the shared wind bend)
 
 type Rng = () => number;
@@ -48,7 +49,7 @@ function leafClusterTexture(rng: Rng): THREE.CanvasTexture {
     const len = lerp(28, 44, rng());
     const wid = len * lerp(0.42, 0.55, rng());
     const rot = a + lerp(-0.6, 0.6, rng());
-    const shade = Math.round(lerp(165, 255, rng()));
+    const shade = Math.round(lerp(195, 255, rng()));
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(rot);
@@ -58,7 +59,7 @@ function leafClusterTexture(rng: Rng): THREE.CanvasTexture {
     ctx.quadraticCurveTo(0, -wid, len / 2, 0);
     ctx.quadraticCurveTo(0, wid, -len / 2, 0);
     ctx.fill();
-    ctx.strokeStyle = `rgba(0,0,0,0.18)`;
+    ctx.strokeStyle = `rgba(0,0,0,0.1)`;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(-len / 2, 0);
@@ -426,6 +427,13 @@ export function createForest(ground: Ground, palette: SeasonPalette, season: Sea
   const e = new THREE.Euler();
   const s = new THREE.Vector3();
   const p = new THREE.Vector3();
+  // Neighbouring trees share hues, so the forest reads as calm patches of colour, not confetti.
+  const hueField = createNoise2D(seed + 5);
+  const pickColor = (list: THREE.Color[], x: number, z: number) => {
+    const n = hueField(x * 0.035, z * 0.035) * 0.5 + 0.5;
+    const i = rng() < 0.8 ? Math.min(list.length - 1, Math.floor(n * list.length)) : Math.floor(rng() * list.length);
+    return list[i];
+  };
   const addInstance = (sp: Species, x: number, z: number, scale: number, colorJitter = 1) => {
     const a = Math.floor(rng() * sp.archetypes.length);
     p.set(x, ground.heightAt(x, z), z);
@@ -435,11 +443,11 @@ export function createForest(ground: Ground, palette: SeasonPalette, season: Sea
     m.compose(p, q, s);
     const set = setFor(sp, a);
     set.matrices.push(m.clone());
-    const c = sp.foliage[Math.floor(rng() * sp.foliage.length)].clone();
+    const c = pickColor(sp.foliage, x, z).clone();
     set.foliage.push(c.offsetHSL((rng() - 0.5) * 0.02, 0, (rng() - 0.5) * 0.05 * colorJitter));
   };
 
-  const spacing = 3.1;
+  const spacing = 4.1;
   for (let gx = -FOREST_RADIUS; gx <= FOREST_RADIUS; gx += spacing) {
     for (let gz = -FOREST_RADIUS; gz <= FOREST_RADIUS; gz += spacing) {
       const x = gx + (rng() - 0.5) * spacing * 0.95;
@@ -459,7 +467,7 @@ export function createForest(ground: Ground, palette: SeasonPalette, season: Sea
   }
 
   // A soft fringe of bushes where meadow meets forest.
-  for (let i = 0; i < 380; i++) {
+  for (let i = 0; i < 300; i++) {
     const a = rng() * Math.PI * 2;
     const r = ground.clearingRadius(a) + lerp(0.0, 3.5, rng());
     const x = Math.cos(a) * r;

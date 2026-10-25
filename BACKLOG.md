@@ -31,6 +31,15 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **Busy-ness review (during 1.2):**
+  - *Feedback:* Way fewer trees and way more space in the middle; it looks very busy, and fewer trees is easier on the phone.
+  - *Changes:*
+    - Clearing radius 16 → 21 m (about 1.7× the garden area).
+    - Tree spacing 3.1 → 4.1 m (about a third fewer trees overall, and fewer detailed ones).
+    - Neighbouring trees share hues (noise-clustered palette), so the forest reads as calm colour patches.
+    - Softer, lower-contrast leaf texture.
+    - Mossy autumn forest floor instead of brown.
+    - More top-down default view (64°), so less far forest is on screen.
 - **1.1 v3 + 1.3 review:** "Looks good, next." 1.1 and 1.3 marked done.
 - **1.1 v3 review (space):**
   - *Feedback:* Is the patch usable space? Wants a smaller house or a larger garden.
@@ -94,7 +103,7 @@ _Feedback from each review, newest first, and what we changed because of it._
 | Rendering | **Three.js** (WebGL2) | Mature, fast on iOS Safari, has instancing and post-processing. |
 | Language/build | **TypeScript + Vite** | Fast dev loop and small static output. |
 | Hosting | **GitHub Pages via GitHub Actions** (pushing `main` deploys; work happens on `master` and is mirrored with `git push origin master:main`) | Static, free, no server. |
-| World layout | Meadow **clearing** (radius ~16 m) inside a dense instanced forest, with the cottage at the back edge | Matches the Tiny Glade framing: the garden is the clearing. |
+| World layout | Meadow **clearing** (radius ~21 m) inside a dense instanced forest, with the cottage at the back edge | Matches the Tiny Glade framing: the garden is the clearing. |
 | World model | Placed "features" (paths, flowers, pond…), each with a **seed** | Procedural uniqueness is reproducible: the same seed gives the same flower. Save and share stay small and exact. |
 | Wind | `WindField`: a tileable gust-noise texture scrolling with the wind, times a slow global calm/gust envelope. Sampled identically on GPU (`gardenWind()`) and CPU (`WindField.sample()`) | One airflow drives everything: grass waves now, and flags and chimes later. |
 | Seasons | `currentSeason()` from the device date and time zone (southern hemisphere flips). `?season=` overrides | "The season should reflect what the current season is." |

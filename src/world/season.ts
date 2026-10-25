@@ -62,7 +62,7 @@ export const PALETTES: Record<Season, SeasonPalette> = {
     canopy: ['#c98236', '#b25a3a', '#d8a948', '#a8703f', '#cf9440', '#9c4a33', '#8f9748', '#71883f', '#c9a04a'],
     pine: ['#3f5f3c', '#4a6b44'],
     meadow: ['#6b8a3a', '#93a548', '#c2b45a'],
-    forestFloor: '#7a5a32',
+    forestFloor: '#5f6a36',
     wildflowers: ['#a98ad8', '#f2c94c', '#ffffff', '#e0a1c9', '#f0e6d2'],
     sun: '#ffcf96',
     sky: '#d6dbe6',
