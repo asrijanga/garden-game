@@ -3,7 +3,8 @@ import './style.css';
 import { Ground, CLEARING_RADIUS } from './world/ground';
 import { createForest } from './world/trees';
 import { CameraRig } from './core/cameraRig';
-import { Cottage } from './world/cottage';
+import { Cottage, DEFAULT_STYLE, decodeStyle, encodeStyle } from './world/cottage';
+import { CottagePanel } from './ui/cottagePanel';
 import { Wildflowers } from './world/wildflowers';
 import { GroundPaint } from './world/groundPaint';
 import { Stones } from './world/stones';
@@ -154,6 +155,7 @@ const marker = new TouchMarker();
 scene.add(marker.mesh);
 const TOOL_PITCH = { move: 1, path: 0.9, fence: 0.95, flowers: 1.2, pond: 0.8, decor: 1.1, erase: 1.05 };
 let tools: ToolController | null = null;
+let cottagePanelRef: CottagePanel | null = null; // made later; tool changes close it
 const dust = new Dust();
 scene.add(dust.points);
 // Ponds come first: paths and beds steer round them.
@@ -367,6 +369,7 @@ tools = new ToolController(
     refreshHistoryButtons();
   },
   (tool) => {
+    cottagePanelRef?.setVisible(false);
     picker.setVisible(tool === 'flowers');
     stylePicker.setVisible(tool === 'fence');
     decorPicker.setVisible(tool === 'decor');
@@ -374,6 +377,57 @@ tools = new ToolController(
   },
 );
 const controller = tools;
+
+/** Rebuild one saved action: a stroke, or a change to the cottage's look. */
+function replayAction(a: Action) {
+  if (a.kind === 'cottage') cottage.setStyle(decodeStyle(a.style), !regrow.instant && regrow.offset === 0);
+  else controller.replay(a);
+}
+
+// --- The cottage: tap it to give it a new look --------------------------------------------
+const cottagePanel = new CottagePanel(
+  () => cottage.style,
+  (style, label) => {
+    cottage.setStyle(style);
+    // Anything growing where the cottage now reaches (a shed, a porch) steps aside.
+    wildflowers.clearIf((x, z) => cottage.contains(x, z, 0.2));
+    store.add({ kind: 'cottage', style: encodeStyle(style), points: [] });
+    redoStack.length = 0;
+    refreshHistoryButtons();
+    const c = cottage.position;
+    for (let i = 0; i < 6; i++) dust.puff(new THREE.Vector3(c.x + (Math.random() - 0.5) * 5, c.y + 0.2, c.z + (Math.random() - 0.5) * 4), 2, 0.4);
+    ambience.bloom();
+    toolbar.showLabel(label, 1400);
+    renderer.shadowMap.needsUpdate = true;
+  },
+);
+cottagePanelRef = cottagePanel;
+{
+  // A tap (not a drag) on the cottage opens its drawer; a tap anywhere else closes it.
+  const ray = new THREE.Raycaster();
+  let down: { x: number; y: number; t: number } | null = null;
+  canvas.addEventListener('pointerdown', (e) => {
+    down = e.isPrimary ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
+  });
+  canvas.addEventListener('pointerup', (e) => {
+    if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10 || performance.now() - down.t > 450) return;
+    const r = canvas.getBoundingClientRect();
+    ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+    const hit = ray.intersectObject(cottage.group, true).length > 0;
+    if (hit && !cottagePanel.open) {
+      picker.setVisible(false);
+      stylePicker.setVisible(false);
+      decorPicker.setVisible(false);
+      cottagePanel.setVisible(true);
+      document.body.classList.add('picking');
+      ambience.tap(1.4);
+      toolbar.showLabel('Your cottage: tap a chip to change it', 2200);
+    } else if (!hit && cottagePanel.open) {
+      cottagePanel.setVisible(false);
+      tools?.setTool(toolbar.tool);
+    }
+  });
+}
 
 // --- Undo / redo ---------------------------------------------------------------------------
 // The garden is its stroke list, so undoing is: drop the last stroke, put the garden back to
@@ -383,7 +437,8 @@ function rebuildInstantly() {
   regrow.instant = true;
   ambience.quiet = true;
   for (const s of [paint, stones, edgePlants, paths, flowers, flowerBrush, ponds, pondPlants, fish, pondBrush, wildflowers, fences, fenceBuilder, boulders, rockBrush, bridgeBuilder, props]) s.reset();
-  for (const a of store.actions) controller.replay(a);
+  cottage.setStyle(DEFAULT_STYLE, false);
+  for (const a of store.actions) replayAction(a);
   flowers.update(10);
   for (let i = 0; i < 120; i++) {
     const d = 0.1;
@@ -404,7 +459,7 @@ function rebuildInstantly() {
   ambience.quiet = false;
   renderer.shadowMap.needsUpdate = true;
 }
-if (debug) Object.assign(window, { rebuildInstantly });
+if (debug) Object.assign(window, { rebuildInstantly, cottageStyle: () => cottage.style, cottageDebug: () => { const p = cottage.position.clone(); p.y += 2; p.project(camera); return { x: (p.x + 1) / 2 * innerWidth, y: (1 - p.y) / 2 * innerHeight }; } });
 const refreshHistory = mountUndoButtons(
   () => {
     const last = store.actions.pop();
@@ -426,7 +481,7 @@ const refreshHistory = mountUndoButtons(
     if (!next) return;
     // Redo plays it out again, just as it was first made.
     store.add(next);
-    controller.replay(next);
+    replayAction(next);
     ambience.tap(1.25);
     toolbar.showLabel('Redone', 900);
     refreshHistoryButtons();
@@ -513,7 +568,7 @@ async function rebuild() {
       // A slice of strokes per frame, so the sprout keeps moving.
       while (next < saved.length && performance.now() - t0 < 12) {
         regrow.offset = 0.3 + next * gap;
-        controller.replay(saved[next++]);
+        replayAction(saved[next++]);
       }
       if (next < saved.length) requestAnimationFrame(step);
       else done();

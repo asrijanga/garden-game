@@ -6,7 +6,7 @@
  *
  * Format (version 1), as JSON:
  *   { v: 1, a: [ [kind, ...settings, points] ] }
- *   kind: 'p' path · 'n' fence (style) · 'r' rocks · 'b' bridge · 'd' decor (prop) · 'f' flowers (species id) · 'o' pond · 'e' erase (radius in cm)
+ *   kind: 'p' path · 'n' fence (style) · 'r' rocks · 'c' cottage look (style code, no points) · 'b' bridge · 'd' decor (prop) · 'f' flowers (species id) · 'o' pond · 'e' erase (radius in cm)
  *   points: "x,z,dx,dz,dx,dz…" in centimetres, each after the first relative to the one before.
  */
 
@@ -17,6 +17,7 @@ export type Action =
   | { kind: 'path'; points: number[] }
   | { kind: 'fence'; style: string; points: number[] }
   | { kind: 'rocks'; points: number[] }
+  | { kind: 'cottage'; style: string; points: number[] }
   | { kind: 'bridge'; points: number[] }
   | { kind: 'prop'; item: string; points: number[] }
   | { kind: 'flowers'; species: string; points: number[] }
@@ -65,6 +66,8 @@ export function encode(actions: Action[]): string {
         return ['n', act.style, pts];
       case 'rocks':
         return ['r', pts];
+      case 'cottage':
+        return ['c', act.style, ''];
       case 'bridge':
         return ['b', pts];
       case 'prop':
@@ -85,6 +88,10 @@ export function decode(json: string): Action[] {
   if (data.v !== SAVE_VERSION || !Array.isArray(data.a)) return [];
   const out: Action[] = [];
   for (const row of data.a) {
+    if (row[0] === 'c') {
+      out.push({ kind: 'cottage', style: String(row[1]), points: [] });
+      continue;
+    }
     const pts = decodePoints(String(row[row.length - 1]));
     if (pts.length < 2) continue;
     if (row[0] === 'p') out.push({ kind: 'path', points: pts });

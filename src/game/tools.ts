@@ -97,6 +97,7 @@ export class ToolController {
 
   /** Rebuild one saved stroke, exactly as it was first drawn. */
   replay(action: Action) {
+    if (action.kind === 'cottage') return; // not a stroke: main applies it to the cottage
     const tool: BuildTool = action.kind === 'rocks' || action.kind === 'bridge' ? 'fence' : action.kind === 'prop' ? 'decor' : action.kind;
     const brush = this.brushes[tool];
     const selected = this.flowers.selected;
