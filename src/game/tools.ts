@@ -46,6 +46,8 @@ export class ToolController {
   private building: Brush | null = null;
   private readonly p = new THREE.Vector3();
   private readonly brushes: Record<BuildTool, Brush>;
+  /** Where a finger touches the ground (down, and as a stroke moves), whatever the tool. */
+  onTouch: (p: THREE.Vector3, tool: Tool, down: boolean) => void = () => {};
 
   constructor(
     el: HTMLElement,
@@ -139,9 +141,10 @@ export class ToolController {
       return;
     }
     const tool = this.toolbar.tool;
-    if (tool === 'move') return;
     const hit = this.pick(e);
     if (!hit) return;
+    this.onTouch(hit, tool, true);
+    if (tool === 'move') return;
     if (tool === 'erase') {
       // A bigger brush when you're zoomed out, a finer one up close.
       this.eraser.radius = roundCm(Math.min(2.2, Math.max(0.7, this.rig.distance * 0.028)));
@@ -162,6 +165,7 @@ export class ToolController {
     if (hit.x === pts[pts.length - 2] && hit.z === pts[pts.length - 1]) return;
     pts.push(hit.x, hit.z);
     this.brushes[this.stroke.tool].extend(hit);
+    this.onTouch(hit, this.stroke.tool, false);
   };
 
   private onUp = (e: PointerEvent) => {

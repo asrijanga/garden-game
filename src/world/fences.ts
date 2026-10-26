@@ -311,6 +311,16 @@ export class Fences {
     }
   }
 
+  /** Is there something solid underfoot within `r` of (x, z): a post, a hedge, a wall stone? */
+  solidNear(x: number, z: number, r: number): boolean {
+    for (const p of this.parts.values()) {
+      if (p.gone || p.shape === 'picket' || p.shape === 'rail' || p.shape === 'log') continue;
+      const reach = r + (p.shape === 'hedge' ? 0.3 : p.shape === 'wallStone' ? Math.max(p.scale.x, p.scale.z) * 0.5 : 0.05);
+      if ((p.pos.x - x) ** 2 + (p.pos.z - z) ** 2 < reach * reach) return true;
+    }
+    return false;
+  }
+
   /** Take parts away (shrinking and sinking), e.g. to rebuild a stretch with a gate. */
   remove(part: Part) {
     if (part.gone) return;

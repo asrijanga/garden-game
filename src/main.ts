@@ -13,6 +13,7 @@ import { PerchingBirds, type Perch } from './world/perchingBirds';
 import { Butterflies } from './world/butterflies';
 import { Dragonflies } from './world/dragonflies';
 import { Vines } from './world/vines';
+import { Bunnies } from './world/bunnies';
 import { GroundPaint } from './world/groundPaint';
 import { Stones } from './world/stones';
 import { EdgePlants } from './world/edgePlants';
@@ -460,7 +461,44 @@ const dragonflies = new Dragonflies(season, {
 });
 scene.add(dragonflies.group);
 
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
+// Bunny families, now and then, out of the woods.
+const bunnies = new Bunnies({
+  heightAt: (x, z) => ground.heightAt(x, z),
+  walkable: (x, z) =>
+    ground.forestness(x, z) < 0.75 && !ponds.contains(x, z, 0.3) && !cottage.contains(x, z, 0.9) && !boulders.occupied(x, z, 0.2) &&
+    flowerBrush.distanceToBeds(x, z) > -0.35 && !props.near(x, z, 0.5) && !fences.solidNear(x, z, 0.12),
+  edge: (angle) => {
+    const r = ground.clearingRadius(angle) + 1.8;
+    return new THREE.Vector2(Math.cos(angle) * r, Math.sin(angle) * r);
+  },
+  wander: (rng) => {
+    // Half the time, somewhere along the edge of a flower bed (for a nibble); else open lawn.
+    const blooms = flowers.openBlooms();
+    for (let k = 0; k < 8; k++) {
+      let x: number;
+      let z: number;
+      if (blooms.length && rng() < 0.5) {
+        const b = blooms[Math.floor(rng() * blooms.length)];
+        const a = rng() * Math.PI * 2;
+        x = b.x + Math.cos(a) * 0.9;
+        z = b.z + Math.sin(a) * 0.9;
+        const d = flowerBrush.distanceToBeds(x, z);
+        if (d < -0.3 || d > 0.4) continue;
+      } else {
+        const a = rng() * Math.PI * 2;
+        const r = Math.sqrt(rng()) * 15;
+        x = Math.cos(a) * r;
+        z = Math.sin(a) * r;
+      }
+      if (ground.forestness(x, z) < 0.3 && !ponds.contains(x, z, 0.5) && !cottage.contains(x, z, 1.2) && !boulders.occupied(x, z, 0.3)) return new THREE.Vector2(x, z);
+    }
+    return null;
+  },
+  inWoods: (x, z) => ground.forestness(x, z) > 0.55,
+});
+scene.add(bunnies.group);
+
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -490,6 +528,12 @@ tools = new ToolController(
   },
 );
 const controller = tools;
+// Bunnies notice fingers: a tap with the hand makes one sit up and look; building beside them shoos them a few hops.
+controller.onTouch = (p, tool, down) => {
+  if (tool === 'move') {
+    if (down) bunnies.tap(p.x, p.z, camera.position);
+  } else bunnies.disturb(p.x, p.z);
+};
 
 /** Rebuild one saved action: a stroke, or a change to the cottage's look. */
 function replayAction(a: Action) {
@@ -735,6 +779,7 @@ function frame(time: number) {
     meadow.update(dt);
     perchAge += dt;
     vines.update(dt);
+    bunnies.update(dt);
     perchingBirds.update(dt);
     butterflies.update(dt);
     dragonflies.update(dt);
