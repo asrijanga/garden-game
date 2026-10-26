@@ -6,6 +6,8 @@ import { CameraRig } from './core/cameraRig';
 import { Cottage, DEFAULT_STYLE, decodeStyle, encodeStyle } from './world/cottage';
 import { CottagePanel } from './ui/cottagePanel';
 import { Wildflowers } from './world/wildflowers';
+import { Meadow } from './world/meadow';
+import { createForestFloor } from './world/forestFloor';
 import { GroundPaint } from './world/groundPaint';
 import { Stones } from './world/stones';
 import { EdgePlants } from './world/edgePlants';
@@ -123,6 +125,7 @@ scene.add(cottage.group);
 scene.add(cottage.smokePoints);
 
 scene.add(createForest(ground, palette, season, WORLD_SEED + 40, (x, z) => cottage.contains(x, z, 1.2)));
+scene.add(createForestFloor(ground, season, WORLD_SEED + 45, (x, z) => cottage.contains(x, z, 1.5)));
 
 const wildflowers = new Wildflowers(ground, palette.wildflowers, 1600, WORLD_SEED + 11, (x, z) => cottage.contains(x, z, 0.4));
 scene.add(wildflowers.mesh);
@@ -355,7 +358,26 @@ const eraser = new EraseBrush(
   },
   (amount) => ambience.erase(amount),
 );
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
+// The untended meadow slowly fills with wildflowers while you play (remembered between visits);
+// anything you build keeps them back, and they creep in again when it's cleared.
+const meadow = new Meadow(ground, season, WORLD_SEED + 13, (x, z) =>
+  cottage.contains(x, z, 0.5) || paths.distanceToPaths(x, z) < 1.05 || flowerBrush.distanceToBeds(x, z) < 0.25 || ponds.contains(x, z, 0.5) ||
+  boulders.occupied(x, z, 0.3) || props.near(x, z, 0.5) || fences.postNear(x, z, 0.2) !== null);
+scene.add(meadow.group);
+const MEADOW_KEY = 'garden-meadow';
+try {
+  meadow.setGrown(Number(localStorage.getItem(MEADOW_KEY)));
+} catch {
+  // no storage: the meadow just starts afresh
+}
+setInterval(() => {
+  try {
+    localStorage.setItem(MEADOW_KEY, String(Math.floor(meadow.grown)));
+  } catch {
+    // nothing to do
+  }
+}, 10000);
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -459,6 +481,7 @@ function rebuildInstantly() {
     ponds.update(d);
     fish.update(d);
     wildflowers.update(d);
+    meadow.update(d);
     paint.update(d);
     dust.update(d);
     splash.update(d);
@@ -626,6 +649,7 @@ function frame(time: number) {
     pondPlants.update(dt);
     splash.update(dt);
     wildflowers.update(dt);
+    meadow.update(dt);
     dust.update(dt);
   }
   paint.update(dt);
