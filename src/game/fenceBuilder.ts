@@ -5,12 +5,17 @@ import type { Wildflowers } from '../world/wildflowers';
 
 const SAMPLE = 0.1; // metres between smoothed stroke samples
 /** Longest run between two posts (hedges are built in shorter sections). */
-const SPAN: Record<FenceStyle, number> = { picket: 2.0, rustic: 2.4, hedge: 1.4 };
+const SPAN: Record<FenceStyle, number> = { picket: 2.0, rustic: 2.4, hedge: 1.4, wall: 2.0 };
 /** How far the line may bow away from a straight run before a corner post goes in. */
 const CORNER = 0.16;
 const PATH_CLEAR = 1.0; // keep this far from a path's centre line (its gravel edge)
 const PICKET_TINTS = ['#ffffff', '#fbf8f2', '#f4f0e8', '#ece6da'];
 const LOG_TINTS = ['#ffffff', '#f2eee8', '#e6dfd5', '#d9d2c8'];
+// Weathered grey stone: some warmer, some cooler, the odd darker or rust-stained one.
+const STONE_TINTS = ['#ffffff', '#f4efe4', '#e6e6e2', '#dcd6cb', '#f0e6d6', '#d2d4d4', '#c9bfb0', '#e9dccb'];
+
+/** How a stretch of wall finishes: running on (a corner), crumbling away, or a neat opening. */
+type End = 'join' | 'crumble' | 'opening';
 
 interface Segment {
   id: number;
@@ -21,6 +26,9 @@ interface Segment {
   signature: string;
   /** Tidied away in part: never rebuilt. */
   locked?: boolean;
+  /** The stroke started / finished here (a wall crumbles away at such ends). */
+  first?: boolean;
+  last?: boolean;
 }
 
 /**
@@ -37,6 +45,7 @@ export class FenceBuilder {
   private samples: THREE.Vector2[] = [];
   private lastPost: THREE.Vector2 | null = null;
   private delay = 0;
+  private firstSegment = false;
 
   constructor(
     private readonly fences: Fences,
@@ -52,6 +61,7 @@ export class FenceBuilder {
     this.samples = [at];
     this.lastPost = at.clone();
     this.delay = 0;
+    this.firstSegment = true;
   }
 
   extend(p: THREE.Vector3) {
@@ -72,10 +82,10 @@ export class FenceBuilder {
   end() {
     if (!this.lastPost) return;
     const last = this.samples[this.samples.length - 1];
-    if (last.distanceTo(this.lastPost) > 0.3) this.segment(this.lastPost, last);
+    if (last.distanceTo(this.lastPost) > 0.3) this.segment(this.lastPost, last, true);
     else if (this.samples.length <= 1) {
       // A single tap: a short length of fence, along the view's sideways direction.
-      this.segment(this.lastPost, this.lastPost.clone().add(new THREE.Vector2(SPAN[this.style] * 0.75, 0)));
+      this.segment(this.lastPost, this.lastPost.clone().add(new THREE.Vector2(SPAN[this.style] * 0.75, 0)), true);
     }
     this.lastPost = null;
     this.samples = [];
@@ -120,8 +130,9 @@ export class FenceBuilder {
     }
   }
 
-  private segment(a: THREE.Vector2, b: THREE.Vector2) {
-    const seg: Segment = { id: this.nextId++, style: this.style, a: a.clone(), b: b.clone(), signature: '' };
+  private segment(a: THREE.Vector2, b: THREE.Vector2, last = false) {
+    const seg: Segment = { id: this.nextId++, style: this.style, a: a.clone(), b: b.clone(), signature: '', first: this.firstSegment, last };
+    this.firstSegment = false;
     this.segments.push(seg);
     this.build(seg, this.delay);
     this.delay = Math.max(0, this.delay - 0.15) + 0.05;
@@ -152,9 +163,13 @@ export class FenceBuilder {
     const len = seg.a.distanceTo(seg.b);
     const dir = seg.b.clone().sub(seg.a).divideScalar(Math.max(len, 1e-6));
     const at = (t: number) => new THREE.Vector2(seg.a.x + dir.x * t, seg.a.y + dir.y * t);
+    const endOf = (i: number, edge: boolean | undefined): End => {
+      if (i < 0 || i >= parts.length) return edge ? 'crumble' : 'join';
+      return parts[i].kind === 'path' ? 'opening' : 'crumble';
+    };
     parts.forEach((p, i) => {
       if (p.kind === 'fence' && p.to - p.from > 0.12) {
-        this.run(seg, at(p.from), at(p.to), delay);
+        this.run(seg, at(p.from), at(p.to), delay, endOf(i - 1, seg.first), endOf(i + 1, seg.last));
         delay += 0.08;
       }
       // A path through the fence: a gate (or, in a hedge, a gap with rounded ends), but only
@@ -170,7 +185,7 @@ export class FenceBuilder {
     const existing = this.fences.postNear(x, z, 0.3);
     if (existing) return existing;
     const style = seg.style;
-    if (style === 'hedge') return null;
+    if (style === 'hedge' || style === 'wall') return null;
     const shape = style === 'picket' ? 'picketPost' : 'logPost';
     const yaw = Math.atan2(-(seg.b.y - seg.a.y), seg.b.x - seg.a.x) + (this.rng() - 0.5) * 0.15;
     // Hand-set: each post leans a hair and stands a touch higher or lower than its neighbour.
@@ -197,11 +212,15 @@ export class FenceBuilder {
   }
 
   /** A run of fence or hedge between two points. */
-  private run(seg: Segment, a: THREE.Vector2, b: THREE.Vector2, delay: number) {
+  private run(seg: Segment, a: THREE.Vector2, b: THREE.Vector2, delay: number, startEnd: End = 'join', endEnd: End = 'join') {
     const len = a.distanceTo(b);
     const dir = b.clone().sub(a).divideScalar(Math.max(len, 1e-6));
     const yaw = Math.atan2(-dir.y, dir.x);
     for (let t = 0; t <= len; t += 0.3) this.wildflowers.clearNear(a.x + dir.x * t, a.y + dir.y * t, 0.35);
+    if (seg.style === 'wall') {
+      this.wall(seg, a, b, delay, startEnd, endEnd);
+      return;
+    }
     if (seg.style === 'hedge') {
       // Overlapping clipped sections, each a little different, growing up in a wave.
       const n = Math.max(1, Math.round(len / 0.42));
@@ -249,8 +268,79 @@ export class FenceBuilder {
     }
   }
 
+  /**
+   * A dry-stone wall: irregular stones laid in courses, joints staggered over the course below,
+   * the wall leaning in as it rises, capped with a row of upright stones. Where it ends it
+   * steps down and crumbles, with a few fallen stones in the grass; at a path it finishes in a
+   * neat opening between two tall upright stones.
+   */
+  private wall(seg: Segment, a: THREE.Vector2, b: THREE.Vector2, delay: number, startEnd: End, endEnd: End) {
+    const len = a.distanceTo(b);
+    const dir = b.clone().sub(a).divideScalar(Math.max(len, 1e-6));
+    const perp = new THREE.Vector2(-dir.y, dir.x);
+    const yaw = Math.atan2(-dir.y, dir.x);
+    const H = lerp(0.72, 0.8, this.rng());
+    const courses = 4;
+    const ch = H / courses;
+    // How high the wall still stands at t: crumbling ends fall away over ~1 m, unevenly.
+    const crumbleLen = 1.0;
+    const standing = (t: number) => {
+      let h = H;
+      if (startEnd === 'crumble') h = Math.min(h, H * Math.max(0, Math.min(1, (t + 0.15) / crumbleLen)) ** 0.8);
+      if (endEnd === 'crumble') h = Math.min(h, H * Math.max(0, Math.min(1, (len - t + 0.15) / crumbleLen)) ** 0.8);
+      return h;
+    };
+    const tint = () => new THREE.Color(STONE_TINTS[Math.floor(this.rng() * STONE_TINTS.length)]).multiplyScalar(lerp(0.9, 1.06, this.rng()));
+    const stone = (t: number, y: number, size: THREE.Vector3, tilt: number, d: number, side = 0) => {
+      const x = a.x + dir.x * t + perp.x * side;
+      const z = a.y + dir.y * t + perp.y * side;
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler((this.rng() - 0.5) * tilt, yaw + (this.rng() - 0.5) * tilt, (this.rng() - 0.5) * tilt, 'YXZ'));
+      this.fences.add('wallStone', new THREE.Vector3(x, this.heightAt(x, z) + y, z), q, size, tint(), 'drop', d, seg.id);
+    };
+    for (let c = 0; c < courses; c++) {
+      const width = 0.5 - c * 0.035; // the wall leans in as it rises (its "batter")
+      // Break the joints: each course starts offset from the one below.
+      let t = c % 2 ? -lerp(0.08, 0.2, this.rng()) : 0;
+      while (t < len) {
+        const sl = c === 0 ? lerp(0.3, 0.5, this.rng()) : lerp(0.22, 0.42, this.rng());
+        const mid = Math.min(len - 0.05, Math.max(0.05, t + sl / 2));
+        t += sl;
+        const top = (c + 1) * ch;
+        const stand = standing(mid);
+        // Crumbled away above the standing height (with a ragged, uneven edge).
+        if (top > stand + ch * (this.rng() - 0.3)) continue;
+        // Now and then a stone is simply missing from the face.
+        if (c > 0 && c < courses - 1 && this.rng() < 0.04) continue;
+        const h = ch * lerp(0.85, 1.12, this.rng());
+        stone(mid, c * ch + h / 2 - 0.03, new THREE.Vector3(sl * lerp(0.93, 1.0, this.rng()), h, width * lerp(0.88, 1.04, this.rng())), 0.12, delay + c * 0.3 + (mid / len) * 0.4, (this.rng() - 0.5) * 0.04);
+      }
+    }
+    // Coping: a row of upright stones along the top, leaning a little this way and that.
+    for (let t = 0.07; t < len - 0.05; t += lerp(0.11, 0.15, this.rng())) {
+      if (standing(t) < H - 0.02 || this.rng() < 0.03) continue;
+      const h = lerp(0.18, 0.25, this.rng());
+      stone(t, H + h / 2 - 0.04, new THREE.Vector3(lerp(0.09, 0.13, this.rng()), h, lerp(0.3, 0.38, this.rng())), 0.18, delay + courses * 0.3 + (t / len) * 0.4);
+    }
+    // Ends: fallen stones lie in the grass beside a crumbled end; an opening gets tall stoops.
+    for (const [end, t, out] of [[startEnd, 0, -1], [endEnd, len, 1]] as const) {
+      if (end === 'crumble') {
+        const n = 2 + Math.floor(this.rng() * 3);
+        for (let i = 0; i < n; i++) {
+          const along = t + out * lerp(-0.1, 0.6, this.rng());
+          const side = (this.rng() < 0.5 ? -1 : 1) * lerp(0.35, 0.7, this.rng());
+          const s = lerp(0.18, 0.32, this.rng());
+          stone(along, s * 0.25, new THREE.Vector3(s * 1.3, s * 0.6, s), 1.0, delay + 0.8 + i * 0.1, side);
+        }
+      } else if (end === 'opening') {
+        const h = H + lerp(0.15, 0.25, this.rng());
+        stone(t - out * 0.18, h / 2 - 0.05, new THREE.Vector3(0.34, h, 0.52), 0.05, delay + 0.5);
+      }
+    }
+  }
+
   /** A gate across an opening from a to b, hung on a and left a little ajar. */
   private gate(seg: Segment, a: THREE.Vector2, b: THREE.Vector2, delay: number) {
+    if (seg.style === 'wall') return; // walls finish in a neat opening instead
     const width = a.distanceTo(b);
     const dir = b.clone().sub(a).divideScalar(Math.max(width, 1e-6));
     if (seg.style === 'hedge') {
@@ -326,7 +416,7 @@ export class FenceBuilder {
       const d2 = s2.b.clone().sub(s2.a).normalize();
       if (d1.dot(d2) < 0.9) continue;
       for (const p of [...this.fences.ownedBy(s1.id), ...this.fences.ownedBy(s2.id)]) this.fences.remove(p);
-      const merged: Segment = { id: this.nextId++, style: s1.style, a: s1.a.clone(), b: s2.b.clone(), signature: '' };
+      const merged: Segment = { id: this.nextId++, style: s1.style, a: s1.a.clone(), b: s2.b.clone(), signature: '', first: s1.first, last: s2.last };
       this.segments.splice(i, 2, merged);
       this.build(merged, 0.2);
     }

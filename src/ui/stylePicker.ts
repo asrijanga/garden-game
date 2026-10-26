@@ -26,6 +26,14 @@ const STYLES: { id: BuildStyle; label: string; icon: string }[] = [
     </svg>`,
   },
   {
+    id: 'wall',
+    label: 'Stone wall',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      ${[[4, 27, 9], [14, 27, 10], [25, 27, 11], [7, 20.5, 10], [18, 20.5, 9], [28, 20.5, 8], [5, 14, 8], [14, 14, 11], [26, 14, 9]].map(([x, y, w]) => `<rect x="${x}" y="${y}" width="${w}" height="6" rx="2.4" fill="#b3aca1" stroke="#6f685f" stroke-width="1.2"/>`).join('')}
+      <path d="M8 33.5h6M28 33.5h6" stroke="#7fb04f" stroke-width="2" stroke-linecap="round"/>
+    </svg>`,
+  },
+  {
     id: 'rocks',
     label: 'Rocks',
     icon: `<svg viewBox="0 0 40 40" aria-hidden="true">

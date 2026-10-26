@@ -206,6 +206,7 @@ const fences = new Fences((shape, at) => {
     dust.puff(at, 3, 0.25);
     ambience.wood(1);
   } else if (shape === 'hedge') ambience.rustle();
+  else if (shape === 'wallStone') ambience.stone(0.16);
   else ambience.wood(0.35);
 });
 scene.add(fences.group);

@@ -5,13 +5,13 @@ import { createRng, lerp } from '../core/random';
 import { regrow } from '../core/regrow';
 import { addWind } from '../render/wind';
 
-export type FenceStyle = 'picket' | 'rustic' | 'hedge';
-export type PartShape = 'picketPost' | 'picket' | 'rail' | 'logPost' | 'log' | 'hedge';
+export type FenceStyle = 'picket' | 'rustic' | 'hedge' | 'wall';
+export type PartShape = 'picketPost' | 'picket' | 'rail' | 'logPost' | 'log' | 'hedge' | 'wallStone';
 /** How a part arrives: knocked in from above, popped into place, or grown up out of the lawn. */
 export type Arrival = 'drop' | 'pop' | 'grow';
 
-const CAPACITY: Record<PartShape, number> = { picketPost: 600, picket: 5000, rail: 1500, logPost: 600, log: 1500, hedge: 2500 };
-const VARIANTS: Record<PartShape, number> = { picketPost: 3, picket: 4, rail: 2, logPost: 4, log: 4, hedge: 5 };
+const CAPACITY: Record<PartShape, number> = { picketPost: 600, picket: 5000, rail: 1500, logPost: 600, log: 1500, hedge: 2500, wallStone: 2500 };
+const VARIANTS: Record<PartShape, number> = { picketPost: 3, picket: 4, rail: 2, logPost: 4, log: 4, hedge: 5, wallStone: 6 };
 
 function colorize(g: THREE.BufferGeometry, color: (x: number, y: number, z: number) => THREE.Color): THREE.BufferGeometry {
   const pos = g.attributes.position;
@@ -133,6 +133,32 @@ function hedgeGeometry(seed: number): THREE.BufferGeometry {
   return colorize(g, (_x, y) => dark.clone().lerp(light, Math.min(1, Math.max(0, y))));
 }
 
+/**
+ * A dry-stone walling stone, a unit block before scaling (centred): flattish faces, softly
+ * worn edges, a little lumpy, never square. Grey with a warm cast and a darker underside.
+ */
+function wallStoneGeometry(seed: number): THREE.BufferGeometry {
+  const rng = createRng(seed);
+  let g: THREE.BufferGeometry = new RoundedBoxGeometry(1, 1, 1, 2, lerp(0.14, 0.22, rng()));
+  g.deleteAttribute('uv');
+  g.deleteAttribute('normal');
+  g = mergeVertices(g, 1e-4);
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  const ph = [rng() * 6, rng() * 6, rng() * 6];
+  const skew = (rng() - 0.5) * 0.25;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const n = Math.sin(x * 5 + ph[0]) * Math.cos(z * 6 + ph[1]) * 0.05 + Math.sin(y * 7 + x * 3 + ph[2]) * 0.03;
+    // Slightly wedge-shaped, the way split stone comes.
+    pos.setXYZ(i, x * (1 + n), y * (1 + n * 0.6) + x * skew * 0.2, z * (1 + n) * (1 - (y + 0.5) * 0.08));
+  }
+  g.computeVertexNormals();
+  const base = new THREE.Color('#bab5ab');
+  return colorize(g, (_x, y) => base.clone().multiplyScalar(0.84 + (y + 0.5) * 0.22));
+}
+
 const BUILD: Record<PartShape, (seed: number) => THREE.BufferGeometry> = {
   picketPost: picketPostGeometry,
   picket: picketGeometry,
@@ -140,6 +166,7 @@ const BUILD: Record<PartShape, (seed: number) => THREE.BufferGeometry> = {
   logPost: logPostGeometry,
   log: logGeometry,
   hedge: hedgeGeometry,
+  wallStone: wallStoneGeometry,
 };
 
 export interface Part {
