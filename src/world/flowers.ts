@@ -442,7 +442,7 @@ export class Flowers {
   private readonly uniforms = { uFlowerTime: { value: 0 } };
   private readonly grid = new Map<string, { x: number; z: number; r: number }[]>();
   private readonly blooms: Pending[] = [];
-  private readonly heads: { pos: THREE.Vector3; openAt: number }[] = [];
+  private readonly heads: { pos: THREE.Vector3; openAt: number; species: string }[] = [];
   /** Every plant placed, by 1 m cell, so the eraser can find them. */
   private readonly placed = new Map<string, Placed[]>();
   private readonly wilting: { p: Placed; t: number }[] = [];
@@ -591,7 +591,7 @@ export class Flowers {
     if (bloomMax > 0.5) {
       this.blooms.push({ at: birth + BLOOM_START + 0.6, pos: new THREE.Vector3(x, y, z) });
       const headY = (mesh.geometry.userData.headY as number) ?? 0.4;
-      this.heads.push({ pos: new THREE.Vector3(x, y + headY * scale + 0.03, z), openAt: birth + BLOOM_END });
+      this.heads.push({ pos: new THREE.Vector3(x, y + headY * scale + 0.03, z), openAt: birth + BLOOM_END, species: sp.id });
     }
   }
 
@@ -631,6 +631,11 @@ export class Flowers {
     for (let i = this.heads.length - 1; i >= 0; i--) if (near(this.heads[i].pos)) this.heads.splice(i, 1);
     for (let i = this.blooms.length - 1; i >= 0; i--) if (near(this.blooms[i].pos)) this.blooms.splice(i, 1);
     return n;
+  }
+
+  /** Open blooms with their species (for visitors with favourite flowers). */
+  openHeads(): { pos: THREE.Vector3; species: string }[] {
+    return this.heads.filter((h) => this.time >= h.openAt);
   }
 
   /** Open blooms bees can visit (in-season flowers that have finished unfurling). */

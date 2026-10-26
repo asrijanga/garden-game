@@ -15,6 +15,7 @@ import { Dragonflies } from './world/dragonflies';
 import { Vines } from './world/vines';
 import { Bunnies } from './world/bunnies';
 import { Ducks } from './world/ducks';
+import { Hummingbirds } from './world/hummingbirds';
 import { GroundPaint } from './world/groundPaint';
 import { Stones } from './world/stones';
 import { EdgePlants } from './world/edgePlants';
@@ -435,16 +436,33 @@ const perchingBirds = new PerchingBirds(perchesNow, fromTheWoods, (at) => {
   ambience.chirp(Math.min(1, Math.max(0, 1.3 - d / 25)), THREE.MathUtils.clamp(at.clone().sub(camera.position).dot(right) / Math.max(d, 1), -0.8, 0.8));
 });
 scene.add(perchingBirds.group);
-const butterflies = new Butterflies(
-  season,
-  (rng) => {
-    const beds = flowers.openBlooms();
-    if (beds.length && rng() < beds.length / (beds.length + meadow.grown * 0.3)) { const b = beds[Math.floor(rng() * beds.length)].clone(); b.y += 0.06; return b; }
-    return meadow.randomBloom(rng);
+// Open bed flowers with their species, refreshed a few times a second (visitors pick favourites).
+let headsCache: { pos: THREE.Vector3; species: string }[] = [];
+let headsAge = Infinity;
+const openHeads = () => {
+  if (headsAge > 0.4) {
+    headsCache = flowers.openHeads();
+    headsAge = 0;
+  }
+  return headsCache;
+};
+const butterflies = new Butterflies(season, {
+  beds: openHeads,
+  meadow: (rng) => meadow.randomBloom(rng),
+  meadowCount: () => meadow.grown,
+  stone: (rng) => stones.randomTop('step', rng),
+  mud: (rng) => {
+    const bodies = [...ponds.bodies.values()].filter((b) => b.filled && b.fillT >= 1);
+    if (!bodies.length) return null;
+    const body = bodies[Math.floor(rng() * bodies.length)];
+    const rim = ponds.rim(body);
+    if (!rim.length) return null;
+    const v2 = ponds.cellPosition(rim[Math.floor(rng() * rim.length)], new THREE.Vector2());
+    return new THREE.Vector3(v2.x, body.level + 0.015, v2.y);
   },
-  () => flowers.openBlooms().length + meadow.grown * 0.3,
-  fromTheWoods,
-);
+  edge: fromTheWoods,
+  wind: () => new THREE.Vector2(wind.direction.x, wind.direction.y).multiplyScalar(0.3 + wind.sample(0, 0) * 0.5),
+});
 scene.add(butterflies.group);
 const dragonflies = new Dragonflies(season, {
   bodies: () => [...ponds.bodies.values()].filter((b) => b.filled && b.fillT >= 1).map((b) => b.id),
@@ -551,7 +569,20 @@ const ducks = new Ducks({
 });
 scene.add(ducks.group);
 
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
+// Hummingbirds, when there are flowers worth the trip.
+const hummingbirds = new Hummingbirds(season, {
+  beds: openHeads,
+  edge: fromTheWoods,
+  perches: perchesNow,
+  camera: () => camera.position,
+  chip: (at) => {
+    const s = soundAt(at, 10);
+    ambience.chip(s.volume, s.pan);
+  },
+});
+scene.add(hummingbirds.group);
+
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -584,10 +615,12 @@ const controller = tools;
 // Bunnies notice fingers: a tap with the hand makes one sit up and look; building beside them shoos them a few hops.
 controller.onTouch = (p, tool, down) => {
   if (tool === 'move') {
-    if (down && !ducks.tap(p.x, p.z)) bunnies.tap(p.x, p.z, camera.position);
+    if (down && !ducks.tap(p.x, p.z) && !hummingbirds.tap(p) && !butterflies.tap(p)) bunnies.tap(p.x, p.z, camera.position);
   } else {
     bunnies.disturb(p.x, p.z);
     ducks.disturb(p.x, p.z);
+    butterflies.disturb(p.x, p.z);
+    hummingbirds.disturb(p.x, p.z);
   }
 };
 
@@ -837,6 +870,8 @@ function frame(time: number) {
     vines.update(dt);
     bunnies.update(dt);
     ducks.update(dt);
+    hummingbirds.update(dt);
+    headsAge += dt;
     perchingBirds.update(dt);
     butterflies.update(dt);
     dragonflies.update(dt);
@@ -847,7 +882,10 @@ function frame(time: number) {
   rig.update(dt);
   ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));
   const buzz = bees.buzzNear(camera.position);
-  ambience.buzz(buzz.level, buzz.pitch);
+  const hum = hummingbirds.humNear(camera.position);
+  // One soft buzz voice: the bees', or a hummingbird's higher, airier hum when one is closer.
+  if (hum > buzz.level) ambience.buzz(hum * 0.7, 2.3);
+  else ambience.buzz(buzz.level, buzz.pitch);
   if (stones.busy || pondPlants.busy || fences.busy || boulders.busy || props.busy) renderer.shadowMap.needsUpdate = true;
   post.render(dt);
 }

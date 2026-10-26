@@ -206,6 +206,18 @@ export class Stones {
     return false;
   }
 
+  /** The top of a random settled stone of `kind` (a stepping stone to bask on), or null. */
+  randomTop(kind: StoneKind, rng: () => number): THREE.Vector3 | null {
+    const cells = [...this.grid.values()];
+    for (let k = 0; k < 10 && cells.length; k++) {
+      const cell = cells[Math.floor(rng() * cells.length)];
+      const s = cell[Math.floor(rng() * cell.length)];
+      if (!s || s.removed || s.kind !== kind || this.falling.some((f) => f.stone === s)) continue;
+      return new THREE.Vector3(s.pos.x, s.pos.y + 0.09 * s.scale.y, s.pos.z);
+    }
+    return null;
+  }
+
   /** Lift away stones of `kind` within `r`, except `keepOwner`'s (e.g. edging where a new path crosses). */
   removeNear(x: number, z: number, r: number, kind: StoneKind, keepOwner = -1) {
     for (const s of this.near(x, z, r)) {

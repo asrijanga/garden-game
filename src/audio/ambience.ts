@@ -409,6 +409,34 @@ export class Ambience {
     setTimeout(() => out.disconnect(), 1200);
   }
 
+  /** A hummingbird's tiny "tsip": a very short, very high falling chirp. */
+  chip(volume: number, pan: number) {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || this.muted || this.quiet || ctx.state !== 'running' || volume < 0.03) return;
+    const t = ctx.currentTime + 0.01;
+    const out = ctx.createGain();
+    out.gain.value = 0.045 * volume;
+    const p = ctx.createStereoPanner();
+    p.pan.value = pan;
+    out.connect(p).connect(this.master);
+    const n = 1 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) {
+      const s = t + i * 0.09;
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(lerp(6800, 7600, Math.random()), s);
+      osc.frequency.exponentialRampToValueAtTime(5200, s + 0.035);
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0, s);
+      env.gain.linearRampToValueAtTime(1, s + 0.004);
+      env.gain.exponentialRampToValueAtTime(0.001, s + 0.045);
+      osc.connect(env).connect(out);
+      osc.start(s);
+      osc.stop(s + 0.05);
+    }
+    setTimeout(() => out.disconnect(), 600);
+  }
+
   private lastWood = 0;
 
   /** A wooden "tock" as a fence post is knocked in (or a softer tap for boards). */
