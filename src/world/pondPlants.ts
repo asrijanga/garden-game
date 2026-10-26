@@ -189,6 +189,11 @@ export class PondPlants {
     this.add(mesh, x, y, z, h, new THREE.Color(1, 1, 1).multiplyScalar(lerp(0.85, 1.1, this.rng())), delay, true);
   }
 
+  /** Is there a lily pad within `r` of (x, z)? */
+  padNear(x: number, z: number, r: number): boolean {
+    return this.items.some((it) => !it.reed && !it.gone && (it.pos.x - x) ** 2 + (it.pos.z - z) ** 2 < (r + it.size) ** 2);
+  }
+
   /** Is there a reed clump within `r` of (x, z)? */
   reedNear(x: number, z: number, r: number): boolean {
     return this.items.some((it) => it.reed && !it.gone && (it.pos.x - x) ** 2 + (it.pos.z - z) ** 2 < r * r);

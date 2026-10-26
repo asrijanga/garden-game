@@ -23,6 +23,7 @@ const BLEND = 1.0; // radius of the soft curve where separate ponds meet
 const NONE = -99;
 const FILL_TIME = 3.2;
 const RIPPLES = 8;
+const WAKES = 8;
 
 /** Dig depth (R), shore halo (G) and height above the waterline (B), read by the lawn shader. One texel per field vertex. */
 export function createPondTexture(): THREE.DataTexture {
@@ -217,6 +218,11 @@ export class Ponds {
   }
 
   /** Expanding rings on the water at (x, z). */
+  /** A soft V of wake behind something paddling (slot 0–7), pointing along `yaw`; strength 0 clears it. */
+  setWake(slot: number, x: number, z: number, yaw: number, strength: number) {
+    (this.waterMat.uniforms.uWakes.value[slot % WAKES] as THREE.Vector4).set(x, z, yaw, strength);
+  }
+
   addRipple(x: number, z: number, strength: number) {
     const r = this.waterMat.uniforms.uRipples.value[this.ripple] as THREE.Vector4;
     r.set(x, z, this.time, strength);
@@ -779,6 +785,7 @@ function waterMaterial(palette: SeasonPalette): THREE.ShaderMaterial {
       uFoam: { value: new THREE.Color('#f4f8f2') },
       uSunDir: { value: new THREE.Vector3(-0.62, 0.62, 0.48).normalize() },
       uRipples: { value: ripples },
+      uWakes: { value: Array.from({ length: WAKES }, () => new THREE.Vector4(0, 0, 0, 0)) },
     },
     vertexShader: /* glsl */ `
       attribute float aDepth;
@@ -803,6 +810,7 @@ function waterMaterial(palette: SeasonPalette): THREE.ShaderMaterial {
       uniform float uTime;
       uniform vec3 uShallow, uDeep, uSkyLow, uSkyHigh, uTree, uFoam, uSunDir;
       uniform vec4 uRipples[${RIPPLES}];
+      uniform vec4 uWakes[${WAKES}];
       varying vec3 vWorld;
       varying float vDepth;
       varying float vWet;
@@ -844,6 +852,21 @@ function waterMaterial(palette: SeasonPalette): THREE.ShaderMaterial {
           float env = exp(-x * x * 30.0) * r.w * exp(-age * 0.8) / (1.0 + dist * 1.5);
           g += dv / dist * cos(x * 38.0) * env * 0.9;
           ring += env * smoothstep(0.0, 0.05, -x + 0.05);
+        }
+        // Wakes: two soft arms spreading back from each paddler, with fine ripples along them.
+        for (int k = 0; k < ${WAKES}; k++) {
+          vec4 w = uWakes[k];
+          if (w.w <= 0.0) continue;
+          vec2 dv = p - w.xy;
+          vec2 f = vec2(sin(w.z), cos(w.z));
+          vec2 rt = vec2(f.y, -f.x);
+          float a = -dot(dv, f);
+          if (a < -0.08 || a > 1.8) continue;
+          float s = dot(dv, rt);
+          float arm = abs(s) - max(a, 0.0) * 0.36 - 0.04;
+          float env = exp(-arm * arm * 900.0) * smoothstep(-0.08, 0.04, a) * exp(-a * 1.6) * w.w;
+          g += rt * sign(s) * cos(a * 70.0 - uTime * 7.0) * env * 0.7;
+          ring += env * 0.55;
         }
         vec3 n = normalize(vec3(-g.x, 1.0, -g.y));
         vec3 V = normalize(cameraPosition - vWorld);

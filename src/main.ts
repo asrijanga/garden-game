@@ -14,6 +14,7 @@ import { Butterflies } from './world/butterflies';
 import { Dragonflies } from './world/dragonflies';
 import { Vines } from './world/vines';
 import { Bunnies } from './world/bunnies';
+import { Ducks } from './world/ducks';
 import { GroundPaint } from './world/groundPaint';
 import { Stones } from './world/stones';
 import { EdgePlants } from './world/edgePlants';
@@ -498,7 +499,59 @@ const bunnies = new Bunnies({
 });
 scene.add(bunnies.group);
 
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
+// A duck family on any pond big enough for one.
+const soundAt = (at: THREE.Vector3, reach: number) => {
+  const d = at.distanceTo(camera.position);
+  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+  return { volume: Math.min(1, Math.max(0, 1.3 - d / reach)), pan: THREE.MathUtils.clamp(at.clone().sub(camera.position).dot(right) / Math.max(d, 1), -0.8, 0.8) };
+};
+const ducks = new Ducks({
+  ponds: () => [...ponds.bodies.values()].filter((b) => b.filled && b.fillT >= 1).map((b) => ({ id: b.id, cells: b.cells.length })),
+  waterPoint: (id, rng) => {
+    const body = ponds.bodies.get(id);
+    if (!body || !body.filled) return null;
+    const v2 = new THREE.Vector2();
+    for (let k = 0; k < 12; k++) {
+      ponds.cellPosition(body.cells[Math.floor(rng() * body.cells.length)], v2);
+      if (ponds.waterDepth(v2.x, v2.y) > 0.22 && !pondPlants.padNear(v2.x, v2.y, 0.35)) return v2.clone();
+    }
+    return null;
+  },
+  swimmable: (x, z) => ponds.waterDepth(x, z) > 0.12 && !pondPlants.padNear(x, z, 0.22),
+  pondAt: (x, z) => ponds.bodyAt(x, z)?.id ?? null,
+  level: (x, z) => ponds.levelAt(x, z),
+  heightAt: (x, z) => ground.heightAt(x, z),
+  bank: (x, z) => {
+    // The nearest dry, clear grass, a little up from the water's edge.
+    for (let r = 0.3; r < 5; r += 0.2) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2 + r;
+        const px = x + Math.cos(a) * r;
+        const pz = z + Math.sin(a) * r;
+        if (ponds.contains(px, pz, 0.25) || boulders.occupied(px, pz, 0.3) || cottage.contains(px, pz, 0.5) || fences.solidNear(px, pz, 0.2) || ground.forestness(px, pz) > 0.4) continue;
+        return new THREE.Vector2(px, pz);
+      }
+    }
+    return null;
+  },
+  woods: (x, z) => {
+    const a = Math.atan2(z, x);
+    const r = ground.clearingRadius(a) + 2;
+    return new THREE.Vector2(Math.cos(a) * r, Math.sin(a) * r);
+  },
+  reedsNear: (x, z, r) => pondPlants.reedNear(x, z, r),
+  wake: (slot, x, z, yaw, k) => ponds.setWake(slot, x, z, yaw, k),
+  splash: (x, y, z, n, p) => splash.burst(x, y, z, n, p),
+  quack: (at, chick) => {
+    const s = soundAt(at, 16);
+    ambience.quack(s.volume, s.pan, chick);
+  },
+  wind: () => new THREE.Vector2(wind.direction.x, wind.direction.y).multiplyScalar(0.6 + wind.sample(0, 0) * 0.6),
+  camera: () => camera.position,
+});
+scene.add(ducks.group);
+
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -531,8 +584,11 @@ const controller = tools;
 // Bunnies notice fingers: a tap with the hand makes one sit up and look; building beside them shoos them a few hops.
 controller.onTouch = (p, tool, down) => {
   if (tool === 'move') {
-    if (down) bunnies.tap(p.x, p.z, camera.position);
-  } else bunnies.disturb(p.x, p.z);
+    if (down && !ducks.tap(p.x, p.z)) bunnies.tap(p.x, p.z, camera.position);
+  } else {
+    bunnies.disturb(p.x, p.z);
+    ducks.disturb(p.x, p.z);
+  }
 };
 
 /** Rebuild one saved action: a stroke, or a change to the cottage's look. */
@@ -780,6 +836,7 @@ function frame(time: number) {
     perchAge += dt;
     vines.update(dt);
     bunnies.update(dt);
+    ducks.update(dt);
     perchingBirds.update(dt);
     butterflies.update(dt);
     dragonflies.update(dt);

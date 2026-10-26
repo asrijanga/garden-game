@@ -1,4 +1,4 @@
-import { createRng } from '../core/random';
+import { createRng, lerp } from '../core/random';
 import type { Season } from '../world/season';
 import { Birds } from './birds';
 
@@ -343,6 +343,70 @@ export class Ambience {
     const ctx = this.ctx;
     if (!ctx || !this.birds || this.muted || this.quiet || ctx.state !== 'running' || volume < 0.03) return;
     this.birds.near(pan, 0.6 + volume * 2.2);
+  }
+
+  /**
+   * A duck's soft "quack" (a nasal, buzzy note with a falling pitch, through a vowel-ish filter),
+   * or a duckling's tiny peep (a thin rising whistle). `volume` 0–1 by distance, `pan` −1…1.
+   */
+  quack(volume: number, pan: number, chick = false) {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || this.muted || this.quiet || ctx.state !== 'running' || volume < 0.03) return;
+    const t = ctx.currentTime + 0.01;
+    const out = ctx.createGain();
+    const p = ctx.createStereoPanner();
+    p.pan.value = pan;
+    out.connect(p).connect(this.master);
+    if (chick) {
+      out.gain.value = 0.05 * volume;
+      for (let i = 0; i < 2; i++) {
+        const s = t + i * lerp(0.11, 0.16, Math.random());
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        const f = lerp(3000, 3600, Math.random());
+        osc.frequency.setValueAtTime(f * 0.8, s);
+        osc.frequency.exponentialRampToValueAtTime(f, s + 0.06);
+        const env = ctx.createGain();
+        env.gain.setValueAtTime(0, s);
+        env.gain.linearRampToValueAtTime(1, s + 0.01);
+        env.gain.exponentialRampToValueAtTime(0.001, s + 0.08);
+        osc.connect(env).connect(out);
+        osc.start(s);
+        osc.stop(s + 0.1);
+      }
+      setTimeout(() => out.disconnect(), 800);
+      return;
+    }
+    out.gain.value = 0.07 * volume;
+    const n = Math.random() < 0.6 ? 1 : 2;
+    for (let i = 0; i < n; i++) {
+      const s = t + i * 0.24;
+      const f = lerp(340, 420, Math.random());
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(f, s);
+      osc.frequency.exponentialRampToValueAtTime(f * 0.78, s + 0.18);
+      // Two formant-ish bands give the nasal "aa" of a quack.
+      const f1 = ctx.createBiquadFilter();
+      f1.type = 'bandpass';
+      f1.frequency.value = 1100;
+      f1.Q.value = 4;
+      const f2 = ctx.createBiquadFilter();
+      f2.type = 'bandpass';
+      f2.frequency.value = 2300;
+      f2.Q.value = 5;
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0, s);
+      env.gain.linearRampToValueAtTime(1, s + 0.02);
+      env.gain.setValueAtTime(1, s + 0.1);
+      env.gain.exponentialRampToValueAtTime(0.001, s + 0.2);
+      osc.connect(f1).connect(env);
+      osc.connect(f2).connect(env);
+      env.connect(out);
+      osc.start(s);
+      osc.stop(s + 0.22);
+    }
+    setTimeout(() => out.disconnect(), 1200);
   }
 
   private lastWood = 0;
