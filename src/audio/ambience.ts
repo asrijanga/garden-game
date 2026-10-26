@@ -338,6 +338,13 @@ export class Ambience {
     }
   }
 
+  /** A bird sitting in the garden chirps (`volume` 0–1 by distance, `pan` −1…1). */
+  chirp(volume: number, pan: number) {
+    const ctx = this.ctx;
+    if (!ctx || !this.birds || this.muted || this.quiet || ctx.state !== 'running' || volume < 0.03) return;
+    this.birds.near(pan, 0.6 + volume * 2.2);
+  }
+
   private lastWood = 0;
 
   /** A wooden "tock" as a fence post is knocked in (or a softer tap for boards). */

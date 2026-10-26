@@ -6,8 +6,12 @@ import { CameraRig } from './core/cameraRig';
 import { Cottage, DEFAULT_STYLE, decodeStyle, encodeStyle } from './world/cottage';
 import { CottagePanel } from './ui/cottagePanel';
 import { Wildflowers } from './world/wildflowers';
+import { createRng } from './core/random';
 import { Meadow } from './world/meadow';
 import { createForestFloor } from './world/forestFloor';
+import { PerchingBirds, type Perch } from './world/perchingBirds';
+import { Butterflies } from './world/butterflies';
+import { Dragonflies } from './world/dragonflies';
 import { GroundPaint } from './world/groundPaint';
 import { Stones } from './world/stones';
 import { EdgePlants } from './world/edgePlants';
@@ -377,7 +381,69 @@ setInterval(() => {
     // nothing to do
   }
 }, 10000);
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
+// --- Creatures ----------------------------------------------------------------------------
+// They come in from (and go back to) the woods round the clearing.
+const fromTheWoods = (angle: number) => {
+  const r = ground.clearingRadius(angle) + 2;
+  const x = Math.cos(angle) * r;
+  const z = Math.sin(angle) * r;
+  return new THREE.Vector3(x, ground.heightAt(x, z) + 1.5, z);
+};
+// Where birds can sit, refreshed now and then (a few spots on open lawn, too).
+let perchList: Perch[] = [];
+let perchAge = Infinity;
+const perchRng = createRng(WORLD_SEED + 60);
+const perchesNow = () => {
+  if (perchAge < 1.5) return perchList;
+  perchAge = 0;
+  perchList = [];
+  fences.perches(perchList);
+  props.perches(perchList);
+  cottage.perches(perchList);
+  for (let i = 0; i < 3; i++) {
+    const a = perchRng() * Math.PI * 2;
+    const r = Math.sqrt(perchRng()) * 14;
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+    if (ponds.contains(x, z, 0.5) || cottage.contains(x, z, 0.5) || boulders.occupied(x, z, 0.3)) continue;
+    perchList.push({ pos: new THREE.Vector3(x, ground.heightAt(x, z), z), yaw: 0, alive: () => !ponds.contains(x, z, 0.2), ground: true });
+  }
+  return perchList;
+};
+const perchingBirds = new PerchingBirds(perchesNow, fromTheWoods, (at) => {
+  const d = at.distanceTo(camera.position);
+  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+  ambience.chirp(Math.min(1, Math.max(0, 1.3 - d / 25)), THREE.MathUtils.clamp(at.clone().sub(camera.position).dot(right) / Math.max(d, 1), -0.8, 0.8));
+});
+scene.add(perchingBirds.group);
+const butterflies = new Butterflies(
+  season,
+  (rng) => {
+    const beds = flowers.openBlooms();
+    if (beds.length && rng() < beds.length / (beds.length + meadow.grown * 0.3)) { const b = beds[Math.floor(rng() * beds.length)].clone(); b.y += 0.06; return b; }
+    return meadow.randomBloom(rng);
+  },
+  () => flowers.openBlooms().length + meadow.grown * 0.3,
+  fromTheWoods,
+);
+scene.add(butterflies.group);
+const dragonflies = new Dragonflies(season, {
+  bodies: () => [...ponds.bodies.values()].filter((b) => b.filled && b.fillT >= 1).map((b) => b.id),
+  pointOn: (id, rng) => {
+    const body = ponds.bodies.get(id);
+    if (!body || !body.filled || !body.cells.length) return null;
+    const v2 = new THREE.Vector2();
+    for (let k = 0; k < 8; k++) {
+      ponds.cellPosition(body.cells[Math.floor(rng() * body.cells.length)], v2);
+      if (ponds.waterDepth(v2.x, v2.y) > 0.15) return new THREE.Vector3(v2.x, body.level, v2.y);
+    }
+    return null;
+  },
+  ripple: (x, z, k) => ponds.addRipple(x, z, k),
+});
+scene.add(dragonflies.group);
+
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -650,6 +716,10 @@ function frame(time: number) {
     splash.update(dt);
     wildflowers.update(dt);
     meadow.update(dt);
+    perchAge += dt;
+    perchingBirds.update(dt);
+    butterflies.update(dt);
+    dragonflies.update(dt);
     dust.update(dt);
   }
   paint.update(dt);

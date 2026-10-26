@@ -8,6 +8,8 @@ import { addWind } from '../render/wind';
 export type FenceStyle = 'picket' | 'rustic' | 'hedge' | 'wall';
 export type PartShape = 'picketPost' | 'picket' | 'rail' | 'logPost' | 'log' | 'hedge' | 'wallStone';
 /** How a part arrives: knocked in from above, popped into place, or grown up out of the lawn. */
+import type { Perch } from './perchingBirds';
+
 export type Arrival = 'drop' | 'pop' | 'grow';
 
 const CAPACITY: Record<PartShape, number> = { picketPost: 600, picket: 5000, rail: 1500, logPost: 600, log: 1500, hedge: 2500, wallStone: 2500 };
@@ -200,6 +202,8 @@ export class Fences {
   private rng = createRng(1717);
   private nextId = 1;
   private readonly m = new THREE.Matrix4();
+  private readonly box = new THREE.Box3();
+  private readonly e = new THREE.Euler();
   private readonly s = new THREE.Vector3();
   private readonly p = new THREE.Vector3();
 
@@ -292,6 +296,19 @@ export class Fences {
       }
     }
     return best;
+  }
+
+  /** Places a bird could sit: the tops of posts, rustic log rails and hedges. */
+  perches(out: Perch[]) {
+    for (const p of this.parts.values()) {
+      if (p.gone || this.moving.has(p) || (p.shape !== 'picketPost' && p.shape !== 'logPost' && p.shape !== 'log' && p.shape !== 'hedge')) continue;
+      const geo = p.mesh.geometry;
+      if (!geo.boundingBox) geo.computeBoundingBox();
+      this.box.copy(geo.boundingBox!).applyMatrix4(this.m.compose(p.pos, p.quat, p.scale));
+      const yaw = this.e.setFromQuaternion(p.quat, 'YXZ').y;
+      const pos = new THREE.Vector3((this.box.min.x + this.box.max.x) / 2, this.box.max.y - (p.shape === 'hedge' ? 0.06 : p.shape === 'picketPost' ? 0.03 : 0.01), (this.box.min.z + this.box.max.z) / 2);
+      out.push({ pos, yaw, alive: () => !p.gone });
+    }
   }
 
   /** Take parts away (shrinking and sinking), e.g. to rebuild a stretch with a gate. */

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Perch } from './perchingBirds';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createRng, lerp } from '../core/random';
 import type { WindField } from '../render/wind';
@@ -431,6 +432,15 @@ export class Cottage {
 
   get smokePoints(): THREE.Points {
     return this.smoke.points;
+  }
+
+  /** Places a bird could sit along the roof ridge. */
+  perches(out: Perch[]) {
+    const top = BASE_H + WALL_H + ROOF_RISE + (ROOFS[this.style.roof]?.thatch ? 0.33 : 0.13);
+    for (let i = 0; i < 5; i++) {
+      const pos = this.group.localToWorld(new THREE.Vector3(lerp(-W / 2 + 0.2, W / 2 - 0.2, i / 4), top, 0));
+      out.push({ pos, yaw: this.yaw, alive: () => true });
+    }
   }
 
   /** True if (x, z) is within the cottage footprint (with its shed and porch) plus `margin`. */

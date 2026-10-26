@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Perch } from './perchingBirds';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
@@ -240,6 +241,7 @@ interface Prop {
 export class Props {
   readonly group = new THREE.Group();
   private readonly props: Prop[] = [];
+  private readonly box = new THREE.Box3();
   private rng = createRng(3131);
   private readonly wood = new THREE.MeshLambertMaterial({ vertexColors: true });
   private readonly roof = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
@@ -289,6 +291,16 @@ export class Props {
 
   get busy(): boolean {
     return this.props.some((p) => p.t === null || (p.t !== null && !p.landed) || p.leaving !== undefined || (p.assemble !== undefined && p.assemble < 6));
+  }
+
+  /** Places a bird could sit: a birdhouse roof, a lantern's top, the gazebo's peak. */
+  perches(out: Perch[]) {
+    for (const p of this.props) {
+      if (p.gone || !p.landed || p.leaving !== undefined || (p.kind !== 'birdhouse' && p.kind !== 'lantern' && p.kind !== 'gazebo')) continue;
+      if (p.kind === 'gazebo' && (p.assemble ?? 0) < 6) continue;
+      this.box.setFromObject(p.group);
+      out.push({ pos: new THREE.Vector3(p.pos.x, this.box.max.y - 0.02, p.pos.z), yaw: p.yaw, alive: () => !p.gone && p.leaving === undefined });
+    }
   }
 
   /** Is there a prop within `r` of (x, z)? */

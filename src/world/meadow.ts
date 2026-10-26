@@ -163,6 +163,18 @@ export class Meadow {
     this.grown = Math.max(0, Math.min(this.sites.length, n || 0));
   }
 
+  /** A random wildflower in full bloom (just above its flowers), for butterflies; null if none. */
+  randomBloom(rng: () => number): THREE.Vector3 | null {
+    const n = Math.floor(this.grown);
+    for (let k = 0; k < 8 && n > 0; k++) {
+      const s = this.sites[Math.floor(rng() * n)];
+      if (s.scale < 0.95) continue;
+      const e = s.m.elements;
+      return new THREE.Vector3(e[12], e[13] + Math.hypot(e[4], e[5], e[6]) * 0.24, e[14]);
+    }
+    return null;
+  }
+
   private write(s: Site) {
     const k = Math.max(0.0001, s.scale);
     this.m.copy(s.m).multiply(this.sc.makeScale(k, k, k));

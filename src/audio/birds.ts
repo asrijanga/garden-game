@@ -45,6 +45,11 @@ export class Birds {
     this.nextAt = this.ctx.currentTime + lerp(10, 25, this.rng()) * this.pace;
   }
 
+  /** A garden bird close by: a quick chirp or a little warble, panned to where it sits. */
+  near(pan: number, loud: number) {
+    this.sing(this.rng() < 0.65 ? 'chirps' : 'warble', this.ctx.currentTime + 0.02, pan, loud);
+  }
+
   private sing(kind: Phrase, t: number, pan: number, loud: number) {
     const ctx = this.ctx;
     // Each bird sits at its own distance: farther = quieter and a little duller.
