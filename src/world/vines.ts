@@ -107,6 +107,8 @@ export interface ClimbOptions {
   wrap?: number;
   /** …or lie on a surface facing this way, wandering from side to side across it. */
   face?: THREE.Vector3;
+  /** A side shoot (which doesn't put out shoots of its own). */
+  shoot?: boolean;
 }
 
 interface Placed {
@@ -263,11 +265,11 @@ export class Vines {
         }
       }
       // Now and then a side shoot wanders off for a hand's length or two.
-      if (!o.face && rng() < 0.05 && total - s > 0.3) {
+      if (!o.face && !o.shoot && rng() < 0.05 && total - s > 0.3) {
         const branch = [cur.clone()];
         const drop = rng() < 0.6 ? -1 : 1;
         for (let k = 1; k <= 4; k++) branch.push(cur.clone().addScaledVector(n1, (k * 0.04) * (rng() < 0.5 ? -1 : 1)).add(new THREE.Vector3(0, drop * k * 0.05, 0)));
-        this.climb(branch, { ...o, seed: o.seed + Math.floor(s * 1000), delay: rebuilt ? 0 : start - this.uniforms.uVineTime.value, wrap: 0.005 });
+        this.climb(branch, { ...o, seed: o.seed + Math.floor(s * 1000), delay: rebuilt ? 0 : start - this.uniforms.uVineTime.value, wrap: 0.005, shoot: true });
       }
     }
   }
