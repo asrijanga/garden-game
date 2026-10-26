@@ -8,6 +8,9 @@ import type { SeasonPalette } from './season';
 
 /** Radius of the open meadow in the middle of the forest: the player's garden. */
 export const CLEARING_RADIUS = 21;
+
+/** What flower beds are dressed with. */
+export type Mulch = 'bark' | 'gravel';
 const WORLD_HALF = 110;
 
 export class Ground {
@@ -20,14 +23,20 @@ export class Ground {
   /** The same lawn, for the finer meshes dug into ponds. */
   readonly basinMaterial: THREE.MeshLambertMaterial;
 
-  constructor(seed: number, palette: SeasonPalette, private readonly paint: THREE.Texture, private readonly pond: THREE.Texture) {
+  constructor(
+    seed: number,
+    palette: SeasonPalette,
+    private readonly paint: THREE.Texture,
+    private readonly pond: THREE.Texture,
+    private readonly mulch: Mulch = 'bark',
+  ) {
     this.hNoise = createNoise2D(seed);
     this.edgeNoise = createNoise2D(seed + 1);
     this.colorNoise = createNoise2D(seed + 2);
     this.meadow = palette.meadow.map((c) => new THREE.Color(c));
     this.floor = new THREE.Color(palette.forestFloor);
     this.mesh = this.buildMesh();
-    this.basinMaterial = lawnMaterial(paint, pond, true);
+    this.basinMaterial = lawnMaterial(paint, pond, true, mulch);
   }
 
   /** Organic outline of the clearing at angle `theta`. */
@@ -90,7 +99,7 @@ export class Ground {
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.setAttribute('aMeadow', new THREE.BufferAttribute(meadowMask, 1));
     geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, lawnMaterial(this.paint, this.pond, false));
+    const mesh = new THREE.Mesh(geo, lawnMaterial(this.paint, this.pond, false, this.mulch));
     mesh.receiveShadow = true;
     return mesh;
   }
@@ -102,6 +111,29 @@ float lawnNoise(vec2 p) {
   vec2 i = floor(p), f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
   return mix(mix(lawnHash(i), lawnHash(i + vec2(1.0, 0.0)), f.x), mix(lawnHash(i + vec2(0.0, 1.0)), lawnHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+`;
+
+/** Pea gravel (cells ~4 cm): rounded stones of mixed light tones with soft shadowed gaps. */
+const peaGravelGLSL = /* glsl */ `
+vec3 peaGravel(vec2 p) {
+  p = vec2(p.x * 0.8 - p.y * 0.6, p.x * 0.6 + p.y * 0.8) * 24.0;
+  vec2 i = floor(p), f = fract(p);
+  float d1 = 8.0, d2 = 8.0;
+  vec2 id = vec2(0.0);
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 g = vec2(float(x), float(y));
+      vec2 o = vec2(lawnHash(i + g), lawnHash(i + g + 17.3)) * 0.85 + 0.075;
+      float d = length(g + o - f);
+      if (d < d1) { d2 = d1; d1 = d; id = i + g; } else if (d < d2) { d2 = d; }
+    }
+  }
+  float tone = lawnHash(id + 3.1);
+  vec3 col = mix(vec3(0.4, 0.36, 0.3), vec3(0.62, 0.57, 0.48), tone);
+  col = mix(col, vec3(0.47, 0.33, 0.22), step(0.85, lawnHash(id + 9.7))); // the odd rusty stone
+  col *= 0.82 + 0.25 * (1.0 - d1); // domed
+  return mix(vec3(0.17, 0.15, 0.12), col, smoothstep(0.0, 0.16, d2 - d1));
 }
 `;
 
@@ -143,7 +175,7 @@ let sharedGrain: THREE.DataTexture | null = null;
  * ponds (its vertices are a metre apart, far too coarse to dig into) and the basin takes over;
  * it is drawn a hair nearer the camera so the two never flicker where they overlap.
  */
-function lawnMaterial(paint: THREE.Texture, pond: THREE.Texture, basin: boolean): THREE.MeshLambertMaterial {
+function lawnMaterial(paint: THREE.Texture, pond: THREE.Texture, basin: boolean, mulch: Mulch): THREE.MeshLambertMaterial {
   const grain = (sharedGrain ??= grainTexture(256, 1234));
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
   if (basin) {
@@ -151,7 +183,8 @@ function lawnMaterial(paint: THREE.Texture, pond: THREE.Texture, basin: boolean)
     mat.polygonOffsetFactor = -1;
     mat.polygonOffsetUnits = -4;
   }
-  mat.customProgramCacheKey = () => (basin ? 'lawn-basin' : 'lawn');
+  mat.defines = { MULCH_GRAVEL: mulch === 'gravel' ? 1 : 0 };
+  mat.customProgramCacheKey = () => (basin ? 'lawn-basin' : 'lawn') + mulch;
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, windUniforms, { uGrain: { value: grain }, uPaint: { value: paint }, uPond: { value: pond } });
     shader.vertexShader = shader.vertexShader
@@ -164,7 +197,7 @@ function lawnMaterial(paint: THREE.Texture, pond: THREE.Texture, basin: boolean)
         vWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
       );
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nuniform sampler2D uGrain;\nuniform sampler2D uPaint;\nuniform sampler2D uPond;\nvarying float vMeadow;\nvarying vec3 vWorld;\n${windSampleGLSL}\n${paintUvGLSL}\n${pondUvGLSL}\n${lawnNoiseGLSL}\n${pebblesGLSL}`)
+      .replace('#include <common>', `#include <common>\nuniform sampler2D uGrain;\nuniform sampler2D uPaint;\nuniform sampler2D uPond;\nvarying float vMeadow;\nvarying vec3 vWorld;\n${windSampleGLSL}\n${paintUvGLSL}\n${pondUvGLSL}\n${lawnNoiseGLSL}\n${pebblesGLSL}\n${peaGravelGLSL}`)
       .replace(
         '#include <color_fragment>',
         /* glsl */ `#include <color_fragment>
@@ -194,16 +227,25 @@ function lawnMaterial(paint: THREE.Texture, pond: THREE.Texture, basin: boolean)
         // Flower beds: rich, dark, crumbly soil with a soft hand-dug edge.
         float bedField = paintTex.b + ragged * 1.2;
         float bed = smoothstep(0.32, 0.46, bedField) * (1.0 - earth);
-        // Black-brown bark mulch: dark shreds, scattered lighter chips, fine crumbs between.
-        vec2 mp = vWorld.xz;
-        vec2 mr = vec2(mp.x * 0.8 - mp.y * 0.6, mp.x * 0.6 + mp.y * 0.8); // rotated, so chips don't line up
-        float shreds = lawnNoise(vec2(mr.x * 34.0, mr.y * 11.0));
-        float chips = lawnNoise(mp * 16.0 + 5.3) * 0.65 + lawnNoise(mp * 41.0 - 2.7) * 0.35;
-        float crumb = lawnNoise(mp * 90.0);
-        vec3 bedSoil = mix(vec3(0.03, 0.022, 0.016), vec3(0.055, 0.038, 0.026), shreds);
-        bedSoil = mix(bedSoil, vec3(0.13, 0.085, 0.05), smoothstep(0.66, 0.74, chips)); // lighter bark chips
-        bedSoil *= 0.85 + crumb * 0.3;
-        bedSoil *= 1.0 - (1.0 - smoothstep(0.46, 0.62, bedField)) * 0.2; // tucked-in edge
+        vec3 bedSoil = vec3(0.0);
+        if (bed > 0.0) {
+          vec2 mp = vWorld.xz;
+          #if MULCH_GRAVEL
+          // Pale pea gravel: small rounded stones in buff, warm grey and the odd rusty one.
+          bedSoil = peaGravel(mp);
+          #else
+          // Cedar bark mulch: warm red-brown shreds, lighter chips, fine dark crumbs between.
+          // Red-brown sits opposite the greens, so leaves and blooms glow against it.
+          vec2 mr = vec2(mp.x * 0.8 - mp.y * 0.6, mp.x * 0.6 + mp.y * 0.8); // rotated, so chips don't line up
+          float shreds = lawnNoise(vec2(mr.x * 34.0, mr.y * 11.0));
+          float chips = lawnNoise(mp * 16.0 + 5.3) * 0.65 + lawnNoise(mp * 41.0 - 2.7) * 0.35;
+          float crumb = lawnNoise(mp * 90.0);
+          bedSoil = mix(vec3(0.115, 0.042, 0.02), vec3(0.2, 0.08, 0.036), shreds);
+          bedSoil = mix(bedSoil, vec3(0.32, 0.15, 0.07), smoothstep(0.66, 0.74, chips)); // lighter bark chips
+          bedSoil *= 0.8 + crumb * 0.35;
+          #endif
+          bedSoil *= 1.0 - (1.0 - smoothstep(0.46, 0.62, bedField)) * 0.2; // tucked-in edge
+        }
         diffuseColor.rgb = mix(diffuseColor.rgb, soil, earth);
         diffuseColor.rgb = mix(diffuseColor.rgb, bedSoil, bed);
         // Ponds: damp, darker grass running down the banks, a narrow band of wet mud at the

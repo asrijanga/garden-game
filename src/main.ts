@@ -101,7 +101,7 @@ scene.add(sun);
 
 const paint = new GroundPaint();
 const pondTexture = createPondTexture();
-const ground = new Ground(WORLD_SEED, palette, paint.texture, pondTexture);
+const ground = new Ground(WORLD_SEED, palette, paint.texture, pondTexture, new URLSearchParams(location.search).get('mulch') === 'gravel' ? 'gravel' : 'bark');
 scene.add(ground.mesh);
 
 // The cottage sits at the back of the clearing, tucked against the trees, facing the player.

@@ -17,6 +17,10 @@ const BLEND = 0.8; // radius of the rounded curve where separate beds meet
 const ROCK_TONES = ['#a39b8f', '#8f877c', '#b3aa9b', '#9b8f80', '#7f786f', '#b8ad9c', '#a8a091'];
 /** Plant scale. Heads are already drawn large (see HEAD); stems stay fairly short so blooms sit over their bed. */
 const FLOWER_SCALE = 1.2;
+/** Gap between flowers, as a multiple of each species' natural spacing (was 0.62: too dense). */
+const SPACING = 1.05;
+/** Minimum gap between leafy clumps. */
+const FOLIAGE_SPACING = 0.55;
 const FOLIAGE_GREEN = ['#4f8a36', '#5e9a3f', '#6aa548', '#47803a', '#578f3c'];
 const FOLIAGE_AUTUMN = ['#4f8434', '#5e9440', '#6a9a42', '#7d9a40', '#567f35'];
 const FOLIAGE_WINTER = ['#557a50', '#5f8459', '#4d7048'];
@@ -35,6 +39,7 @@ export class FlowerBrush {
   private stroke: THREE.Vector2[] = [];
   private strokeId = 0;
   private readonly fieldIds: number[] = [];
+  private readonly foliageAt = new Map<number, { x: number; z: number }[]>();
   private readonly fieldMins: number[] = [];
 
   constructor(
@@ -85,6 +90,7 @@ export class FlowerBrush {
 
   /** Forget bed dabs centred within `r` of (x, z). */
   erase(x: number, z: number, r: number) {
+    for (const [k, list] of this.foliageAt) this.foliageAt.set(k, list.filter((p) => (p.x - x) ** 2 + (p.z - z) ** 2 > r * r));
     for (let i = this.beds.length - 1; i >= 0; i--) {
       if (Math.hypot(this.beds[i].c.x - x, this.beds[i].c.y - z) < r) this.beds.splice(i, 1);
     }
@@ -94,6 +100,21 @@ export class FlowerBrush {
   reborder(path: THREE.Vector2[], r: number) {
     const cut = this.beds.filter((b) => path.some((p) => b.c.distanceTo(p) < r + EDGE_RADIUS + 0.4)).map((b) => b.c);
     if (cut.length) this.layBorder(cut);
+  }
+
+  private foliageNear(x: number, z: number, r: number): boolean {
+    for (let i = Math.floor(x) - 1; i <= Math.floor(x) + 1; i++) {
+      for (let j = Math.floor(z) - 1; j <= Math.floor(z) + 1; j++) {
+        for (const p of this.foliageAt.get(i * 4096 + j) ?? []) if ((p.x - x) ** 2 + (p.z - z) ** 2 < r * r) return true;
+      }
+    }
+    return false;
+  }
+
+  private addFoliageSpot(x: number, z: number) {
+    const k = Math.floor(x) * 4096 + Math.floor(z);
+    if (!this.foliageAt.has(k)) this.foliageAt.set(k, []);
+    this.foliageAt.get(k)!.push({ x, z });
   }
 
   /** Rough distance from (x, z) to the edge of the nearest flower bed (negative inside). */
@@ -245,7 +266,8 @@ export class FlowerBrush {
           const plain = P[i * nz + j] - EDGE_RADIUS;
           if (plain > -0.06 && !this.blocked(x, z) && this.distanceToPaths(x, z) > 0.75) {
             this.paint.bed(x, z, 0.32);
-            if (this.rng() < 0.08) {
+            if (this.rng() < 0.08 && !this.foliageNear(x, z, FOLIAGE_SPACING)) {
+              this.addFoliageSpot(x, z);
               const green = new THREE.Color(greens[Math.floor(this.rng() * greens.length)]);
               this.flowers.plantFoliage(x, this.ground.heightAt(x, z) - 0.02, z, this.rng() * 6.28, lerp(0.9, 1.3, this.rng()), 0.2 + this.rng() * 0.4, green);
             }
@@ -311,18 +333,20 @@ export class FlowerBrush {
     this.wildflowers.clearNear(c.x, c.y, BED_RADIUS);
     // Leafy foliage first: the bed fills with green, then the flowers rise out of it.
     const greens = this.season === 'autumn' ? FOLIAGE_AUTUMN : this.season === 'winter' ? FOLIAGE_WINTER : FOLIAGE_GREEN;
-    for (let i = 0; i < 7; i++) {
+    // Just a few leafy clumps, well apart, so the mulch shows between the plants.
+    for (let i = 0; i < 2; i++) {
       const a = this.rng() * Math.PI * 2;
       const r = Math.sqrt(this.rng()) * PLANT_RADIUS * 0.95;
       const x = c.x + Math.cos(a) * r;
       const z = c.y + Math.sin(a) * r;
-      if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.8) continue;
+      if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.8 || this.foliageNear(x, z, FOLIAGE_SPACING)) continue;
+      this.addFoliageSpot(x, z);
       const green = new THREE.Color(greens[Math.floor(this.rng() * greens.length)]).multiplyScalar(lerp(0.9, 1.1, this.rng()));
       this.flowers.plantFoliage(x, this.ground.heightAt(x, z) - 0.02, z, this.rng() * Math.PI * 2, lerp(1.0, 1.6, this.rng()), this.strokeTime * 0.2 + this.rng() * 0.4, green);
     }
     // In a mix, neighbouring plants tend to share a species, in soft drifts like a real border.
     let drift = this.pickSpecies();
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 16; i++) {
       if (this.rng() < 0.35) drift = this.pickSpecies();
       const sp = drift;
       const a = this.rng() * Math.PI * 2;
@@ -330,7 +354,8 @@ export class FlowerBrush {
       const x = c.x + Math.cos(a) * r;
       const z = c.y + Math.sin(a) * r;
       if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.85) continue;
-      if (this.flowers.isCrowded(x, z, sp.spacing * FLOWER_SCALE * 0.62)) continue;
+      // Room round each plant: a cottage-garden scatter, not a carpet.
+      if (this.flowers.isCrowded(x, z, sp.spacing * FLOWER_SCALE * SPACING)) continue;
       const base = new THREE.Color(sp.colors[Math.floor(this.rng() * sp.colors.length)]);
       const color = base.offsetHSL((this.rng() - 0.5) * 0.03, (this.rng() - 0.5) * 0.1, (this.rng() - 0.5) * 0.06);
       // The wave: plants further from the stroke sprout a little later.
