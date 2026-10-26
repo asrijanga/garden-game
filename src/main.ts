@@ -36,6 +36,7 @@ import { ToolController } from './game/tools';
 import { GardenStore } from './game/garden';
 import { regrow } from './core/regrow';
 import { confirmCard } from './ui/confirm';
+import { mountShotButton } from './ui/shotButton';
 
 const WORLD_SEED = 20261025;
 
@@ -101,7 +102,7 @@ scene.add(sun);
 
 const paint = new GroundPaint();
 const pondTexture = createPondTexture();
-const ground = new Ground(WORLD_SEED, palette, paint.texture, pondTexture, new URLSearchParams(location.search).get('mulch') === 'gravel' ? 'gravel' : 'bark');
+const ground = new Ground(WORLD_SEED, palette, paint.texture, pondTexture, paint.mulchTexture);
 scene.add(ground.mesh);
 
 // The cottage sits at the back of the clearing, tucked against the trees, facing the player.
@@ -311,6 +312,22 @@ const quality = new Quality(
   fixedTier !== null,
 );
 const fpsMeter = params.has('fps') ? mountFpsMeter(quality) : null;
+
+// A picture of the garden to keep or share: rendered sharper than usual (no buttons), once.
+let recentFps = 60;
+mountShotButton(
+  () => {
+    const keep = tierPixelRatio;
+    tierPixelRatio = Math.min(window.devicePixelRatio || 1, 2.5);
+    resize();
+    post.render(0);
+    const url = canvas.toDataURL('image/jpeg', 0.92);
+    tierPixelRatio = keep;
+    resize();
+    return { url, info: `q${quality.tier}-${Math.round(recentFps)}fps` };
+  },
+  () => ambience.tap(1.6),
+);
 if (debug) Object.assign(window, { quality, TIERS, store });
 
 // Compile every shader up front (in parallel where supported), so the first pond or bed
@@ -361,6 +378,7 @@ function frame(time: number) {
   const dt = Math.min(raw, 1 / 20);
   if (!loading) quality.frame(raw);
   fpsMeter?.(raw);
+  if (raw > 0 && raw < 0.5) recentFps += (1 / raw - recentFps) * 0.02;
   elapsed += dt;
 
   wind.update(dt);

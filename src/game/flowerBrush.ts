@@ -6,7 +6,7 @@ import type { Flowers } from '../world/flowers';
 import type { Wildflowers } from '../world/wildflowers';
 import type { Season } from '../world/season';
 import type { Stones } from '../world/stones';
-import { MIX_ID, SPECIES, type FlowerSpecies } from '../world/flowerSpecies';
+import { MIX_ID, SPECIES, type FlowerSpecies, type Mulch } from '../world/flowerSpecies';
 
 const DAB_STEP = 0.3; // metres between brush dabs along a stroke
 const BED_RADIUS = 0.8; // painted soil (visible edge at ~80% of this), mostly hidden under foliage
@@ -35,7 +35,7 @@ export class FlowerBrush {
   private last: THREE.Vector2 | null = null;
   private strokeTime = 0;
   /** Every dab of every bed so far (centre + which stroke made it), and the stroke in progress. */
-  private readonly beds: { c: THREE.Vector2; stroke: number }[] = [];
+  private readonly beds: { c: THREE.Vector2; stroke: number; mulch: Mulch }[] = [];
   private stroke: THREE.Vector2[] = [];
   private strokeId = 0;
   private readonly fieldIds: number[] = [];
@@ -266,6 +266,17 @@ export class FlowerBrush {
           const plain = P[i * nz + j] - EDGE_RADIUS;
           if (plain > -0.06 && !this.blocked(x, z) && this.distanceToPaths(x, z) > 0.75) {
             this.paint.bed(x, z, 0.32);
+            // The curve takes the dressing of whichever bed is closest.
+            let nearest = near[0];
+            let best = Infinity;
+            for (const bd of near) {
+              const d = (bd.c.x - x) ** 2 + (bd.c.y - z) ** 2;
+              if (d < best) {
+                best = d;
+                nearest = bd;
+              }
+            }
+            if (nearest) this.paint.mulch(x, z, 0.32, nearest.mulch);
             if (this.rng() < 0.08 && !this.foliageNear(x, z, FOLIAGE_SPACING)) {
               this.addFoliageSpot(x, z);
               const green = new THREE.Color(greens[Math.floor(this.rng() * greens.length)]);
@@ -317,6 +328,12 @@ export class FlowerBrush {
     }
   }
 
+  /** The dressing for the bed being planted: the species' own, or cedar for a mix. */
+  private mulchFor(): Mulch {
+    if (this.selected === MIX_ID) return 'cedar';
+    return SPECIES.find((s) => s.id === this.selected)?.mulch ?? 'cedar';
+  }
+
   private pickSpecies(): FlowerSpecies {
     if (this.selected !== MIX_ID) return SPECIES.find((s) => s.id === this.selected) ?? SPECIES[0];
     const blooming = SPECIES.filter((s) => this.inSeason(s));
@@ -327,8 +344,10 @@ export class FlowerBrush {
   private dab(c: THREE.Vector2) {
     if (this.blocked(c.x, c.y) || this.distanceToPaths(c.x, c.y) < 0.7) return;
     this.paint.bed(c.x, c.y, BED_RADIUS);
+    const mulch = this.mulchFor();
+    this.paint.mulch(c.x, c.y, BED_RADIUS, mulch);
     const centre = c.clone();
-    this.beds.push({ c: centre, stroke: this.strokeId });
+    this.beds.push({ c: centre, stroke: this.strokeId, mulch });
     this.stroke.push(centre);
     this.wildflowers.clearNear(c.x, c.y, BED_RADIUS);
     // Leafy foliage first: the bed fills with green, then the flowers rise out of it.

@@ -420,3 +420,21 @@ body.picking .sound-hint {
 .confirm-actions button:active { transform: scale(0.95); }
 .confirm-keep { background: #fffdf8; color: #4a3424; box-shadow: 0 2px 8px rgba(60, 40, 20, 0.15); }
 .confirm-go { background: #e8956a; color: #fffaf2; box-shadow: 0 3px 10px rgba(180, 90, 40, 0.35); }
+
+/* --- Screenshot ---------------------------------------------------------------------------- */
+.shot-toggle {
+  right: calc(env(safe-area-inset-right, 0px) + 70px);
+  padding: 10px;
+}
+.shot-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: #fffaf0;
+  pointer-events: none;
+  animation: shot-flash 0.6s ease-out forwards;
+}
+@keyframes shot-flash {
+  from { opacity: 0.85; }
+  to { opacity: 0; }
+}

@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import type { Mulch } from './flowerSpecies';
+
+/** Mulch styles as colours in the style layer (cedar is the default, black). */
+const MULCH_RGB: Record<Mulch, string> = { cedar: '#000000', cocoa: '#ff0000', pea: '#00ff00', slate: '#0000ff' };
 
 /** World half-size covered by the paint layer (the clearing plus a margin). */
 export const PAINT_HALF = 25;
@@ -11,8 +15,12 @@ const SIZE = 512; // ~10 cm per texel
  */
 export class GroundPaint {
   readonly texture: THREE.CanvasTexture;
+  /** Which dressing each bed has: R cocoa, G pea gravel, B slate gravel, black cedar. */
+  readonly mulchTexture: THREE.CanvasTexture;
   private readonly ctx: CanvasRenderingContext2D;
+  private readonly mulchCtx: CanvasRenderingContext2D;
   private dirty = false;
+  private mulchDirty = false;
   private readonly clearing: { x: number; z: number; r: number; t: number }[] = [];
 
   constructor() {
@@ -27,6 +35,26 @@ export class GroundPaint {
     this.texture.minFilter = THREE.LinearFilter;
     this.texture.magFilter = THREE.LinearFilter;
     this.texture.generateMipmaps = false;
+    const mc = document.createElement('canvas');
+    mc.width = mc.height = SIZE;
+    this.mulchCtx = mc.getContext('2d', { willReadFrequently: true })!;
+    this.mulchCtx.fillStyle = '#000';
+    this.mulchCtx.fillRect(0, 0, SIZE, SIZE);
+    this.mulchTexture = new THREE.CanvasTexture(mc);
+    this.mulchTexture.colorSpace = THREE.NoColorSpace;
+    this.mulchTexture.minFilter = THREE.LinearFilter;
+    this.mulchTexture.magFilter = THREE.LinearFilter;
+    this.mulchTexture.generateMipmaps = false;
+  }
+
+  /** Set the dressing under a bed dab (the newest bed wins where two styles overlap). */
+  mulch(x: number, z: number, radius: number, style: Mulch) {
+    const [cx, cy] = this.toCanvas(x, z);
+    this.mulchCtx.fillStyle = MULCH_RGB[style];
+    this.mulchCtx.beginPath();
+    this.mulchCtx.arc(cx, cy, (radius / (PAINT_HALF * 2)) * SIZE, 0, Math.PI * 2);
+    this.mulchCtx.fill();
+    this.mulchDirty = true;
   }
 
   private toCanvas(x: number, z: number): [number, number] {
@@ -94,6 +122,10 @@ export class GroundPaint {
       if (c.t >= 1) this.clearing.splice(i, 1);
     }
     this.ctx.globalCompositeOperation = 'source-over';
+    if (this.mulchDirty) {
+      this.mulchTexture.needsUpdate = true;
+      this.mulchDirty = false;
+    }
     if (!this.dirty) return;
     this.texture.needsUpdate = true;
     this.dirty = false;
