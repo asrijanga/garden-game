@@ -32,7 +32,7 @@ function clumpGeometry(rng: Rng, kind: 'disc' | 'cup' | 'bell' | 'spray'): THREE
   const leafC = new THREE.Color('#6a9c45');
   const white = new THREE.Color('#ffffff');
   const heart = new THREE.Color(kind === 'disc' ? '#f2c230' : '#3a3020');
-  const n = kind === 'spray' ? 5 : 3;
+  const n = kind === 'spray' ? 5 : 4;
   for (let i = 0; i < n; i++) {
     const h = lerp(0.14, 0.28, rng());
     const x = (rng() - 0.5) * 0.12;
@@ -45,7 +45,7 @@ function clumpGeometry(rng: Rng, kind: 'disc' | 'cup' | 'bell' | 'spray'): THREE
     parts.push(colored(stem, stemC));
     const top = new THREE.Vector3(x - Math.sin(lean * 0.3) * h, h, z);
     if (kind === 'disc') {
-      const petals = new THREE.CircleGeometry(lerp(0.02, 0.03, rng()), 9).rotateX(-Math.PI / 2 + 0.3).translate(top.x, top.y, top.z);
+      const petals = new THREE.CircleGeometry(lerp(0.026, 0.036, rng()), 9).rotateX(-Math.PI / 2 + 0.3).translate(top.x, top.y, top.z);
       parts.push(colored(petals, white));
       parts.push(colored(new THREE.CircleGeometry(0.009, 6).rotateX(-Math.PI / 2 + 0.3).translate(top.x, top.y + 0.003, top.z + 0.001), heart));
     } else if (kind === 'cup') {
@@ -133,7 +133,7 @@ export class Meadow {
       const colours = kinds[k][1];
       const tintHex = colours[Math.floor(rng() * colours.length)];
       const n = 6 + Math.floor(rng() * 14);
-      const spread = lerp(0.8, 2.2, rng());
+      const spread = lerp(0.7, 1.6, rng());
       for (let i = 0; i < n && raw.length < SITES; i++) {
         const a = rng() * Math.PI * 2;
         const r = Math.sqrt(rng()) * spread;
@@ -151,7 +151,7 @@ export class Meadow {
       const mesh = meshes[r.k];
       const index = mesh.count++;
       mesh.setColorAt(index, r.tint);
-      const m = new THREE.Matrix4().compose(new THREE.Vector3(r.x, ground.heightAt(r.x, r.z) - 0.01, r.z), q.setFromEuler(e.set(0, rng() * 6.28, 0)), new THREE.Vector3(1, 1, 1).multiplyScalar(lerp(0.85, 1.25, rng())));
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(r.x, ground.heightAt(r.x, r.z) - 0.01, r.z), q.setFromEuler(e.set(0, rng() * 6.28, 0)), new THREE.Vector3(1, 1, 1).multiplyScalar(lerp(1.5, 2.1, rng())));
       this.sites.push({ x: r.x, z: r.z, mesh, index, m, scale: 0, want: 0 });
       mesh.setMatrixAt(index, this.m.makeScale(0, 0, 0));
     }
