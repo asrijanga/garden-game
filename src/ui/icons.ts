@@ -13,6 +13,12 @@ export const ICONS = {
     <ellipse cx="40" cy="10.5" rx="4.4" ry="3" fill="#c7beb1" stroke="#7f766b" stroke-width="1.6"/>
     <path d="M8.5 36.5c1.5-1 3.5-1.2 5-.6M20 27c1.5-.9 3.4-1 4.8-.5" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".7"/>
   </svg>`,
+  fence: `<svg viewBox="0 0 48 48" aria-hidden="true">
+    <path d="M4 40c10-2 30-2 40 0" stroke="#7fb04f" stroke-width="3" stroke-linecap="round" opacity=".6"/>
+    <path d="M5 24.5h38M5 33.5h38" stroke="#d9cdb6" stroke-width="3.4" stroke-linecap="round"/>
+    <path d="M5 24.5h38M5 33.5h38" stroke="#a8916f" stroke-width="1" stroke-linecap="round" opacity=".5"/>
+    ${[8.5, 16.5, 24.5, 32.5, 40.5].map((x, i) => `<path d="M${x - 2.6} 39V${15 + (i % 2) * 1.5}l2.6-3.5 2.6 3.5V39z" fill="#fbf7ee" stroke="#9c8667" stroke-width="1.5" stroke-linejoin="round"/>`).join('')}
+  </svg>`,
   flowers: `<svg viewBox="0 0 48 48" aria-hidden="true">
     <path d="M24 42V24" stroke="#5f8f3e" stroke-width="2.6" stroke-linecap="round"/>
     <path d="M24 36c-6 0-10-3.5-11-8 5 0 9 2.5 11 8zM24 33c5.5-.5 9-4 9.5-8.5-4.8.3-8.5 3-9.5 8.5z" fill="#7fb04f" stroke="#4f7f33" stroke-width="1.5" stroke-linejoin="round"/>

@@ -3,15 +3,17 @@ import type { CameraRig } from '../core/cameraRig';
 import type { GroundPicker } from '../core/groundPicker';
 import type { Toolbar, Tool } from '../ui/toolbar';
 import type { TouchMarker } from '../world/touchMarker';
-import type { PathBuilder } from './pathBuilder';
 import type { FlowerBrush } from './flowerBrush';
 import type { PondBrush } from './pondBrush';
 import type { EraseBrush } from './eraseBrush';
+import type { FenceBuilder } from './fenceBuilder';
+import type { FenceStyle } from '../world/fences';
 import { roundCm, type Action } from './garden';
 
 const MARKER_COLORS: Record<Tool, string> = {
   move: '#fff2cf',
   path: '#f3e2c0',
+  fence: '#f6ead2',
   flowers: '#ffd1e0',
   pond: '#cdeefa',
   erase: '#ffe2c4',
@@ -19,7 +21,7 @@ const MARKER_COLORS: Record<Tool, string> = {
 
 type BuildTool = Exclude<Tool, 'move'>;
 
-interface Brush {
+export interface Brush {
   begin(p: THREE.Vector3): void;
   extend(p: THREE.Vector3): void;
   end(): void;
@@ -32,7 +34,7 @@ interface Brush {
  */
 export class ToolController {
   private readonly pointers = new Set<number>();
-  private stroke: { tool: BuildTool; points: number[]; species: string } | null = null;
+  private stroke: { tool: BuildTool; points: number[]; species: string; style: FenceStyle } | null = null;
   private readonly p = new THREE.Vector3();
   private readonly brushes: Record<BuildTool, Brush>;
 
@@ -42,7 +44,8 @@ export class ToolController {
     private readonly rig: CameraRig,
     private readonly picker: GroundPicker,
     private readonly marker: TouchMarker,
-    paths: PathBuilder,
+    paths: Brush,
+    private readonly fences: FenceBuilder,
     private readonly flowers: FlowerBrush,
     ponds: PondBrush,
     private readonly eraser: EraseBrush,
@@ -50,7 +53,7 @@ export class ToolController {
     private readonly onAction: (action: Action) => void,
     private readonly onToolChange: (tool: Tool) => void = () => {},
   ) {
-    this.brushes = { path: paths, flowers, pond: ponds, erase: eraser };
+    this.brushes = { path: paths, fence: fences, flowers, pond: ponds, erase: eraser };
     el.addEventListener('pointerdown', this.onDown);
     el.addEventListener('pointermove', this.onMove);
     el.addEventListener('pointerup', this.onUp);
@@ -71,7 +74,9 @@ export class ToolController {
     const tool: BuildTool = action.kind;
     const brush = this.brushes[tool];
     const selected = this.flowers.selected;
+    const style = this.fences.style;
     if (action.kind === 'flowers') this.flowers.selected = action.species;
+    if (action.kind === 'fence') this.fences.style = action.style as FenceStyle;
     if (action.kind === 'erase') this.eraser.radius = action.radius;
     const pts = action.points;
     for (let i = 0; i < pts.length; i += 2) {
@@ -81,6 +86,7 @@ export class ToolController {
     }
     brush.end();
     this.flowers.selected = selected;
+    this.fences.style = style;
   }
 
   /** Where the finger is, on the ground, rounded to the centimetre (as saved). */
@@ -109,7 +115,7 @@ export class ToolController {
       this.eraser.radius = roundCm(Math.min(2.2, Math.max(0.7, this.rig.distance * 0.028)));
       this.marker.brush = this.eraser.radius;
     }
-    this.stroke = { tool, points: [hit.x, hit.z], species: this.flowers.selected };
+    this.stroke = { tool, points: [hit.x, hit.z], species: this.flowers.selected, style: this.fences.style };
     this.marker.down(hit);
     this.brushes[tool].begin(hit);
   };
@@ -139,6 +145,7 @@ export class ToolController {
     this.brushes[s.tool].end();
     const points = s.points;
     if (s.tool === 'flowers') this.onAction({ kind: 'flowers', species: s.species, points });
+    else if (s.tool === 'fence') this.onAction({ kind: 'fence', style: s.style, points });
     else if (s.tool === 'erase') this.onAction({ kind: 'erase', radius: this.eraser.radius, points });
     else this.onAction({ kind: s.tool, points });
   }

@@ -310,6 +310,57 @@ export class Ambience {
     osc.stop(at + 0.15);
   }
 
+  private lastWood = 0;
+
+  /** A wooden "tock" as a fence post is knocked in (or a softer tap for boards). */
+  wood(size = 1) {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    if (t - this.lastWood < (size < 0.5 ? 0.07 : 0.05)) return;
+    this.lastWood = t;
+    const pitch = (0.9 + Math.random() * 0.2) * (size < 0.5 ? 1.6 : 1);
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(330 * pitch, t);
+    osc.frequency.exponentialRampToValueAtTime(190 * pitch, t + 0.06);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.22 * size, t + 0.003);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 700 * pitch;
+    bp.Q.value = 1.4;
+    osc.connect(bp).connect(env).connect(this.master);
+    osc.start(t);
+    osc.stop(t + 0.14);
+  }
+
+  private lastRustle = 0;
+
+  /** Leaves rustling as a hedge grows. */
+  rustle() {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    if (t - this.lastRustle < 0.18) return;
+    this.lastRustle = t;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise(ctx);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'bandpass';
+    hp.frequency.value = 2600 + Math.random() * 1200;
+    hp.Q.value = 0.7;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.035, t + 0.06);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    src.connect(hp).connect(env).connect(this.master);
+    src.start(t, Math.random());
+    src.stop(t + 0.38);
+  }
+
   private lastErase = 0;
 
   /** A soft, earthy "shff" as things sink back into the ground. */

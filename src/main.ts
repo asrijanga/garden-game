@@ -21,6 +21,9 @@ import { Fish } from './world/fish';
 import { Splash } from './world/splash';
 import { PondBrush } from './game/pondBrush';
 import { EraseBrush } from './game/eraseBrush';
+import { FenceBuilder } from './game/fenceBuilder';
+import { Fences } from './world/fences';
+import { StylePicker } from './ui/stylePicker';
 import { createMotes } from './world/motes';
 import { FlyingBirds } from './world/flyingBirds';
 import { currentSeason, PALETTES } from './world/season';
@@ -143,7 +146,7 @@ mountSoundControls(ambience);
 // --- Tools: what your finger does -----------------------------------------------------------
 const marker = new TouchMarker();
 scene.add(marker.mesh);
-const TOOL_PITCH = { move: 1, path: 0.9, flowers: 1.2, pond: 0.8, erase: 1.05 };
+const TOOL_PITCH = { move: 1, path: 0.9, fence: 0.95, flowers: 1.2, pond: 0.8, erase: 1.05 };
 let tools: ToolController | null = null;
 const dust = new Dust();
 scene.add(dust.points);
@@ -195,6 +198,39 @@ const flowerBrush = new FlowerBrush(
   (x, z) => paths.distanceToPaths(x, z),
   stones,
 );
+// Fences and hedges: posts knocked in with a wooden "tock", hedges rustling up.
+const fences = new Fences((shape, at) => {
+  if (shape === 'picketPost' || shape === 'logPost') {
+    dust.puff(at, 3, 0.25);
+    ambience.wood(1);
+  } else if (shape === 'hedge') ambience.rustle();
+  else ambience.wood(0.35);
+});
+scene.add(fences.group);
+const fenceBuilder = new FenceBuilder(
+  fences,
+  wildflowers,
+  (x, z) => ground.heightAt(x, z),
+  (x, z) => paths.distanceToPaths(x, z),
+  (x, z) => cottage.contains(x, z, 0.3) || ground.forestness(x, z) > 0.45 || ponds.contains(x, z, 0.3) || flowerBrush.distanceToBeds(x, z) < -0.1,
+);
+// A path drawn across a fence opens a gate in it.
+let pathTrail: THREE.Vector2[] = [];
+const pathBrush = {
+  begin(p: THREE.Vector3) {
+    pathTrail = [new THREE.Vector2(p.x, p.z)];
+    paths.begin(p);
+  },
+  extend(p: THREE.Vector3) {
+    pathTrail.push(new THREE.Vector2(p.x, p.z));
+    paths.extend(p);
+  },
+  end() {
+    paths.end();
+    fenceBuilder.repath(pathTrail);
+    pathTrail = [];
+  },
+};
 const pondBrush = new PondBrush(
   ponds,
   pondPlants,
@@ -230,6 +266,11 @@ addEventListener('pagehide', () => store.save());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) store.save();
 });
+const stylePicker = new StylePicker((style, label) => {
+  fenceBuilder.style = style;
+  ambience.tap(1.1);
+  toolbar.showLabel(label, 1600);
+});
 const picker = new FlowerPicker(flowerBrush.ordered(), (sp) => flowerBrush.inSeason(sp), (id, label) => {
   flowerBrush.selected = id;
   ambience.tap(1.3);
@@ -247,19 +288,21 @@ const eraser = new EraseBrush(
     dust,
     paths,
     beds: flowerBrush,
+    fences: fenceBuilder,
     heightAt: (x, z) => ground.heightAt(x, z),
     occupied: (x, z) => cottage.contains(x, z, 0.4) || paths.distanceToPaths(x, z) < 1.0 || flowerBrush.distanceToBeds(x, z) < 0.15 || ponds.contains(x, z, 0.4),
   },
   (amount) => ambience.erase(amount),
 );
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, renderer, scene });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, renderer, scene, fences, fenceBuilder });
 tools = new ToolController(
   canvas,
   toolbar,
   rig,
   new GroundPicker(camera, canvas, (x, z) => ground.heightAt(x, z)),
   marker,
-  paths,
+  pathBrush,
+  fenceBuilder,
   flowerBrush,
   pondBrush,
   eraser,
@@ -267,7 +310,8 @@ tools = new ToolController(
   (action) => store.add(action),
   (tool) => {
     picker.setVisible(tool === 'flowers');
-    document.body.classList.toggle('picking', tool === 'flowers');
+    stylePicker.setVisible(tool === 'fence');
+    document.body.classList.toggle('picking', tool === 'flowers' || tool === 'fence');
   },
 );
 const controller = tools;
@@ -387,6 +431,7 @@ function frame(time: number) {
   marker.update(dt, rig.distance);
   if (!loading) {
     stones.update(dt);
+    fences.update(dt);
     edgePlants.update(dt);
     flowers.update(dt);
     bees.update(dt);
@@ -403,7 +448,7 @@ function frame(time: number) {
   ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));
   const buzz = bees.buzzNear(camera.position);
   ambience.buzz(buzz.level, buzz.pitch);
-  if (stones.busy || pondPlants.busy) renderer.shadowMap.needsUpdate = true;
+  if (stones.busy || pondPlants.busy || fences.busy) renderer.shadowMap.needsUpdate = true;
   post.render(dt);
 }
 

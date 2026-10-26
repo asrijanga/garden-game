@@ -39,6 +39,8 @@ export class EraseBrush {
       heightAt: (x: number, z: number) => number;
       /** Is (x, z) still somewhere wildflowers shouldn't grow (cottage, built things)? */
       occupied: (x: number, z: number) => boolean;
+      /** Fences and hedges: removes what's within r and says where posts and hedges were. */
+      fences: { erase(x: number, z: number, r: number): THREE.Vector3[] };
     },
     private readonly onErase: (amount: number) => void,
   ) {}
@@ -76,6 +78,9 @@ export class EraseBrush {
     const sunk = w.stones.erase(x, z, r);
     for (const p of sunk.slice(0, 6)) w.dust.puff(p, 2, 0.3);
     let amount = sunk.length;
+    const felled = w.fences.erase(x, z, r);
+    for (const p of felled.slice(0, 4)) w.dust.puff(p, 2, 0.3);
+    amount += felled.length;
     const wilted = w.flowers.erase(x, z, r) + w.edgePlants.erase(x, z, r) + w.pondPlants.erase(x, z, r);
     if (wilted) w.dust.puff(new THREE.Vector3(x, w.heightAt(x, z), z), Math.min(6, 2 + wilted), r * 0.6);
     amount += wilted;
