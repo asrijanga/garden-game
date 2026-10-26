@@ -268,7 +268,9 @@ export class Bunnies {
         b.yaw = h.yaw1;
         b.hop = null;
         b.hopsLeft--;
-        b.pause = b.flee ? lerp(0.05, 0.15, this.rng()) : b.baby ? lerp(0.05, 0.35, this.rng()) : lerp(0.2, 0.7, this.rng());
+        // Followers that have fallen behind hurry to catch up; the leader ambles.
+        const behind = b !== fam.leader && !b.flee && (this.goal(b, fam)?.distanceTo(b.pos) ?? 0) > 0.9;
+        b.pause = b.flee || behind ? lerp(0.03, 0.12, this.rng()) : b.baby ? lerp(0.05, 0.35, this.rng()) : b === fam.leader ? lerp(0.35, 0.9, this.rng()) : lerp(0.2, 0.7, this.rng());
         if (b.hopsLeft <= 0 && b.flee) b.flee = null;
       }
     } else {
@@ -280,7 +282,7 @@ export class Bunnies {
       const goal = this.goal(b, fam);
       if (b.pause <= 0 && (b.act === 'none' || b.flee)) {
         const far = goal ? goal.distanceTo(b.pos) : 0;
-        if (goal && far > 0.25 && (b.hopsLeft > 0 || b.parent || fam.leaving || b.flee || this.rng() < 0.6)) {
+        if (goal && far > 0.25 && (b.hopsLeft > 0 || b.parent || fam.leaving || b.flee || this.rng() < 0.45)) {
           if (b.hopsLeft <= 0) b.hopsLeft = b.baby ? 2 + Math.floor(this.rng() * 4) : 2 + Math.floor(this.rng() * 4);
           this.startHop(b, goal, fam);
         } else {
@@ -301,7 +303,8 @@ export class Bunnies {
   private startHop(b: Bunny, goal: THREE.Vector2, fam: Family) {
     const want = Math.atan2(goal.x - b.pos.x, goal.y - b.pos.y);
     const clumsy = b.baby ? (this.rng() - 0.5) * 0.7 : (this.rng() - 0.5) * 0.3;
-    const len = (b.baby ? lerp(0.16, 0.26, this.rng()) : lerp(0.26, 0.42, this.rng())) * (b.flee ? 1.3 : 1);
+    const far = b !== fam.leader && goal.distanceTo(b.pos) > 0.9;
+    const len = (b.baby ? lerp(0.16, 0.26, this.rng()) : lerp(0.26, 0.42, this.rng())) * (b.flee ? 1.3 : far ? 1.25 : 1);
     // Find a clear landing, turning a little further each try (never into a pond or onto stones).
     for (const turn of [0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6, 2.4, -2.4]) {
       const a = want + clumsy + turn;
