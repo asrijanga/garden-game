@@ -13,8 +13,8 @@ const CURB_OFFSET = 0.62; // centre line → edging stone centre
 const INSIDE = CURB_OFFSET - 0.1; // closer than this to a centre line = inside that path
 const CELL = 1; // spatial hash for path centre lines
 const LEAD = 0.55; // the finger leads the path by this much before it moves on (ignores jitter)
-const FLARE_START = 1.6; // junction curve begins this far from another path's centre line…
-const FLARE_FULL = 0.75; // …and is fully flared by here
+const FLARE_START = 2.4; // junction curve begins this far from another path's centre line…
+const FLARE_FULL = 0.7; // …and is fully flared by here
 
 /** Smoothstep from a (0) to b (1); works with a > b. */
 const smooth = (a: number, b: number, x: number) => {
@@ -132,13 +132,14 @@ export class PathBuilder {
     // so its edging sweeps round in a soft fillet to meet the other path's edge.
     const toOther = this.distanceTo(w.x, w.y, true, 3);
     const flare = smooth(FLARE_START, FLARE_FULL, toOther);
-    const gravel = GRAVEL_RADIUS * (1 + flare * 0.35);
-    const curbOffset = CURB_OFFSET * (1 + flare * 0.4);
+    // A wide, soft mouth: the gravel and edging sweep out into a curved fillet on both sides.
+    const gravel = GRAVEL_RADIUS * (1 + flare * flare * 0.9);
+    const curbOffset = CURB_OFFSET * (1 + flare * flare * 1.1);
     this.paint.wear(w.x, w.y, gravel, 1, 1);
     this.wildflowers.clearNear(w.x, w.y, 1.1 + flare);
 
     // Merging: the old path's edging that now sits inside our (flared) gravel is lifted away.
-    this.stones.removeNear(w.x, w.y, INSIDE * (1 + flare), 'curb', this.pathId);
+    this.stones.removeNear(w.x, w.y, INSIDE * (1 + flare * flare * 1.6), 'curb', this.pathId);
 
     // Centre stones, unless we're running through or alongside another path's gravel (its
     // stones carry on there, so overlapping paths keep a single row).

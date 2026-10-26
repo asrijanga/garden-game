@@ -319,6 +319,17 @@ toolbar.onHold = (tool) => {
 const store = new GardenStore();
 const saved = store.load();
 addEventListener('pagehide', () => store.save());
+// Coming back to the app: iOS may have thrown away the ground-paint canvas (paths' gravel, bed
+// soil) or the WebGL context while we were in the background; put the paint back.
+const restorePaint = () => {
+  if (document.visibilityState === 'visible') paint.restore();
+};
+document.addEventListener('visibilitychange', restorePaint);
+window.addEventListener('pageshow', restorePaint);
+renderer.domElement.addEventListener('webglcontextrestored', () => {
+  paint.restore(true);
+  renderer.shadowMap.needsUpdate = true;
+});
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) store.save();
 });
@@ -583,7 +594,7 @@ const hummingbirds = new Hummingbirds(season, {
 });
 scene.add(hummingbirds.group);
 
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, paint, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
