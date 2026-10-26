@@ -306,7 +306,7 @@ Demo script: draw a pond next to the path and wait for the first fish to jump.
 - Shade under the forest edge grows ferns and mushrooms, and stones gather moss.
 
 ### Story 3.3 — Creatures (L)
-- Butterflies and bees drift between blooms. Birds land on fences and the cottage roof. Dragonflies skim the pond.
+- Butterflies and bees drift between blooms (butterflies in depth in Story 3.7). Birds land on fences and the cottage roof. Dragonflies skim the pond.
 - *(Birds flying across the sky were already pulled forward as 1.2b; bees as 1.6b.)*
 
 ### Story 3.4 — Vines and climbing roses (M)
@@ -345,6 +345,35 @@ Demo script: zoom in near the forest edge and wait for a bunny family; watch the
 - **Performance:** a few simple procedural meshes with GPU-friendly animation, cheap on iPhone.
 
 Demo script: dig a large pond, wait for the duck family to fly in, then watch the ducklings follow their mother round the lily pads.
+
+### Story 3.7 — Hummingbirds and butterflies (M) — *requested by the player*
+**As a** player, **I want** jewel-bright hummingbirds and many kinds of butterflies visiting my flowers, **so that** the garden feels alive, colourful and magical to watch.
+
+- **Many butterfly varieties**, each with its own wing shape, pattern and size, procedurally varied so no two look alike:
+  - **Monarch:** orange with black veins and white-spotted edges.
+  - **Swallowtail:** pale yellow with black stripes and tail points.
+  - **Blue morpho:** shimmering iridescent blue tops, brown undersides that flash as it flaps.
+  - **Painted lady:** orange-brown with black and white tips.
+  - **Cabbage white and brimstone:** soft white and lemon yellow.
+  - **Peacock:** red-brown with "eye" spots.
+  - **Red admiral:** black with red bands.
+  - **Small blues and coppers:** tiny lilac-blue and bright copper.
+  - **Glasswing:** rare, see-through wings with brown edges.
+- **Butterfly flight:** fluttery, bobbing, a little erratic. They glide on open wings between flaps, drift with the wind (riding the same gusts as everything else), and sometimes spiral around each other in pairs.
+- **Butterfly behaviours:**
+  - landing on open blooms, wings slowly opening and closing while they sip;
+  - basking with wings spread flat on warm path stones;
+  - puddling at a pond's muddy edge;
+  - favouring certain flowers (lavender, salvia, sedum, cosmos, asters).
+- **Hummingbirds:** tiny, jewel-toned birds (ruby-throated, green-and-violet, rufous orange) with iridescent throats that catch the light, and wings drawn as a soft blur.
+- **Hummingbird flight:** darting flights with sudden stops, hovering perfectly still in front of a bloom, sipping with a long beak, then backing away and zipping off. The odd playful chase between two, and a rare pause perched on a twig or the cottage eaves.
+- **Hummingbird preferences:** tube-shaped and bright flowers (salvia, foxglove, and roses or other tubular flowers when they arrive).
+- **Visitors follow the garden:** butterflies and hummingbirds only come when there are open, in-season blooms, and more flowers bring more visitors (capped so it stays calm, never swarming). They arrive from and leave into the woods, and get along politely with the bees. Seasonal: plenty in spring and summer, a few in early autumn, none in winter.
+- **Gentle with the player:** a nearby stroke sends them drifting off and back again. Tapping a butterfly lets it land on a nearby flower (or briefly on the touch ring), and tapping a hummingbird makes it hover and look at you.
+- **Soft sound:** butterflies are silent. Hummingbirds give a faint, high wing-hum and a tiny chip call, only when zoomed in close.
+- **Performance:** instanced bodies with wing flapping animated on the GPU, with a firm cap on how many are about, so the iPhone stays at a smooth 60fps.
+
+Demo script: plant a bed of lavender and salvia, wait for butterflies to settle on the blooms and a hummingbird to hover and sip, then zoom in close to watch a morpho flash blue.
 
 ---
 
