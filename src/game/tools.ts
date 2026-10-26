@@ -12,7 +12,7 @@ import type { FenceBuilder } from './fenceBuilder';
 import type { FenceStyle } from '../world/fences';
 
 /** What the Build tool lays: a fence or hedge style, or rocks. */
-export type BuildStyle = FenceStyle | 'rocks';
+export type BuildStyle = FenceStyle | 'rocks' | 'bridge';
 import { roundCm, type Action } from './garden';
 
 const MARKER_COLORS: Record<Tool, string> = {
@@ -56,6 +56,7 @@ export class ToolController {
     paths: Brush,
     fences: FenceBuilder,
     rocks: Brush,
+    bridge: Brush,
     private readonly decor: PropBrush,
     private readonly flowers: FlowerBrush,
     ponds: PondBrush,
@@ -67,8 +68,9 @@ export class ToolController {
     // The Build tool hands each stroke to the fence builder or the rock brush, by style.
     const build: Brush = {
       begin: (p) => {
-        if (this.buildStyle !== 'rocks') fences.style = this.buildStyle;
-        this.building = this.buildStyle === 'rocks' ? rocks : fences;
+        const s = this.buildStyle;
+        if (s !== 'rocks' && s !== 'bridge') fences.style = s;
+        this.building = s === 'rocks' ? rocks : s === 'bridge' ? bridge : fences;
         this.building.begin(p);
       },
       extend: (p) => this.building?.extend(p),
@@ -95,13 +97,14 @@ export class ToolController {
 
   /** Rebuild one saved stroke, exactly as it was first drawn. */
   replay(action: Action) {
-    const tool: BuildTool = action.kind === 'rocks' ? 'fence' : action.kind === 'prop' ? 'decor' : action.kind;
+    const tool: BuildTool = action.kind === 'rocks' || action.kind === 'bridge' ? 'fence' : action.kind === 'prop' ? 'decor' : action.kind;
     const brush = this.brushes[tool];
     const selected = this.flowers.selected;
     const style = this.buildStyle;
     if (action.kind === 'flowers') this.flowers.selected = action.species;
     if (action.kind === 'fence') this.buildStyle = action.style as FenceStyle;
     if (action.kind === 'rocks') this.buildStyle = 'rocks';
+    if (action.kind === 'bridge') this.buildStyle = 'bridge';
     const item = this.decor.kind;
     if (action.kind === 'prop') this.decor.kind = action.item as PropKind;
     if (action.kind === 'erase') this.eraser.radius = action.radius;
@@ -174,6 +177,7 @@ export class ToolController {
     const points = s.points;
     if (s.tool === 'flowers') this.onAction({ kind: 'flowers', species: s.species, points });
     else if (s.tool === 'fence' && s.style === 'rocks') this.onAction({ kind: 'rocks', points });
+    else if (s.tool === 'fence' && s.style === 'bridge') this.onAction({ kind: 'bridge', points });
     else if (s.tool === 'decor') this.onAction({ kind: 'prop', item: s.item, points });
     else if (s.tool === 'fence') this.onAction({ kind: 'fence', style: s.style, points });
     else if (s.tool === 'erase') this.onAction({ kind: 'erase', radius: this.eraser.radius, points });

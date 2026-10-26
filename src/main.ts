@@ -28,6 +28,7 @@ import { Props } from './world/props';
 import { PropBrush } from './game/propBrush';
 import { Boulders } from './world/boulders';
 import { RockBrush } from './game/rockBrush';
+import { BridgeBuilder } from './game/bridgeBuilder';
 import { createMotes } from './world/motes';
 import { FlyingBirds } from './world/flyingBirds';
 import { currentSeason, PALETTES } from './world/season';
@@ -231,6 +232,14 @@ const rockBrush = new RockBrush(
   (x, z) => ground.heightAt(x, z),
   (x, z) => cottage.contains(x, z, 0.5) || ground.forestness(x, z) > 0.45 || paths.distanceToPaths(x, z) < 1.0 || ponds.contains(x, z, -0.4),
 );
+// Arched footbridges across ponds.
+const bridgeBuilder = new BridgeBuilder(
+  fences,
+  wildflowers,
+  (x, z) => ground.heightAt(x, z),
+  (x, z) => ponds.waterDepth(x, z),
+  (why) => toolbar.showLabel(why, 2200),
+);
 // A path drawn across a fence opens a gate in it.
 let pathTrail: THREE.Vector2[] = [];
 const pathBrush = {
@@ -284,7 +293,11 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) store.save();
 });
 // Garden props: set down with a soft wooden thud.
-const props = new Props((_kind, at) => {
+const props = new Props((_kind, at, piece) => {
+  if (piece) {
+    ambience.wood(0.45); // a gazebo piece knocked into place
+    return;
+  }
   dust.puff(at, 4, 0.4);
   ambience.wood(0.8);
 });
@@ -341,6 +354,7 @@ tools = new ToolController(
   pathBrush,
   fenceBuilder,
   rockBrush,
+  bridgeBuilder,
   propBrush,
   flowerBrush,
   pondBrush,

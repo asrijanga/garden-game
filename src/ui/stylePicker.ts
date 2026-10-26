@@ -35,6 +35,16 @@ export const BUILD_CHIPS: { id: BuildStyle; label: string; icon: string }[] = [
     </svg>`,
   },
   {
+    id: 'bridge',
+    label: 'Bridge',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M2 31c6-2 10-2 14 0s10 2 22 0" stroke="#8cc3cf" stroke-width="3" stroke-linecap="round"/>
+      <path d="M4 27c8-12 24-12 32 0" fill="none" stroke="#9a6a45" stroke-width="4" stroke-linecap="round"/>
+      <path d="M4 20c8-12 24-12 32 0" fill="none" stroke="#8c5e3c" stroke-width="2" stroke-linecap="round"/>
+      <path d="M8 22v-5M14 17.5v-6M20 16v-7M26 17.5v-6M32 22v-5" stroke="#7f5638" stroke-width="2" stroke-linecap="round"/>
+    </svg>`,
+  },
+  {
     id: 'rocks',
     label: 'Rocks',
     icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
@@ -63,6 +73,18 @@ export const DECOR_CHIPS: { id: PropKind; label: string; icon: string }[] = [
       <path d="M20 17v19M15 36h10" stroke="#3a332e" stroke-width="2.4" stroke-linecap="round"/>
       <path d="M14.5 7h11l-5.5-4z" fill="#3a332e"/>
       <rect x="16" y="7" width="8" height="9" rx="1" fill="#ffc46e" stroke="#3a332e" stroke-width="1.6"/>
+    </svg>`,
+  },
+  {
+    id: 'gazebo',
+    label: 'Gazebo',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M5 17L20 5l15 12z" fill="#7f9a7a" stroke="#56704f" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M8 17v16M15 17v16M25 17v16M32 17v16" stroke="#f2eee6" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M8 17v16M15 17v16M25 17v16M32 17v16" stroke="#9c9488" stroke-width=".7" stroke-linecap="round"/>
+      <path d="M8 26h7M25 26h7" stroke="#e6e0d4" stroke-width="2"/>
+      <path d="M4 34h32" stroke="#a8825a" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="20" cy="4" r="1.6" fill="#f2eee6"/>
     </svg>`,
   },
   {

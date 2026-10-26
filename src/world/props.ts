@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import { regrow } from '../core/regrow';
 
-export type PropKind = 'bench' | 'lantern' | 'birdhouse';
+export type PropKind = 'bench' | 'lantern' | 'birdhouse' | 'gazebo';
 
 type Rng = () => number;
 
@@ -103,6 +103,83 @@ function birdhouseGeometry(rng: Rng): THREE.BufferGeometry {
   return mergeGeometries(parts);
 }
 
+/**
+ * An octagonal garden gazebo, ~3.6 m across, entrance facing +z. Returned as separate pieces in
+ * the order it goes together: deck and step, eight posts, railings, top beams, eight roof
+ * panels, then the finial.
+ */
+function gazeboPieces(rng: Rng): { geo: THREE.BufferGeometry; roof?: boolean }[] {
+  const R = 1.55; // to the post centres
+  const H = 2.25; // post height
+  const white = new THREE.Color('#f2eee6');
+  const deck = new THREE.Color('#a8825a');
+  const roofs = [['#7f9a7a', '#6c8768'], ['#b7654a', '#9e5440'], ['#6b7680', '#59636c']];
+  const [roofA, roofB] = roofs[Math.floor(rng() * roofs.length)].map((c) => new THREE.Color(c));
+  const pieces: { geo: THREE.BufferGeometry; roof?: boolean }[] = [];
+  // Angles of the eight posts: a flat side (the entrance) faces +z.
+  const ang = (k: number) => Math.PI / 2 + Math.PI / 8 + (k * Math.PI) / 4;
+  const at = (k: number, r: number) => new THREE.Vector2(Math.cos(ang(k)) * r, Math.sin(ang(k)) * r);
+  // Deck: a low octagonal platform of boards, with a step at the entrance.
+  const plat = new THREE.CylinderGeometry(R + 0.25, R + 0.3, 0.2, 8, 1).rotateY(Math.PI / 8).translate(0, 0.1, 0);
+  const deckParts = [paint(plat, deck)];
+  deckParts.push(block(1.1, 0.1, 0.35, 0, 0.05, R + 0.4, deck.clone().multiplyScalar(0.92), 0.02));
+  pieces.push({ geo: mergeGeometries(deckParts) });
+  for (let k = 0; k < 8; k++) {
+    const p = at(k, R);
+    pieces.push({ geo: block(0.11, H, 0.11, p.x, 0.2 + H / 2, p.y, white, 0.02) });
+  }
+  // Railings between posts, leaving the front open (between posts 7 and 0).
+  for (let k = 0; k < 7; k++) {
+    const p0 = at(k, R);
+    const p1 = at(k + 1, R);
+    const mid = p0.clone().add(p1).multiplyScalar(0.5);
+    const len = p0.distanceTo(p1) - 0.1;
+    const yaw = Math.atan2(-(p1.y - p0.y), p1.x - p0.x);
+    const rot = new THREE.Euler(0, yaw, 0);
+    const parts = [block(len, 0.05, 0.06, mid.x, 0.95, mid.y, white, 0.01, rot), block(len, 0.04, 0.05, mid.x, 0.35, mid.y, white, 0.01, rot)];
+    for (let b = 1; b < 7; b++) {
+      const q = p0.clone().lerp(p1, b / 7);
+      parts.push(block(0.035, 0.6, 0.035, q.x, 0.65, q.y, white, 0.008, rot));
+    }
+    pieces.push({ geo: mergeGeometries(parts) });
+  }
+  // Ring of beams along the tops of the posts.
+  const beams: THREE.BufferGeometry[] = [];
+  for (let k = 0; k < 8; k++) {
+    const p0 = at(k, R);
+    const p1 = at(k + 1, R);
+    const mid = p0.clone().add(p1).multiplyScalar(0.5);
+    beams.push(block(p0.distanceTo(p1) + 0.12, 0.14, 0.12, mid.x, 0.2 + H, mid.y, white, 0.015, new THREE.Euler(0, Math.atan2(-(p1.y - p0.y), p1.x - p0.x), 0)));
+  }
+  pieces.push({ geo: mergeGeometries(beams) });
+  // Roof: eight shingled panels rising to a point, the eaves overhanging the posts.
+  const eave = 0.2 + H + 0.07;
+  const rise = 1.15;
+  for (let k = 0; k < 8; k++) {
+    const g = new THREE.CylinderGeometry(0.02, R + 0.5, rise, 1, 6, true, ang(k), Math.PI / 4);
+    g.translate(0, eave + rise / 2, 0);
+    // A gentle bell curve, and rows of shingles in two tones.
+    const pos = g.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) {
+      const t = (pos.getY(i) - eave) / rise;
+      pos.setY(i, pos.getY(i) - Math.sin(t * Math.PI) * 0.08);
+    }
+    g.computeVertexNormals();
+    const col = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const row = Math.floor(((pos.getY(i) - eave) / rise) * 6 + 0.01);
+      const c = (row % 2 ? roofA : roofB).clone().multiplyScalar(0.92 + (k % 2) * 0.06);
+      col.set([c.r, c.g, c.b], i * 3);
+    }
+    g.deleteAttribute('uv');
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    pieces.push({ geo: g.index ? g.toNonIndexed() : g, roof: true });
+  }
+  const top = eave + rise - 0.05;
+  pieces.push({ geo: mergeGeometries([paint(new THREE.CylinderGeometry(0.06, 0.09, 0.14, 8).translate(0, top + 0.05, 0), white), paint(new THREE.SphereGeometry(0.08, 10, 8).translate(0, top + 0.18, 0), white)]) });
+  return pieces;
+}
+
 interface Prop {
   kind: PropKind;
   group: THREE.Group;
@@ -112,6 +189,8 @@ interface Prop {
   t: number | null;
   delay: number;
   landed: boolean;
+  /** Seconds since a self-assembling prop (the gazebo) touched down. */
+  assemble?: number;
   gone?: boolean;
   leaving?: number;
 }
@@ -126,11 +205,12 @@ export class Props {
   private readonly props: Prop[] = [];
   private readonly rng = createRng(3131);
   private readonly wood = new THREE.MeshLambertMaterial({ vertexColors: true });
+  private readonly roof = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
   private readonly glow = new THREE.MeshLambertMaterial({ color: '#3a2a1a', emissive: '#ffc277', emissiveIntensity: 1.7, transparent: true, opacity: 0.92 });
   private readonly variants: Record<PropKind, (() => THREE.Mesh[])[]>;
   private time = 0;
 
-  constructor(private readonly onLand: (kind: PropKind, at: THREE.Vector3) => void) {
+  constructor(private readonly onLand: (kind: PropKind, at: THREE.Vector3, piece?: boolean) => void) {
     const vr = createRng(77);
     const mesh = (g: THREE.BufferGeometry, m: THREE.Material) => {
       const x = new THREE.Mesh(g, m);
@@ -140,15 +220,23 @@ export class Props {
     const benches = [0, 1, 2, 3].map((i) => benchGeometry(vr, i % 2 === 1));
     const lanterns = [0, 1, 2].map(() => lanternGeometry(vr));
     const houses = [0, 1, 2, 3, 4].map(() => birdhouseGeometry(vr));
+    const gazebos = [0, 1, 2].map(() => gazeboPieces(vr));
     this.variants = {
       bench: benches.map((g) => () => [mesh(g, this.wood)]),
       lantern: lanterns.map((l) => () => [mesh(l.body, this.wood), mesh(l.glass, this.glow)]),
       birdhouse: houses.map((g) => () => [mesh(g, this.wood)]),
+      gazebo: gazebos.map((pieces) => () =>
+        pieces.map((p, i) => {
+          const m = mesh(p.geo, p.roof ? this.roof : this.wood);
+          m.userData.order = i;
+          return m;
+        }),
+      ),
     };
   }
 
   get busy(): boolean {
-    return this.props.some((p) => p.t === null || (p.t !== null && !p.landed) || p.leaving !== undefined);
+    return this.props.some((p) => p.t === null || (p.t !== null && !p.landed) || p.leaving !== undefined || (p.assemble !== undefined && p.assemble < 6));
   }
 
   /** Is there a prop within `r` of (x, z)? */
@@ -164,6 +252,8 @@ export class Props {
     // Hand-made: each one leans a hair and sits a touch differently.
     group.userData.tilt = new THREE.Euler((this.rng() - 0.5) * 0.04, 0, (this.rng() - 0.5) * 0.04);
     group.userData.size = lerp(0.95, 1.05, this.rng());
+    // A gazebo arrives as its deck alone; the rest goes together once it's down.
+    if (kind === 'gazebo') for (const c of group.children) c.visible = c.userData.order === 0;
     const prop: Prop = { kind, group, pos: new THREE.Vector3(), yaw: 0, t: null, delay: 0, landed: false };
     this.group.add(group);
     this.props.push(prop);
@@ -199,6 +289,23 @@ export class Props {
     return at;
   }
 
+  /** The gazebo going together: each piece drops into place after the one before. */
+  private assemble(p: Prop, dt: number) {
+    p.assemble! += dt;
+    for (const c of p.group.children) {
+      const order = c.userData.order as number;
+      if (!order) continue;
+      const start = 0.12 + order * 0.14;
+      const k = Math.min(1, Math.max(0, (p.assemble! - start) / 0.3));
+      c.visible = k > 0;
+      c.position.y = (1 - k * k) * 0.8;
+      if (k > 0 && !c.userData.landed && k >= 1) {
+        c.userData.landed = true;
+        this.onLand(p.kind, p.pos, true);
+      }
+    }
+  }
+
   private place(p: Prop, lift: number, squash: number, scale = 1) {
     const g = p.group;
     const s = (g.userData.size as number) * scale;
@@ -227,7 +334,10 @@ export class Props {
         this.place(p, 0.3 + Math.sin(this.time * 5) * 0.03, 0);
         continue;
       }
-      if (p.landed) continue;
+      if (p.landed) {
+        if (p.assemble !== undefined && p.assemble < 6) this.assemble(p, dt);
+        continue;
+      }
       if (p.delay > 0) {
         p.delay -= dt;
         this.place(p, 0.3, 0, 0.0001);
@@ -245,6 +355,7 @@ export class Props {
         if (s > 0.6) {
           this.place(p, 0, 0);
           p.landed = true;
+          if (p.kind === 'gazebo') p.assemble = 0;
         }
       }
     }

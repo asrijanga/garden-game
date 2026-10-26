@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import type { Props, Prop, PropKind } from '../world/props';
 
 /** How close to a path's centre line each prop may stand (beside the gravel, not on it). */
-const PATH_CLEAR: Record<PropKind, number> = { bench: 1.05, lantern: 0.8, birdhouse: 0.9 };
+const PATH_CLEAR: Record<PropKind, number> = { bench: 1.05, lantern: 0.8, birdhouse: 0.9, gazebo: 2.6 };
+/** How much room each prop needs around it. */
+const FOOTPRINT: Record<PropKind, number> = { bench: 0.6, lantern: 0.4, birdhouse: 0.4, gazebo: 2.0 };
 
 /**
  * Places garden props. Touch to pick one up where your finger is; slide to move it (it turns to
@@ -39,7 +41,9 @@ export class PropBrush {
     if (!prop) return;
     this.carrying = null;
     const { x, y: z } = this.at;
-    if (this.blocked(x, z) || this.distanceToPaths(x, z) < PATH_CLEAR[prop.kind] || this.props.near(x, z, 0.6)) {
+    const r = FOOTPRINT[prop.kind];
+    const ringBlocked = r > 1 && Array.from({ length: 8 }, (_, k) => (k / 8) * Math.PI * 2).some((a) => this.blocked(x + Math.cos(a) * r, z + Math.sin(a) * r));
+    if (this.blocked(x, z) || ringBlocked || this.distanceToPaths(x, z) < PATH_CLEAR[prop.kind] || this.props.near(x, z, r + 0.2)) {
       this.props.discard(prop);
       this.onRefuse();
       return;
