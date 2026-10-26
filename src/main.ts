@@ -12,6 +12,7 @@ import { createForestFloor } from './world/forestFloor';
 import { PerchingBirds, type Perch } from './world/perchingBirds';
 import { Butterflies } from './world/butterflies';
 import { Dragonflies } from './world/dragonflies';
+import { Vines } from './world/vines';
 import { GroundPaint } from './world/groundPaint';
 import { Stones } from './world/stones';
 import { EdgePlants } from './world/edgePlants';
@@ -223,12 +224,28 @@ const fences = new Fences((shape, at) => {
   else ambience.wood(0.35);
 });
 scene.add(fences.group);
+// Climbers: roses, clematis and honeysuckle on fences, ivy over walls, roses and wisteria on the cottage.
+const vines = new Vines(season);
+scene.add(vines.group);
+let cottageVines = '';
+const growCottageVines = () => {
+  // Only when they'd grow differently (a door colour change leaves the roses be).
+  const paths = cottage.vinePaths();
+  const key = paths.map((v) => v.kind + v.points.map((p) => p.toArray().map((n) => n.toFixed(2)).join()).join()).join('|');
+  if (key === cottageVines && !(regrow.instant || regrow.offset > 0)) return;
+  cottageVines = key;
+  vines.removeOwner(-1, regrow.instant || regrow.offset > 0);
+  for (const v of paths) vines.climb(v.points, { kind: v.kind, owner: -1, seed: v.seed, face: v.face, delay: 1.5, speed: v.kind === 'wisteria' ? 0.25 : 0.2 });
+};
+cottage.onBuilt = growCottageVines;
+growCottageVines();
 const fenceBuilder = new FenceBuilder(
   fences,
   wildflowers,
   (x, z) => ground.heightAt(x, z),
   (x, z) => paths.distanceToPaths(x, z),
   (x, z) => cottage.contains(x, z, 0.3) || ground.forestness(x, z) > 0.45 || ponds.contains(x, z, 0.3) || flowerBrush.distanceToBeds(x, z) < -0.1,
+  vines,
 );
 // Rocks and boulders: a thud (deeper for bigger stones) and a puff of dust as each settles.
 const boulders = new Boulders((at, size) => {
@@ -443,7 +460,7 @@ const dragonflies = new Dragonflies(season, {
 });
 scene.add(dragonflies.group);
 
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -532,7 +549,7 @@ const redoStack: Action[] = [];
 function rebuildInstantly() {
   regrow.instant = true;
   ambience.quiet = true;
-  for (const s of [paint, stones, edgePlants, paths, flowers, flowerBrush, ponds, pondPlants, fish, pondBrush, wildflowers, fences, fenceBuilder, boulders, rockBrush, bridgeBuilder, props]) s.reset();
+  for (const s of [paint, stones, edgePlants, paths, flowers, flowerBrush, ponds, pondPlants, fish, pondBrush, wildflowers, fences, fenceBuilder, boulders, rockBrush, bridgeBuilder, props, vines]) s.reset();
   cottage.setStyle(DEFAULT_STYLE, false);
   for (const a of store.actions) replayAction(a);
   flowers.update(10);
@@ -717,6 +734,7 @@ function frame(time: number) {
     wildflowers.update(dt);
     meadow.update(dt);
     perchAge += dt;
+    vines.update(dt);
     perchingBirds.update(dt);
     butterflies.update(dt);
     dragonflies.update(dt);

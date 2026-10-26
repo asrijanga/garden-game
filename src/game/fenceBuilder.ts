@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createRng, lerp } from '../core/random';
 import type { Fences, FenceStyle, Part } from '../world/fences';
 import type { Wildflowers } from '../world/wildflowers';
+import type { Vines } from '../world/vines';
 
 const SAMPLE = 0.1; // metres between smoothed stroke samples
 /** Longest run between two posts (hedges are built in shorter sections). */
@@ -54,7 +55,96 @@ export class FenceBuilder {
     private readonly distanceToPaths: (x: number, z: number) => number,
     /** Places a fence can't stand: ponds, flower beds, the cottage, the woods. */
     private readonly blocked: (x: number, z: number) => boolean,
+    private readonly vines: Vines | null = null,
   ) {}
+
+  /**
+   * Its own dice for each stretch (from where it stands), so whether and how a climber takes
+   * to it never disturbs the fence's own variation, and a rebuilt garden grows the same vines.
+   */
+  private vineRng(seg: Segment, a: THREE.Vector2, b: THREE.Vector2) {
+    const h = Math.round(a.x * 97 + a.y * 131 + b.x * 173 + b.y * 211) + seg.id * 7919;
+    return createRng(h);
+  }
+
+  /** Points from the foot of a post up to `top`, winding round it. */
+  private upPost(at: THREE.Vector2, top: number): THREE.Vector3[] {
+    const g = this.heightAt(at.x, at.y);
+    return [0.02, 0.3, 0.6, 1].map((k) => new THREE.Vector3(at.x, g + k * top, at.y));
+  }
+
+  /** Maybe a climber on this run of fence: roses on pickets; clematis or honeysuckle on rails. */
+  private fenceVine(seg: Segment, a: THREE.Vector2, b: THREE.Vector2, top: number, delay: number) {
+    if (!this.vines) return;
+    const rng = this.vineRng(seg, a, b);
+    if (rng() > (seg.style === 'picket' ? 0.4 : 0.45)) return;
+    const len = a.distanceTo(b);
+    // It starts from one post or the other and reaches part or all of the way along.
+    const flip = rng() < 0.5;
+    const from = flip ? b : a;
+    const to = flip ? a : b;
+    const dir = to.clone().sub(from).divideScalar(Math.max(len, 1e-6));
+    const reach = len * lerp(0.45, 1.0, rng());
+    const side = seg.style === 'picket' ? (flip ? -1 : 1) * 0.06 : 0;
+    const pts = this.upPost(from, top);
+    const n = Math.max(2, Math.ceil(reach / 0.2));
+    for (let i = 1; i <= n; i++) {
+      const t = (i / n) * reach;
+      const x = from.x + dir.x * t + dir.y * side;
+      const z = from.y + dir.y * t - dir.x * side;
+      // Roses scramble over the top of the pickets in a wave; climbers on logs follow the rail.
+      const wave = seg.style === 'picket' ? Math.sin(t * 2.3 + rng()) * 0.1 - 0.02 : (rng() - 0.5) * 0.02;
+      pts.push(new THREE.Vector3(x, this.heightAt(x, z) + top + wave, z));
+    }
+    const kind = seg.style === 'picket' ? 'rose' : rng() < 0.55 ? 'clematis' : 'honeysuckle';
+    this.vines.climb(pts, { kind, owner: seg.id, seed: Math.floor(rng() * 1e6), delay: delay + lerp(6, 14, rng()), wrap: seg.style === 'picket' ? 0.035 : 0.05 });
+  }
+
+  /** Maybe ivy over a stone wall: along its top, with strands trailing down both faces. */
+  private wallVine(seg: Segment, a: THREE.Vector2, b: THREE.Vector2, top: (t: number) => number, delay: number) {
+    if (!this.vines) return;
+    const rng = this.vineRng(seg, a, b);
+    if (rng() > 0.5) return;
+    const len = a.distanceTo(b);
+    if (len < 0.8) return;
+    const dir = b.clone().sub(a).divideScalar(len);
+    const perp = new THREE.Vector2(-dir.y, dir.x);
+    const t0 = lerp(0.1, Math.max(0.1, len * 0.5), rng());
+    const t1 = Math.min(len - 0.1, t0 + lerp(0.6, 2.2, rng()));
+    if (t1 - t0 < 0.4) return;
+    const seed = Math.floor(rng() * 1e6);
+    const d = delay + lerp(8, 16, rng());
+    const ground = (t: number, side: number) => {
+      const x = a.x + dir.x * t + perp.x * side;
+      const z = a.y + dir.y * t + perp.y * side;
+      return new THREE.Vector3(x, this.heightAt(x, z), z);
+    };
+    // Along the top…
+    const along: THREE.Vector3[] = [];
+    for (let t = t0; t <= t1; t += 0.15) {
+      const p = ground(t, (rng() - 0.5) * 0.1);
+      p.y += top(t) + 0.04;
+      along.push(p);
+    }
+    const up = new THREE.Vector3(0, 1, 0);
+    this.vines.climb(along, { kind: 'ivy', owner: seg.id, seed, delay: d, face: up, speed: 0.05 });
+    // …and trailing down the faces, each strand starting where the top growth has reached.
+    for (let t = t0 + 0.1; t < t1; t += lerp(0.18, 0.35, rng())) {
+      const side = rng() < 0.5 ? -1 : 1;
+      const h = top(t);
+      const depth = h * lerp(0.3, 0.95, rng());
+      const face = new THREE.Vector3(perp.x * side, 0, perp.y * side);
+      const strand: THREE.Vector3[] = [];
+      for (let k = 0; k <= 4; k++) {
+        // Down the face, which leans in as it rises (wider at the foot than under the coping).
+        const y = h - depth * (k / 4);
+        const p = ground(t + (rng() - 0.5) * 0.06, side * (0.27 - 0.07 * Math.min(1, y / h)));
+        p.y += y + 0.02;
+        strand.push(p);
+      }
+      this.vines.climb(strand, { kind: 'ivy', owner: seg.id, seed: seed + Math.floor(t * 100), delay: d + (t - t0) / 0.05 + 2, face, speed: 0.04 });
+    }
+  }
 
   /** Back to an untouched garden (before an undo replays what remains). */
   reset() {
@@ -272,10 +362,12 @@ export class FenceBuilder {
         const tint = new THREE.Color(PICKET_TINTS[Math.floor(this.rng() * 4)]);
         this.fences.add('picket', new THREE.Vector3(x, this.heightAt(x, z) + 0.06, z), q, new THREE.Vector3(1, h, 1), tint, 'pop', railDelay + 0.15 + i * 0.03, seg.id);
       }
+      this.fenceVine(seg, a, b, h2 + 0.08, railDelay);
     } else {
       // Post and rail: two (now and then three) split logs, a little crooked.
       const rails = this.rng() < 0.25 ? [0.3, 0.62, 0.92] : [0.45, 0.88];
       rails.forEach((h, k) => this.rail(seg, a, h + (this.rng() - 0.5) * 0.06, b, h + (this.rng() - 0.5) * 0.06, railDelay + k * 0.07, sag * 2));
+      this.fenceVine(seg, a, b, rails[rails.length - 1] + 0.03, railDelay);
     }
   }
 
@@ -332,6 +424,7 @@ export class FenceBuilder {
       const h = lerp(0.18, 0.25, this.rng());
       stone(t, H + h / 2 - 0.04, new THREE.Vector3(lerp(0.09, 0.13, this.rng()), h, lerp(0.3, 0.38, this.rng())), 0.18, delay + courses * 0.3 + (t / len) * 0.4);
     }
+    this.wallVine(seg, a, b, (t) => (standing(t) < H - 0.02 ? standing(t) * 0.8 : H + 0.12), delay + courses * 0.3);
     // Ends: fallen stones lie in the grass beside a crumbled end; an opening gets tall stoops.
     for (const [end, t, out] of [[startEnd, 0, -1], [endEnd, len, 1]] as const) {
       if (end === 'crumble') {
@@ -440,6 +533,7 @@ export class FenceBuilder {
         .join('|');
       if (sig === seg.signature) continue;
       for (const p of this.fences.ownedBy(seg.id)) this.fences.remove(p);
+      this.vines?.removeOwner(seg.id);
       this.build(seg, 0.2);
     }
   }
@@ -447,6 +541,7 @@ export class FenceBuilder {
   /** Tidy up: fence within `r` of (x, z) goes; what's left of those stretches stays as it is. */
   erase(x: number, z: number, r: number) {
     const { owners, at } = this.fences.erase(x, z, r);
+    this.vines?.erase(x, z, r + 0.1);
     for (const seg of this.segments) if (owners.has(seg.id)) seg.locked = true;
     return at;
   }

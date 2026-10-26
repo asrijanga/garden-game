@@ -27,6 +27,7 @@ export interface CottageStyle {
   bay: boolean;
   boxes: boolean;
   roses: boolean;
+  wisteria: boolean;
   shed: boolean;
   chimes: boolean;
 }
@@ -63,11 +64,11 @@ export const DOORS = [
 ];
 export const CHIMNEYS = ['Stone', 'Brick', 'White with pot'];
 
-export const DEFAULT_STYLE: CottageStyle = { roof: 0, walls: 0, shutters: 0, door: 0, chimney: 0, porch: false, bay: false, boxes: true, roses: false, shed: false, chimes: false };
+export const DEFAULT_STYLE: CottageStyle = { roof: 0, walls: 0, shutters: 0, door: 0, chimney: 0, porch: false, bay: false, boxes: true, roses: false, wisteria: false, shed: false, chimes: false };
 
 /** Compact text form for saving: five digits, then the upgrades' letters. */
 export function encodeStyle(s: CottageStyle): string {
-  const ups = (s.porch ? 'p' : '') + (s.bay ? 'b' : '') + (s.boxes ? 'f' : '') + (s.roses ? 'r' : '') + (s.shed ? 's' : '') + (s.chimes ? 'w' : '');
+  const ups = (s.porch ? 'p' : '') + (s.bay ? 'b' : '') + (s.boxes ? 'f' : '') + (s.roses ? 'r' : '') + (s.wisteria ? 'v' : '') + (s.shed ? 's' : '') + (s.chimes ? 'w' : '');
   return `${s.roof}${s.walls}${s.shutters}${s.door}${s.chimney}:${ups}`;
 }
 
@@ -84,6 +85,7 @@ export function decodeStyle(text: string): CottageStyle {
     bay: ups.includes('b'),
     boxes: ups.includes('f'),
     roses: ups.includes('r'),
+    wisteria: ups.includes('v'),
     shed: ups.includes('s'),
     chimes: ups.includes('w'),
   };
@@ -123,6 +125,7 @@ export class Cottage {
   setStyle(style: CottageStyle, animate = true) {
     this.style = { ...style };
     this.build();
+    this.onBuilt();
     if (animate) this.bounce = 0;
   }
 
@@ -359,31 +362,6 @@ export class Cottage {
       smokeY += 0.3;
     }
 
-    if (st.roses) {
-      // Climbing roses: leafy stems scrambling up the front corners and over the door.
-      const rose = new THREE.IcosahedronGeometry(0.07, 0);
-      const pinks = ['#e46f86', '#f2a0b2', '#c9405c', '#fbd0d8'].map((c) => lambert(c));
-      const climb = (x0: number, z0: number, height: number, lean: number) => {
-        for (let i = 0; i < 26; i++) {
-          const t = i / 25;
-          const x = x0 + Math.sin(t * 9 + x0) * 0.12 + lean * t;
-          const y = BASE_H + 0.05 + t * height;
-          const leaf = new THREE.Mesh(rose.clone(), leafy);
-          leaf.position.set(x, y, z0 + 0.06);
-          leaf.scale.setScalar(lerp(1.2, 1.8, rng()));
-          g.add(leaf);
-          if (rng() < 0.55) {
-            const bloom = new THREE.Mesh(rose.clone(), pinks[Math.floor(rng() * pinks.length)]);
-            bloom.position.set(x + (rng() - 0.5) * 0.14, y + (rng() - 0.5) * 0.1, z0 + 0.12);
-            g.add(bloom);
-          }
-        }
-      };
-      climb(-1.2, front, 2.0, 0.45);
-      climb(0.1, front, 1.9, -0.4);
-      climb(-W / 2 + 0.15, front, 2.1, 0.2);
-    }
-
     if (st.shed) {
       // A lean-to shed on the right gable end: timber boards, a sloping roof, a little door.
       const sh = new THREE.Group();
@@ -432,6 +410,35 @@ export class Cottage {
 
   get smokePoints(): THREE.Points {
     return this.smoke.points;
+  }
+
+  /** Called after every (re)build, so climbers can be grown over the new walls. */
+  onBuilt: () => void = () => {};
+
+  /**
+   * Where climbers grow on this cottage (world points, from the root): climbing roses up the
+   * front corners and round the door, wisteria up a corner and along under the front eave.
+   */
+  vinePaths(): { kind: 'rose' | 'wisteria'; points: THREE.Vector3[]; face: THREE.Vector3; seed: number }[] {
+    const st = this.style;
+    const out: { kind: 'rose' | 'wisteria'; points: THREE.Vector3[]; face: THREE.Vector3; seed: number }[] = [];
+    const front = D / 2 + 0.06;
+    const face = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
+    // (By hand rather than from the group's matrix, which may be mid-bounce.)
+    const world = (pts: [number, number, number][]) => pts.map(([x, y, z]) => new THREE.Vector3(x, y, z).multiplyScalar(COTTAGE_SCALE).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw).add(this.position));
+    const eave = BASE_H + WALL_H - 0.12;
+    if (st.roses) {
+      // Up beside the door and over it, and up the left front corner.
+      out.push({ kind: 'rose', face, seed: this.seed + 101, points: world([[-0.75, 0.05, front], [-0.7, 0.9, front], [-0.68, 1.75, front], [-0.4, 2.05, front], [0.05, 2.1, front], [0.35, 1.95, front]]) });
+      out.push({ kind: 'rose', face, seed: this.seed + 102, points: world([[0.42, 0.05, front], [0.4, 1.0, front], [0.38, 1.6, front]]) });
+      out.push({ kind: 'rose', face, seed: this.seed + 103, points: world([[-W / 2 + 0.12, 0.05, front], [-W / 2 + 0.15, 1.2, front], [-W / 2 + 0.2, eave, front], [-W / 2 + 0.9, eave + 0.02, front]]) });
+    }
+    if (st.wisteria) {
+      // A gnarled trunk up the right corner, then a long arm under the eave, racemes hanging.
+      const x0 = W / 2 - 0.14;
+      out.push({ kind: 'wisteria', face, seed: this.seed + 111, points: world([[x0, 0.05, front], [x0 - 0.04, 0.8, front], [x0 + 0.02, 1.6, front], [x0 - 0.05, eave, front], [x0 - 1.2, eave + 0.03, front], [x0 - 2.4, eave - 0.02, front], [x0 - 3.4, eave + 0.02, front], [-W / 2 + 0.2, eave, front]]) });
+    }
+    return out;
   }
 
   /** Places a bird could sit along the roof ridge. */
