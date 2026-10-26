@@ -47,7 +47,7 @@ interface LinePoint {
  */
 export class PathBuilder {
   readonly records: PathRecord[] = [];
-  private readonly rng = createRng(1234);
+  private rng = createRng(1234);
   private walker = new THREE.Vector2();
   private heading = new THREE.Vector2();
   private sinceStone = 0;
@@ -212,6 +212,19 @@ export class PathBuilder {
     const key = Math.floor(x / CELL) * 4096 + Math.floor(z / CELL);
     if (!this.lines.has(key)) this.lines.set(key, []);
     this.lines.get(key)!.push({ x, z, id: this.pathId });
+  }
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    this.records.length = 0;
+    this.rng = createRng(1234);
+    this.sinceStone = 0;
+    this.lastCurb = [null, null];
+    this.curbTarget = [0.36, 0.36];
+    this.active = null;
+    this.pathId = 0;
+    this.started = false;
+    this.lines.clear();
   }
 
   /** The nearest point on any path's centre line within `reach` metres of (x, z), if any. */

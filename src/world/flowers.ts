@@ -447,7 +447,7 @@ export class Flowers {
   private readonly placed = new Map<string, Placed[]>();
   private readonly wilting: { p: Placed; t: number }[] = [];
   private time = 0;
-  private readonly rng = createRng(4242);
+  private rng = createRng(4242);
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
 
@@ -593,6 +593,20 @@ export class Flowers {
       const headY = (mesh.geometry.userData.headY as number) ?? 0.4;
       this.heads.push({ pos: new THREE.Vector3(x, y + headY * scale + 0.03, z), openAt: birth + BLOOM_END });
     }
+  }
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    for (const m of [...[...this.meshes.values()].flat(), ...this.foliage]) {
+      m.count = 0;
+      m.visible = false;
+    }
+    this.grid.clear();
+    this.blooms.length = 0;
+    this.heads.length = 0;
+    this.placed.clear();
+    this.wilting.length = 0;
+    this.rng = createRng(4242);
   }
 
   /** Plants within `r` of (x, z) wilt and sink back into the soil. Returns how many. */

@@ -72,6 +72,14 @@ export class GroundPaint {
     this.clearing.push({ x, z, r: radius, t: 0 });
   }
 
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    this.ctx.fillStyle = '#000';
+    this.ctx.fillRect(0, 0, SIZE, SIZE);
+    this.clearing.length = 0;
+    this.dirty = true;
+  }
+
   /** Upload changes at most once per frame. */
   update(dt = 0) {
     // Darken = per-channel minimum: each pass can only take paint away, never add it.

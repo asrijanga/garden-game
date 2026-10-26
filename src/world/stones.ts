@@ -155,7 +155,7 @@ export class Stones {
   private readonly falling: Falling[] = [];
   private readonly sinking: { stone: Placed; t: number }[] = [];
   private readonly grid = new Map<string, Placed[]>();
-  private readonly rng = createRng(31);
+  private rng = createRng(31);
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly s = new THREE.Vector3();
@@ -268,6 +268,15 @@ export class Stones {
     this.m.compose(this.p.set(st.pos.x, st.pos.y + lift, st.pos.z), this.q, this.s);
     st.mesh.setMatrixAt(st.index, this.m);
     st.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    for (const list of this.meshes.values()) for (const m of list) m.count = 0;
+    this.falling.length = 0;
+    this.sinking.length = 0;
+    this.grid.clear();
+    this.rng = createRng(31);
   }
 
   /** Is anything still settling or sinking (so shadows need redrawing)? */

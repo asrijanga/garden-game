@@ -41,10 +41,11 @@ import { Toolbar } from './ui/toolbar';
 import { GroundPicker } from './core/groundPicker';
 import { TouchMarker } from './world/touchMarker';
 import { ToolController } from './game/tools';
-import { GardenStore } from './game/garden';
+import { GardenStore, type Action } from './game/garden';
 import { regrow } from './core/regrow';
 import { confirmCard } from './ui/confirm';
 import { mountShotButton } from './ui/shotButton';
+import { mountUndoButtons } from './ui/undoButtons';
 
 const WORLD_SEED = 20261025;
 
@@ -344,7 +345,7 @@ const eraser = new EraseBrush(
   },
   (amount) => ambience.erase(amount),
 );
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, renderer, scene, fences, fenceBuilder, boulders, props });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -360,7 +361,11 @@ tools = new ToolController(
   pondBrush,
   eraser,
   (x, z) => ground.heightAt(x, z),
-  (action) => store.add(action),
+  (action) => {
+    store.add(action);
+    redoStack.length = 0;
+    refreshHistoryButtons();
+  },
   (tool) => {
     picker.setVisible(tool === 'flowers');
     stylePicker.setVisible(tool === 'fence');
@@ -369,6 +374,67 @@ tools = new ToolController(
   },
 );
 const controller = tools;
+
+// --- Undo / redo ---------------------------------------------------------------------------
+// The garden is its stroke list, so undoing is: drop the last stroke, put the garden back to
+// untouched, and quietly replay the rest, settled at once (no build-up, no sounds).
+const redoStack: Action[] = [];
+function rebuildInstantly() {
+  regrow.instant = true;
+  ambience.quiet = true;
+  for (const s of [paint, stones, edgePlants, paths, flowers, flowerBrush, ponds, pondPlants, fish, pondBrush, wildflowers, fences, fenceBuilder, boulders, rockBrush, bridgeBuilder, props]) s.reset();
+  for (const a of store.actions) controller.replay(a);
+  flowers.update(10);
+  for (let i = 0; i < 120; i++) {
+    const d = 0.1;
+    stones.update(d);
+    fences.update(d);
+    boulders.update(d);
+    props.update(d);
+    edgePlants.update(d);
+    pondPlants.update(d);
+    ponds.update(d);
+    fish.update(d);
+    wildflowers.update(d);
+    paint.update(d);
+    dust.update(d);
+    splash.update(d);
+  }
+  regrow.instant = false;
+  ambience.quiet = false;
+  renderer.shadowMap.needsUpdate = true;
+}
+if (debug) Object.assign(window, { rebuildInstantly });
+const refreshHistory = mountUndoButtons(
+  () => {
+    const last = store.actions.pop();
+    if (!last) return;
+    redoStack.push(last);
+    store.save();
+    rebuildInstantly();
+    // A puff where it was, and a soft brush of sound.
+    const pts = last.points;
+    for (let i = 0; i < pts.length; i += Math.max(2, Math.floor(pts.length / 12) * 2)) {
+      dust.puff(new THREE.Vector3(pts[i], ground.heightAt(pts[i], pts[i + 1]), pts[i + 1]), 3, 0.5);
+    }
+    ambience.erase(0.6);
+    toolbar.showLabel('Undone', 900);
+    refreshHistoryButtons();
+  },
+  () => {
+    const next = redoStack.pop();
+    if (!next) return;
+    // Redo plays it out again, just as it was first made.
+    store.add(next);
+    controller.replay(next);
+    ambience.tap(1.25);
+    toolbar.showLabel('Redone', 900);
+    refreshHistoryButtons();
+  },
+);
+function refreshHistoryButtons() {
+  refreshHistory(store.actions.length > 0, redoStack.length > 0);
+}
 
 // --- Post-processing ----------------------------------------------------------------------
 const post = new PostFX(renderer, scene, camera);
@@ -459,6 +525,7 @@ async function rebuild() {
   const shown = performance.now() - loadStart;
   await new Promise((r) => setTimeout(r, Math.max(0, 2300 - shown)));
   loading = false;
+  refreshHistoryButtons();
   canvas.classList.add('ready');
   const loader = document.getElementById('loader');
   loader?.classList.add('done');

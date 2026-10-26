@@ -223,6 +223,31 @@ export class Ponds {
     this.ripple = (this.ripple + 1) % RIPPLES;
   }
 
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    this.S.fill(NONE);
+    this.D.fill(0);
+    this.O.fill(0);
+    this.B.fill(NaN);
+    this.comp.fill(-1);
+    this.bodies.clear();
+    for (const [key, ch] of this.chunks) {
+      ch.basin.visible = false;
+      ch.water.visible = false;
+      this.spare.set(key, ch);
+    }
+    this.chunks.clear();
+    this.digging.clear();
+    for (let i = 0; i < N * N; i++) {
+      this.data[i * 4] = this.data[i * 4 + 1] = 0;
+      this.data[i * 4 + 2] = 255;
+    }
+    this.texDirty = true;
+    this.compsDirty = false;
+    this.stroking = false;
+    this.bounds = { i0: N, i1: -1, j0: N, j1: -1 };
+  }
+
   // --- Digging ---------------------------------------------------------------------------------
 
   beginStroke() {

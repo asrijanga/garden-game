@@ -21,7 +21,7 @@ const LILY_COLORS = ['#fbf7f1', '#fbf7f1', '#f4bfd0', '#f8dbe1'];
  * reeds and fish follow over the next few seconds.
  */
 export class PondBrush {
-  private readonly rng = createRng(2468);
+  private rng = createRng(2468);
   private readonly zones = createNoise2D(1357);
   private last: THREE.Vector2 | null = null;
   private dabs = 0;
@@ -40,6 +40,14 @@ export class PondBrush {
     /** Places a pond mustn't reach: the cottage, paths, flower beds, the woods. */
     private readonly blocked: (x: number, z: number) => boolean,
   ) {}
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    this.rng = createRng(2468);
+    this.last = null;
+    this.dabs = 0;
+    this.trail = [];
+  }
 
   begin(p: THREE.Vector3) {
     this.ponds.beginStroke();

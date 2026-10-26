@@ -86,7 +86,7 @@ export class EdgePlants {
   private readonly growing: Growing[] = [];
   private readonly all: Growing[] = [];
   private readonly wilting: { g: Growing; t: number }[] = [];
-  private readonly rng = createRng(77);
+  private rng = createRng(77);
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly e = new THREE.Euler();
@@ -118,6 +118,13 @@ export class EdgePlants {
     this.growing.push(g);
     this.all.push(g);
     this.write(g, 0.0001);
+  }
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    this.clover.count = this.daisies.count = 0;
+    this.growing.length = this.all.length = this.wilting.length = 0;
+    this.rng = createRng(77);
   }
 
   /** Plants within `r` of (x, z) shrink back into the lawn. Returns how many. */

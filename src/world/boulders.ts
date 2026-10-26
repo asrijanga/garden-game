@@ -79,7 +79,7 @@ export class Boulders {
   private readonly rocks: Rock[] = [];
   private readonly falling = new Set<Rock>();
   private readonly leaving: { rock: Rock; t: number }[] = [];
-  private readonly rng = createRng(2024);
+  private rng = createRng(2024);
   private readonly uniforms = { uMossTime: { value: 0 } };
   private readonly m = new THREE.Matrix4();
   private readonly s = new THREE.Vector3();
@@ -144,6 +144,15 @@ export class Boulders {
     }
   }
 
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    for (const m of this.meshes) m.count = 0;
+    this.rocks.length = 0;
+    this.falling.clear();
+    this.leaving.length = 0;
+    this.rng = createRng(2024);
+  }
+
   get busy(): boolean {
     return this.falling.size > 0 || this.leaving.length > 0;
   }
@@ -164,7 +173,7 @@ export class Boulders {
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     // Rocks rebuilt from a save are old friends: their moss is already grown.
     const moss = mesh.geometry.attributes.aMossStart as THREE.InstancedBufferAttribute;
-    moss.setX(index, regrow.offset > 0 ? -1e4 : this.uniforms.uMossTime.value + delay + this.rng() * 20);
+    moss.setX(index, regrow.offset > 0 || regrow.instant ? -1e4 : this.uniforms.uMossTime.value + delay + this.rng() * 20);
     moss.needsUpdate = true;
     const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler((this.rng() - 0.5) * 0.35, this.rng() * Math.PI * 2, (this.rng() - 0.5) * 0.35));
     const scale = new THREE.Vector3(size * lerp(0.85, 1.15, this.rng()), size * lerp(0.8, 1.2, this.rng()), size * lerp(0.85, 1.15, this.rng()));

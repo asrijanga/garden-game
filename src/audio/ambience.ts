@@ -21,6 +21,8 @@ const MASTER_VOLUME = 0.3;
 
 export class Ambience {
   private ctx: AudioContext | null = null;
+  /** Hush one-shot sounds (while the garden is rebuilt silently after an undo). */
+  quiet = false;
   private master: GainNode | null = null;
   private layers: {
     air: GainNode;
@@ -158,7 +160,7 @@ export class Ambience {
   /** A soft wooden "tock" for UI presses: quiet, warm, never clicky. */
   tap(pitch = 1) {
     const ctx = this.ctx;
-    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    if (!ctx || !this.master || this.muted || this.quiet || ctx.state !== 'running') return;
     const t = ctx.currentTime;
     const osc = ctx.createOscillator();
     osc.type = 'sine';
@@ -220,7 +222,7 @@ export class Ambience {
   /** A tiny, soft pentatonic "pling" as a flower opens. Rate-limited so a bed shimmers, not chatters. */
   bloom() {
     const ctx = this.ctx;
-    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    if (!ctx || !this.master || this.muted || this.quiet || ctx.state !== 'running') return;
     const t = ctx.currentTime;
     if (t - this.lastBloom < 0.16) return;
     this.lastBloom = t;
@@ -251,7 +253,7 @@ export class Ambience {
   /** A soft, earthy "tok" as a stone settles into the soil. */
   stone(size = 0.3) {
     const ctx = this.ctx;
-    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    if (!ctx || !this.master || this.muted || this.quiet || ctx.state !== 'running') return;
     const t = ctx.currentTime;
     if (t - this.lastStone < (size < 0.1 ? 0.11 : 0.06)) return;
     // Pebbles tick softly; bigger stones get the fuller "tok".
@@ -315,7 +317,7 @@ export class Ambience {
   /** A wooden "tock" as a fence post is knocked in (or a softer tap for boards). */
   wood(size = 1) {
     const ctx = this.ctx;
-    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    if (!ctx || !this.master || this.muted || this.quiet || ctx.state !== 'running') return;
     const t = ctx.currentTime;
     if (t - this.lastWood < (size < 0.5 ? 0.07 : 0.05)) return;
     this.lastWood = t;
@@ -342,7 +344,7 @@ export class Ambience {
   /** Leaves rustling as a hedge grows. */
   rustle() {
     const ctx = this.ctx;
-    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    if (!ctx || !this.master || this.muted || this.quiet || ctx.state !== 'running') return;
     const t = ctx.currentTime;
     if (t - this.lastRustle < 0.18) return;
     this.lastRustle = t;
@@ -366,7 +368,7 @@ export class Ambience {
   /** A soft, earthy "shff" as things sink back into the ground. */
   erase(amount = 0.5) {
     const ctx = this.ctx;
-    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    if (!ctx || !this.master || this.muted || this.quiet || ctx.state !== 'running') return;
     const t = ctx.currentTime;
     if (t - this.lastErase < 0.14) return;
     this.lastErase = t;
@@ -391,7 +393,7 @@ export class Ambience {
   /** A fish breaking the surface: a soft plop with a little spray. */
   splash(size = 1) {
     const ctx = this.ctx;
-    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    if (!ctx || !this.master || this.muted || this.quiet || ctx.state !== 'running') return;
     const t = ctx.currentTime;
     if (t - this.lastSplash < 0.1) return;
     this.lastSplash = t;
@@ -414,7 +416,7 @@ export class Ambience {
   /** Water welling up into a new pond: a soft, low trickle with the odd bubble, over a few seconds. */
   fill(seconds = 3.5) {
     const ctx = this.ctx;
-    if (!ctx || !this.master || this.muted || ctx.state !== 'running') return;
+    if (!ctx || !this.master || this.muted || this.quiet || ctx.state !== 'running') return;
     const t = ctx.currentTime + 0.6;
     const src = ctx.createBufferSource();
     src.buffer = this.noise(ctx);

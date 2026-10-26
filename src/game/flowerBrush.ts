@@ -31,7 +31,7 @@ const FOLIAGE_WINTER = ['#557a50', '#5f8459', '#4d7048'];
  */
 export class FlowerBrush {
   selected = MIX_ID;
-  private readonly rng = createRng(4321);
+  private rng = createRng(4321);
   private last: THREE.Vector2 | null = null;
   private strokeTime = 0;
   /** Every dab of every bed so far (centre + which stroke made it), and the stroke in progress. */
@@ -94,6 +94,17 @@ export class FlowerBrush {
     for (let i = this.beds.length - 1; i >= 0; i--) {
       if (Math.hypot(this.beds[i].c.x - x, this.beds[i].c.y - z) < r) this.beds.splice(i, 1);
     }
+  }
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    this.rng = createRng(4321);
+    this.last = null;
+    this.strokeTime = 0;
+    this.beds.length = 0;
+    this.stroke = [];
+    this.strokeId = 0;
+    this.foliageAt.clear();
   }
 
   /** After erasing along `path`: lay stones along the new edges of beds that were cut. */

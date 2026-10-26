@@ -13,7 +13,7 @@ const WOODS = ['#9a6a45', '#8c5e3c', '#a87650', '#946545', '#7f5638'];
  * one along a gentle arch, then posts and handrails following the curve.
  */
 export class BridgeBuilder {
-  private readonly rng = createRng(5151);
+  private rng = createRng(5151);
   private start: THREE.Vector2 | null = null;
   private to = new THREE.Vector2();
   private nextOwner = 1_000_000;
@@ -25,6 +25,13 @@ export class BridgeBuilder {
     private readonly waterDepth: (x: number, z: number) => number,
     private readonly onRefuse: (why: string) => void,
   ) {}
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    this.rng = createRng(5151);
+    this.start = null;
+    this.nextOwner = 1_000_000;
+  }
 
   begin(p: THREE.Vector3) {
     this.start = new THREE.Vector2(p.x, p.z);

@@ -59,6 +59,17 @@ export class Wildflowers {
     }
   }
 
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    for (let i = 0; i < this.positions.length; i++) {
+      this.scale[i] = this.target[i] = 1;
+      this.mesh.setMatrixAt(i, this.base[i]);
+    }
+    this.shrinking.clear();
+    this.delay.clear();
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
   update(dt: number) {
     if (!this.shrinking.size) return;
     const m = new THREE.Matrix4();

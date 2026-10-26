@@ -39,7 +39,7 @@ interface Segment {
  */
 export class FenceBuilder {
   style: FenceStyle = 'picket';
-  private readonly rng = createRng(6060);
+  private rng = createRng(6060);
   private readonly segments: Segment[] = [];
   private nextId = 1;
   private samples: THREE.Vector2[] = [];
@@ -55,6 +55,17 @@ export class FenceBuilder {
     /** Places a fence can't stand: ponds, flower beds, the cottage, the woods. */
     private readonly blocked: (x: number, z: number) => boolean,
   ) {}
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    this.rng = createRng(6060);
+    this.segments.length = 0;
+    this.nextId = 1;
+    this.samples = [];
+    this.lastPost = null;
+    this.delay = 0;
+    this.firstSegment = false;
+  }
 
   begin(p: THREE.Vector3) {
     const at = new THREE.Vector2(p.x, p.z);

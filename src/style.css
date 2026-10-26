@@ -452,3 +452,12 @@ body.picking .sound-hint {
   .tool { width: 46px; height: 46px; }
   .tool svg { width: 34px; height: 34px; }
 }
+
+/* --- Undo / redo ------------------------------------------------------------------------------ */
+.history-toggle {
+  right: auto;
+  padding: 10px;
+}
+.undo-toggle { left: calc(env(safe-area-inset-left, 0px) + 14px); }
+.redo-toggle { left: calc(env(safe-area-inset-left, 0px) + 70px); }
+.history-toggle.is-off { opacity: 0.35; }

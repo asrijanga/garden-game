@@ -137,7 +137,7 @@ export class PondPlants {
   private readonly items: Item[] = [];
   private readonly growing: Item[] = [];
   private readonly wilting: { it: Item; t: number }[] = [];
-  private readonly rng = createRng(606);
+  private rng = createRng(606);
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly e = new THREE.Euler();
@@ -201,6 +201,13 @@ export class PondPlants {
       it.gone = true;
       this.write(it, 0);
     }
+  }
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    for (const m of [...this.pads, this.lilies, ...this.reeds]) m.count = 0;
+    this.items.length = this.growing.length = this.wilting.length = 0;
+    this.rng = createRng(606);
   }
 
   /** Plants within `r` of (x, z) shrink away. Returns how many. */

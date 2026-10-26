@@ -109,7 +109,7 @@ export class Fish {
   private readonly meshes: THREE.InstancedMesh[] = [];
   private readonly swim: THREE.InstancedBufferAttribute[] = [];
   private readonly fish: Swimmer[] = [];
-  private readonly rng = createRng(808);
+  private rng = createRng(808);
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly e = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -147,6 +147,14 @@ export class Fish {
       this.swim.push(swim);
       this.group.add(mesh);
     });
+  }
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    for (const m of this.meshes) m.count = 0;
+    this.fish.length = 0;
+    this.rng = createRng(808);
+    this.nextJump = 5;
   }
 
   /** Make sure a pond has a few fish (more for bigger ponds), arriving after `delay` seconds. */

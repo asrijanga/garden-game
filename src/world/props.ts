@@ -203,7 +203,7 @@ interface Prop {
 export class Props {
   readonly group = new THREE.Group();
   private readonly props: Prop[] = [];
-  private readonly rng = createRng(3131);
+  private rng = createRng(3131);
   private readonly wood = new THREE.MeshLambertMaterial({ vertexColors: true });
   private readonly roof = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
   private readonly glow = new THREE.MeshLambertMaterial({ color: '#3a2a1a', emissive: '#ffc277', emissiveIntensity: 1.7, transparent: true, opacity: 0.92 });
@@ -233,6 +233,13 @@ export class Props {
         }),
       ),
     };
+  }
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    for (const p of this.props) this.group.remove(p.group);
+    this.props.length = 0;
+    this.rng = createRng(3131);
   }
 
   get busy(): boolean {

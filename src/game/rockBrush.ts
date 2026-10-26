@@ -10,7 +10,7 @@ const SCATTER = 0.9; // metres between rocks along a dragged line
  * nestled round its foot; dragging scatters a natural rocky line of mixed sizes.
  */
 export class RockBrush {
-  private readonly rng = createRng(8080);
+  private rng = createRng(8080);
   private last: THREE.Vector2 | null = null;
   private start = new THREE.Vector2();
   private travelled = 0;
@@ -23,6 +23,12 @@ export class RockBrush {
     /** Places a rock can't go: paths, ponds, the cottage, the woods. */
     private readonly blocked: (x: number, z: number) => boolean,
   ) {}
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    this.rng = createRng(8080);
+    this.last = null;
+  }
 
   begin(p: THREE.Vector3) {
     this.last = new THREE.Vector2(p.x, p.z);

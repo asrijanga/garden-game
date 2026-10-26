@@ -197,7 +197,7 @@ export class Fences {
   private readonly parts = new Map<number, Part>();
   private readonly moving = new Set<Part>();
   private readonly leaving: { part: Part; t: number }[] = [];
-  private readonly rng = createRng(1717);
+  private rng = createRng(1717);
   private nextId = 1;
   private readonly m = new THREE.Matrix4();
   private readonly s = new THREE.Vector3();
@@ -248,6 +248,16 @@ export class Fences {
       }
       this.meshes.set(shape, list);
     });
+  }
+
+  /** Back to an untouched garden (before an undo replays what remains). */
+  reset() {
+    for (const list of this.meshes.values()) for (const m of list) m.count = 0;
+    this.parts.clear();
+    this.moving.clear();
+    this.leaving.length = 0;
+    this.rng = createRng(1717);
+    this.nextId = 1;
   }
 
   /** Is anything still arriving or leaving (so shadows need redrawing)? */
