@@ -436,7 +436,8 @@ export class Cottage {
     if (st.wisteria) {
       // A gnarled trunk up the right corner, then a long arm under the eave, racemes hanging.
       const x0 = W / 2 - 0.14;
-      out.push({ kind: 'wisteria', face, seed: this.seed + 111, points: world([[x0, 0.05, front], [x0 - 0.04, 0.8, front], [x0 + 0.02, 1.6, front], [x0 - 0.05, eave, front], [x0 - 1.2, eave + 0.03, front], [x0 - 2.4, eave - 0.02, front], [x0 - 3.4, eave + 0.02, front], [-W / 2 + 0.2, eave, front]]) });
+      const arm = eave - 0.22; // low enough that the flowers hang below the eave
+      out.push({ kind: 'wisteria', face, seed: this.seed + 111, points: world([[x0, 0.05, front], [x0 - 0.04, 0.8, front], [x0 + 0.02, 1.6, front], [x0 - 0.05, arm, front], [x0 - 1.2, arm + 0.04, front], [x0 - 2.4, arm - 0.03, front], [x0 - 3.4, arm + 0.03, front], [-W / 2 + 0.2, arm, front]]) });
     }
     return out;
   }
