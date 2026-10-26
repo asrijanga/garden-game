@@ -1,6 +1,6 @@
-import type { FenceStyle } from '../world/fences';
+import type { BuildStyle } from '../game/tools';
 
-const STYLES: { id: FenceStyle; label: string; icon: string }[] = [
+const STYLES: { id: BuildStyle; label: string; icon: string }[] = [
   {
     id: 'picket',
     label: 'Picket fence',
@@ -25,14 +25,23 @@ const STYLES: { id: FenceStyle; label: string; icon: string }[] = [
       <path d="M9 18c2-1 4-1 6 0M18 22c2-1 4-1 6 0M26 17c2-1 4-1 5 0M11 27c2-1 4-1 6 0" stroke="#78ad55" stroke-width="1.6" stroke-linecap="round"/>
     </svg>`,
   },
+  {
+    id: 'rocks',
+    label: 'Rocks',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M6 33c0-8 4-15 11-16 6-1 10 3 12 8 1 3 1 6 0 8z" fill="#a9a196" stroke="#6f685f" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M11 22c3-3 8-4 12-2" stroke="#7fa64a" stroke-width="3" stroke-linecap="round" opacity=".85"/>
+      <path d="M27 33c0-4 2-7 5-7s4 3 4 7z" fill="#bdb5a9" stroke="#6f685f" stroke-width="1.3" stroke-linejoin="round"/>
+    </svg>`,
+  },
 ];
 
 /** Style chips for the fence tool, floating above the toolbar (same look as the flower picker). */
 export class StylePicker {
   private readonly el: HTMLDivElement;
-  private readonly chips = new Map<FenceStyle, HTMLButtonElement>();
+  private readonly chips = new Map<BuildStyle, HTMLButtonElement>();
 
-  constructor(private readonly onPick: (style: FenceStyle, label: string) => void) {
+  constructor(private readonly onPick: (style: BuildStyle, label: string) => void) {
     this.el = document.createElement('div');
     this.el.className = 'flower-picker';
     const row = document.createElement('div');
@@ -57,7 +66,7 @@ export class StylePicker {
     this.select('picket');
   }
 
-  select(id: FenceStyle) {
+  select(id: BuildStyle) {
     for (const [cid, b] of this.chips) b.classList.toggle('active', cid === id);
   }
 

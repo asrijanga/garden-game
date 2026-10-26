@@ -24,6 +24,8 @@ import { EraseBrush } from './game/eraseBrush';
 import { FenceBuilder } from './game/fenceBuilder';
 import { Fences } from './world/fences';
 import { StylePicker } from './ui/stylePicker';
+import { Boulders } from './world/boulders';
+import { RockBrush } from './game/rockBrush';
 import { createMotes } from './world/motes';
 import { FlyingBirds } from './world/flyingBirds';
 import { currentSeason, PALETTES } from './world/season';
@@ -214,6 +216,18 @@ const fenceBuilder = new FenceBuilder(
   (x, z) => paths.distanceToPaths(x, z),
   (x, z) => cottage.contains(x, z, 0.3) || ground.forestness(x, z) > 0.45 || ponds.contains(x, z, 0.3) || flowerBrush.distanceToBeds(x, z) < -0.1,
 );
+// Rocks and boulders: a thud (deeper for bigger stones) and a puff of dust as each settles.
+const boulders = new Boulders((at, size) => {
+  dust.puff(at, Math.round(3 + size * 4), 0.3 + size * 0.4);
+  ambience.stone(Math.min(0.6, 0.25 + size * 0.35));
+});
+scene.add(boulders.group);
+const rockBrush = new RockBrush(
+  boulders,
+  wildflowers,
+  (x, z) => ground.heightAt(x, z),
+  (x, z) => cottage.contains(x, z, 0.5) || ground.forestness(x, z) > 0.45 || paths.distanceToPaths(x, z) < 1.0 || ponds.contains(x, z, -0.4),
+);
 // A path drawn across a fence opens a gate in it.
 let pathTrail: THREE.Vector2[] = [];
 const pathBrush = {
@@ -267,7 +281,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) store.save();
 });
 const stylePicker = new StylePicker((style, label) => {
-  fenceBuilder.style = style;
+  if (tools) tools.buildStyle = style;
   ambience.tap(1.1);
   toolbar.showLabel(label, 1600);
 });
@@ -288,13 +302,13 @@ const eraser = new EraseBrush(
     dust,
     paths,
     beds: flowerBrush,
-    fences: fenceBuilder,
+    fences: { erase: (x, z, r) => [...fenceBuilder.erase(x, z, r), ...boulders.erase(x, z, r)] },
     heightAt: (x, z) => ground.heightAt(x, z),
     occupied: (x, z) => cottage.contains(x, z, 0.4) || paths.distanceToPaths(x, z) < 1.0 || flowerBrush.distanceToBeds(x, z) < 0.15 || ponds.contains(x, z, 0.4),
   },
   (amount) => ambience.erase(amount),
 );
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, renderer, scene, fences, fenceBuilder });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, renderer, scene, fences, fenceBuilder, boulders });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -303,6 +317,7 @@ tools = new ToolController(
   marker,
   pathBrush,
   fenceBuilder,
+  rockBrush,
   flowerBrush,
   pondBrush,
   eraser,
@@ -432,6 +447,7 @@ function frame(time: number) {
   if (!loading) {
     stones.update(dt);
     fences.update(dt);
+    boulders.update(dt);
     edgePlants.update(dt);
     flowers.update(dt);
     bees.update(dt);
@@ -448,7 +464,7 @@ function frame(time: number) {
   ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));
   const buzz = bees.buzzNear(camera.position);
   ambience.buzz(buzz.level, buzz.pitch);
-  if (stones.busy || pondPlants.busy || fences.busy) renderer.shadowMap.needsUpdate = true;
+  if (stones.busy || pondPlants.busy || fences.busy || boulders.busy) renderer.shadowMap.needsUpdate = true;
   post.render(dt);
 }
 

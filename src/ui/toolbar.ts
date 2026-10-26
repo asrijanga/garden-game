@@ -5,7 +5,7 @@ export type Tool = 'move' | 'path' | 'fence' | 'flowers' | 'pond' | 'erase';
 const TOOLS: { id: Tool; label: string }[] = [
   { id: 'move', label: 'Look around' },
   { id: 'path', label: 'Path' },
-  { id: 'fence', label: 'Fences & hedges' },
+  { id: 'fence', label: 'Build' },
   { id: 'flowers', label: 'Flowers' },
   { id: 'pond', label: 'Pond' },
   { id: 'erase', label: 'Tidy up' },
