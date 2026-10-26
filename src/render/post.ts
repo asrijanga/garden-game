@@ -69,6 +69,8 @@ uniform sampler2D tBloom;
 uniform float uBloom;
 uniform vec3 uLift, uGain;
 uniform float uSaturation, uVignette, uAspect;
+uniform vec2 uTexel;
+uniform float uSharpen;
 varying vec2 vUv;
 vec3 neutral(vec3 color) {
   const float startCompression = 0.8 - 0.04;
@@ -88,7 +90,17 @@ vec3 toSRGB(vec3 c) {
   return mix(c * 12.92, pow(c, vec3(0.41666)) * 1.055 - 0.055, step(0.0031308, c));
 }
 void main() {
-  vec3 c = texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * uBloom;
+  // Gentle contrast-aware sharpening: the screen shows this image upscaled (phone screens are
+  // 3x), so lift fine detail back, clamped to the neighbourhood so edges never ring or halo.
+  vec3 c = texture2D(tScene, vUv).rgb;
+  vec3 n = texture2D(tScene, vUv + vec2(0.0, uTexel.y)).rgb;
+  vec3 s = texture2D(tScene, vUv - vec2(0.0, uTexel.y)).rgb;
+  vec3 e = texture2D(tScene, vUv + vec2(uTexel.x, 0.0)).rgb;
+  vec3 w = texture2D(tScene, vUv - vec2(uTexel.x, 0.0)).rgb;
+  vec3 lo = min(c, min(min(n, s), min(e, w)));
+  vec3 hi = max(c, max(max(n, s), max(e, w)));
+  c = clamp(c + (c - (n + s + e + w) * 0.25) * uSharpen, lo, hi);
+  c += texture2D(tBloom, vUv).rgb * uBloom;
   c = toSRGB(clamp(neutral(c), 0.0, 1.0));
   // Lift shadows toward a warm brown so darks never go dead black.
   c = uLift * 0.35 + c * (uGain - uLift * 0.35);
@@ -134,6 +146,8 @@ export class PostFX {
     uSaturation: { value: 1.08 },
     uVignette: { value: 0.22 },
     uAspect: { value: 1 },
+    uTexel: { value: new THREE.Vector2(1, 1) },
+    uSharpen: { value: 0.6 },
   });
   private samples = 4;
   bloomEnabled = true;
@@ -173,6 +187,10 @@ export class PostFX {
       this.upRTs[i].setSize(Math.ceil(w / k), Math.ceil(h / k));
     }
     this.final.uniforms.uAspect.value = width / height;
+    this.final.uniforms.uTexel.value.set(1 / w, 1 / h);
+    // Sharpen more the more the screen will stretch the picture.
+    const stretch = Math.max(1, (window.devicePixelRatio || 1) / pixelRatio);
+    this.final.uniforms.uSharpen.value = Math.min(1.0, 0.45 + (stretch - 1) * 0.6);
   }
 
   private blit(mat: THREE.ShaderMaterial, to: THREE.WebGLRenderTarget | null) {

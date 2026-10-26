@@ -6,11 +6,15 @@ export interface QualityTier {
   bloom: boolean;
 }
 
-/** Best first. Phones start at 1.5×; only the first four are chosen automatically. */
+/**
+ * Best first. Phones start at 1.75× and climb to 2× when frames stay steady; only the first
+ * five are chosen automatically. (Phone screens are 3×; the final pass sharpens the upscale.)
+ */
 export const TIERS: QualityTier[] = [
+  { pixelRatio: 2.0, samples: 4, bloom: true },
   { pixelRatio: 1.75, samples: 4, bloom: true },
   { pixelRatio: 1.5, samples: 4, bloom: true },
-  { pixelRatio: 1.3, samples: 4, bloom: true },
+  { pixelRatio: 1.35, samples: 4, bloom: true },
   { pixelRatio: 1.2, samples: 4, bloom: true },
   // Debugging only (`?q=4`, `?q=5`): below this the picture looks soft and pixelated.
   { pixelRatio: 1.0, samples: 2, bloom: false },
@@ -18,7 +22,7 @@ export const TIERS: QualityTier[] = [
 ];
 
 /** The lowest tier the game picks on its own: it never trades away a crisp picture. */
-const AUTO_FLOOR = 3;
+const AUTO_FLOOR = 4;
 const WINDOW = 60; // frames per measurement (~1 s)
 
 /**
@@ -30,7 +34,6 @@ const WINDOW = 60; // frames per measurement (~1 s)
  */
 export class Quality {
   tier: number;
-  private readonly start: number;
   private samples: number[] = [];
   private slow = 0;
   private skip = 2;
@@ -44,7 +47,7 @@ export class Quality {
     private readonly apply: (tier: QualityTier, index: number) => void,
     private readonly locked = false,
   ) {
-    this.start = this.tier = Math.min(TIERS.length - 1, Math.max(0, start));
+    this.tier = Math.min(TIERS.length - 1, Math.max(0, start));
     apply(TIERS[this.tier], this.tier);
   }
 
@@ -77,7 +80,7 @@ export class Quality {
     if (this.probing > 0) this.probing--;
     // Steady at 60fps: after a while, see whether a sharper picture holds too.
     this.steadyFor += seconds;
-    if (this.tier > this.start && this.steadyFor > this.probeAfter) {
+    if (this.tier > 0 && this.steadyFor > this.probeAfter) {
       this.set(this.tier - 1);
       this.probing = 6;
     }

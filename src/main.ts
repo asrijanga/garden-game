@@ -68,7 +68,7 @@ renderer.shadowMap.needsUpdate = true;
 
 // Render resolution comes from the adaptive quality tier (phones have 3x screens; ~1.5x plus
 // post-processing looks just as soft). Never above the screen's own.
-let tierPixelRatio = 1.5;
+let tierPixelRatio = 1.75;
 const pixelRatio = () => Math.min(window.devicePixelRatio || 1, tierPixelRatio);
 
 // --- World ------------------------------------------------------------------------------
@@ -302,7 +302,7 @@ started = true;
 const params = new URLSearchParams(location.search);
 const fixedTier = params.get('q');
 const quality = new Quality(
-  fixedTier !== null ? +fixedTier : 1,
+  fixedTier !== null ? +fixedTier : 1, // 1.75×, climbing to 2× when the device keeps up
   (tier) => {
     tierPixelRatio = tier.pixelRatio;
     post.setSamples(tier.samples);
@@ -318,7 +318,7 @@ let recentFps = 60;
 mountShotButton(
   () => {
     const keep = tierPixelRatio;
-    tierPixelRatio = Math.min(window.devicePixelRatio || 1, 2.5);
+    tierPixelRatio = Math.min(window.devicePixelRatio || 1, 3);
     resize();
     post.render(0);
     const url = canvas.toDataURL('image/jpeg', 0.92);
