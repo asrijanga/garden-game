@@ -37,29 +37,50 @@ interface Kind {
   glass?: boolean;
 }
 
-function wingPath(s: Shape): Path2D {
-  const p = new Path2D();
+/** The wing's area, and (as `outer`) just its outer edges, for painting a margin along them. */
+type Wing = Path2D & { outer: Path2D };
+
+function wingPath(s: Shape): Wing {
+  const p = new Path2D() as Wing;
+  const outer = new Path2D();
   const fx = s.fore * 124;
   const fy = 10 + (1 - s.sweep) * 14;
   // Forewing: leading edge out to the tip, the outer edge down, back along the body.
-  p.moveTo(2, 50);
-  p.bezierCurveTo(fx * 0.35, 18, fx * 0.75, fy - 4, fx, fy);
-  p.bezierCurveTo(fx * 1.02, fy + 22, fx * 0.85, 62, fx * 0.62, 70);
-  p.lineTo(2, 64);
-  p.closePath();
-  // Hindwing: rounder, below.
+  const fore = (q: Path2D, close: boolean) => {
+    q.moveTo(2, 50);
+    q.bezierCurveTo(fx * 0.35, 18, fx * 0.75, fy - 4, fx, fy);
+    q.bezierCurveTo(fx * 1.02, fy + 22, fx * 0.85, 62, fx * 0.62, 70);
+    if (close) {
+      q.lineTo(2, 64);
+      q.closePath();
+    }
+  };
+  // Hindwing: rounder, below (its top edge tucks under the forewing).
   const hx = s.hind * 112;
-  p.moveTo(2, 60);
-  p.bezierCurveTo(hx * 0.6, 58, hx, 66 + s.round * 4, hx * 0.95, 82 + s.round * 8);
-  if (s.tail) {
-    p.bezierCurveTo(hx * 0.85, 98, hx * 0.62, 104, hx * 0.55, 108);
-    p.lineTo(hx * 0.5, 126); // the swallowtail's tail
-    p.lineTo(hx * 0.42, 108);
-    p.bezierCurveTo(hx * 0.3, 106, 10, 98, 3, 88);
-  } else {
-    p.bezierCurveTo(hx * 0.85, 100 + s.round * 10, hx * 0.35, 104 + s.round * 8, 3, 88);
-  }
-  p.closePath();
+  const hind = (q: Path2D, close: boolean) => {
+    if (close) {
+      q.moveTo(2, 60);
+      q.bezierCurveTo(hx * 0.6, 58, hx, 66 + s.round * 4, hx * 0.95, 82 + s.round * 8);
+    } else {
+      // Only the part of the edge that shows below the forewing.
+      q.moveTo(hx * 0.9, 68 + s.round * 3);
+      q.bezierCurveTo(hx * 0.98, 72 + s.round * 4, hx, 76 + s.round * 6, hx * 0.95, 82 + s.round * 8);
+    }
+    if (s.tail) {
+      q.bezierCurveTo(hx * 0.85, 98, hx * 0.62, 104, hx * 0.55, 108);
+      q.lineTo(hx * 0.5, 126); // the swallowtail's tail
+      q.lineTo(hx * 0.42, 108);
+      q.bezierCurveTo(hx * 0.3, 106, 10, 98, 3, 88);
+    } else {
+      q.bezierCurveTo(hx * 0.85, 100 + s.round * 10, hx * 0.35, 104 + s.round * 8, 3, 88);
+    }
+    if (close) q.closePath();
+  };
+  fore(p, true);
+  hind(p, true);
+  fore(outer, false);
+  hind(outer, false);
+  p.outer = outer;
   return p;
 }
 
@@ -74,7 +95,8 @@ const border = (c: Ctx, p: Path2D, w: number, col: string) => {
   c.clip(p);
   c.strokeStyle = col;
   c.lineWidth = w * 2;
-  c.stroke(p);
+  c.lineJoin = 'round';
+  c.stroke((p as Wing).outer ?? p);
   c.restore();
 };
 const veins = (c: Ctx, p: Path2D, col: string, w = 1.6) => {
