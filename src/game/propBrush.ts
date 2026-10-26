@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import type { Props, Prop, PropKind } from '../world/props';
 
 /** How close to a path's centre line each prop may stand (beside the gravel, not on it). */
-const PATH_CLEAR: Record<PropKind, number> = { bench: 1.05, lantern: 0.8, birdhouse: 0.9, gazebo: 2.6 };
+const PATH_CLEAR: Record<PropKind, number> = { bench: 1.05, lantern: 0.8, birdhouse: 0.9, gazebo: 2.6, flag: 0.8, chimes: 0.85 };
 /** How much room each prop needs around it. */
-const FOOTPRINT: Record<PropKind, number> = { bench: 0.6, lantern: 0.4, birdhouse: 0.4, gazebo: 2.0 };
+const FOOTPRINT: Record<PropKind, number> = { bench: 0.6, lantern: 0.4, birdhouse: 0.4, gazebo: 2.0, flag: 0.4, chimes: 0.45 };
 
 /**
  * Places garden props. Touch to pick one up where your finger is; slide to move it (it turns to

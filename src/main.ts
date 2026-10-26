@@ -305,6 +305,14 @@ const props = new Props((_kind, at, piece) => {
   ambience.wood(0.8);
 });
 scene.add(props.group);
+// Wind chimes ring softer the further the view is from them.
+const ringChime = (freq: number, volume: number, at: THREE.Vector3) => {
+  const d = at.distanceTo(camera.position);
+  ambience.chime(freq, volume * Math.min(1, Math.max(0.12, 1.4 - d / 30)));
+};
+props.wind = wind;
+props.onChime = ringChime;
+cottage.onChime = ringChime;
 const propBrush = new PropBrush(
   props,
   (x, z) => ground.heightAt(x, z),

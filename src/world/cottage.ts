@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { createRng, lerp } from '../core/random';
 import type { WindField } from '../render/wind';
 import type { SeasonPalette } from './season';
+import { ChimeSet } from './chimes';
 
 const W = 4.6; // wall length (along local x)
 const D = 3.4; // wall depth (along local z)
@@ -26,6 +27,7 @@ export interface CottageStyle {
   boxes: boolean;
   roses: boolean;
   shed: boolean;
+  chimes: boolean;
 }
 
 export const ROOFS = [
@@ -60,11 +62,11 @@ export const DOORS = [
 ];
 export const CHIMNEYS = ['Stone', 'Brick', 'White with pot'];
 
-export const DEFAULT_STYLE: CottageStyle = { roof: 0, walls: 0, shutters: 0, door: 0, chimney: 0, porch: false, bay: false, boxes: true, roses: false, shed: false };
+export const DEFAULT_STYLE: CottageStyle = { roof: 0, walls: 0, shutters: 0, door: 0, chimney: 0, porch: false, bay: false, boxes: true, roses: false, shed: false, chimes: false };
 
 /** Compact text form for saving: five digits, then the upgrades' letters. */
 export function encodeStyle(s: CottageStyle): string {
-  const ups = (s.porch ? 'p' : '') + (s.bay ? 'b' : '') + (s.boxes ? 'f' : '') + (s.roses ? 'r' : '') + (s.shed ? 's' : '');
+  const ups = (s.porch ? 'p' : '') + (s.bay ? 'b' : '') + (s.boxes ? 'f' : '') + (s.roses ? 'r' : '') + (s.shed ? 's' : '') + (s.chimes ? 'w' : '');
   return `${s.roof}${s.walls}${s.shutters}${s.door}${s.chimney}:${ups}`;
 }
 
@@ -82,6 +84,7 @@ export function decodeStyle(text: string): CottageStyle {
     boxes: ups.includes('f'),
     roses: ups.includes('r'),
     shed: ups.includes('s'),
+    chimes: ups.includes('w'),
   };
 }
 
@@ -96,6 +99,9 @@ export class Cottage {
   private readonly yaw: number;
   private readonly flowerTints: THREE.Color[];
   private bounce = 1;
+  private chimeSet: ChimeSet | null = null;
+  /** A chime on the eaves rang (frequency, 0–1 loudness, where). */
+  onChime: (freq: number, volume: number, at: THREE.Vector3) => void = () => {};
 
   constructor(
     readonly position: THREE.Vector3,
@@ -394,6 +400,19 @@ export class Cottage {
       g.add(sh);
     }
 
+    this.chimeSet = null;
+    if (st.chimes) {
+      // Wind chimes hung from a little iron bracket under the front eave, by the door.
+      const bx = -W / 2 + 0.45;
+      const by = BASE_H + WALL_H - 0.12;
+      box(0.03, 0.03, 0.42, lambert('#2f2b28'), bx, by, D / 2 + 0.2);
+      const set = new ChimeSet(this.seed + 9, (f, v, at) => this.onChime(f, v, at));
+      set.group.position.set(bx, by - 0.04, D / 2 + 0.38);
+      set.group.scale.setScalar(0.9);
+      g.add(set.group);
+      this.chimeSet = set;
+    }
+
     g.traverse((o) => {
       if (o instanceof THREE.Mesh) {
         o.castShadow = true;
@@ -430,6 +449,7 @@ export class Cottage {
 
   update(dt: number, wind: WindField) {
     this.smoke.update(dt, wind);
+    this.chimeSet?.update(dt, wind.direction, wind.sample(this.position.x, this.position.z + 2));
     if (this.bounce < 1) {
       // A happy little bounce when it's been given a new look.
       this.bounce = Math.min(1, this.bounce + dt / 0.7);

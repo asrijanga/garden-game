@@ -1,7 +1,7 @@
 import { CHIMNEYS, DOORS, ROOFS, SHUTTERS, WALLS, type CottageStyle } from '../world/cottage';
 
 type Cycle = 'roof' | 'walls' | 'shutters' | 'door' | 'chimney';
-type Toggle = 'porch' | 'bay' | 'boxes' | 'roses' | 'shed';
+type Toggle = 'porch' | 'bay' | 'boxes' | 'roses' | 'shed' | 'chimes';
 
 const swatch = (c: string, shape = 'roof') =>
   shape === 'roof'
@@ -19,6 +19,7 @@ const ICON: Record<Toggle, string> = {
   bay: `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 14h28l-3-5H9z" fill="#5f6872"/><path d="M8 14h24v15H8z" fill="#ffd38a" stroke="#efe6d6" stroke-width="2"/><path d="M14 14v15M26 14v15" stroke="#efe6d6" stroke-width="2"/><rect x="6" y="29" width="28" height="5" fill="#f1e3c8"/></svg>`,
   boxes: `<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="8" width="22" height="14" fill="#ffd38a" stroke="#efe6d6" stroke-width="2"/><rect x="7" y="25" width="26" height="7" rx="1.5" fill="#7a5236"/><circle cx="12" cy="24" r="3" fill="#e46f86"/><circle cx="19" cy="23" r="3" fill="#f0b73d"/><circle cx="26" cy="24" r="3" fill="#c78bc9"/><circle cx="31" cy="23.5" r="2.4" fill="#5f8a3e"/></svg>`,
   roses: `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M12 36c4-8-3-14 3-22s9-6 11-10" stroke="#4f7f33" stroke-width="2.4" fill="none" stroke-linecap="round"/><circle cx="14" cy="27" r="3.4" fill="#e46f86"/><circle cx="19" cy="16" r="3.4" fill="#c9405c"/><circle cx="26" cy="8" r="3" fill="#f2a0b2"/><circle cx="11" cy="20" r="2.4" fill="#6fa848"/></svg>`,
+  chimes: `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 9h28" stroke="#a65a41" stroke-width="4" stroke-linecap="round"/><path d="M20 11v3" stroke="#2f2b28" stroke-width="1.6"/><rect x="14" y="14" width="12" height="2.2" rx="1" fill="#8a6a4a"/>${[16, 19, 22, 25].map((x, i) => `<rect x="${x - 0.9}" y="17" width="1.8" height="${13 - i * 2.2}" rx=".9" fill="#c9c3b6" stroke="#8f897c" stroke-width=".6"/>`).join('')}</svg>`,
   shed: `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 14l30-6v5L5 19z" fill="#5f6872"/><rect x="7" y="17" width="26" height="17" fill="#8a6a4a"/><rect x="16" y="22" width="8" height="12" fill="#6e5338"/><path d="M11 17v17M29 15v19" stroke="#6e5338" stroke-width="1"/></svg>`,
 };
 
@@ -35,6 +36,7 @@ const TOGGLES: { id: Toggle; label: string }[] = [
   { id: 'boxes', label: 'Flower boxes' },
   { id: 'roses', label: 'Roses' },
   { id: 'shed', label: 'Shed' },
+  { id: 'chimes', label: 'Wind chimes' },
 ];
 
 /**

@@ -88,6 +88,27 @@ export const DECOR_CHIPS: { id: PropKind; label: string; icon: string }[] = [
     </svg>`,
   },
   {
+    id: 'flag',
+    label: 'Flag',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M9 36V5" stroke="#efe9de" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M9 36V5" stroke="#a8a094" stroke-width=".8"/>
+      <circle cx="9" cy="4" r="2" fill="#d9b45a"/>
+      <path d="M10 7c6 1 10-1 16 1s7 3 10 4c-4 1-8 1-12 3s-9 2-14 2z" fill="#e9a6a0" stroke="#b87570" stroke-width="1.2" stroke-linejoin="round"/>
+      <path d="M10 12c6 0 10-1 15 0" stroke="#f6e8d6" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+    </svg>`,
+  },
+  {
+    id: 'chimes',
+    label: 'Wind chimes',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M8 37V8a6 6 0 0 1 12 0v2" stroke="#2f2b28" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <rect x="15" y="11" width="11" height="2.4" rx="1" fill="#8a6a4a"/>
+      ${[16.5, 19.5, 22.5, 25].map((x, i) => `<rect x="${x - 0.9}" y="14" width="1.8" height="${14 - i * 2.4}" rx=".9" fill="#c9c3b6" stroke="#8f897c" stroke-width=".6"/>`).join('')}
+      <path d="M20.5 14v14" stroke="#d9d2c4" stroke-width=".6"/><rect x="18.5" y="28" width="4" height="6" rx="1" fill="#8a6a4a"/>
+    </svg>`,
+  },
+  {
     id: 'birdhouse',
     label: 'Birdhouse',
     icon: `<svg viewBox="0 0 40 40" aria-hidden="true">

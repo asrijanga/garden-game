@@ -312,6 +312,32 @@ export class Ambience {
     osc.stop(at + 0.15);
   }
 
+  /** One wind-chime tube: a soft metallic ring (slightly inharmonic partials) that hangs in the air. */
+  chime(freq: number, volume: number) {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || this.muted || this.quiet || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const out = ctx.createGain();
+    out.gain.value = 0.11 * volume;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 6000;
+    out.connect(lp).connect(this.master);
+    // Tube modes ring at about 1, 2.76, 5.4 and 8.9 times the fundamental, the high ones dying first.
+    for (const [mult, gain, decay] of [[1, 1, 3.2], [2.76, 0.5, 1.8], [5.4, 0.22, 0.9], [8.93, 0.08, 0.5]] as const) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = freq * mult;
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0, t);
+      env.gain.linearRampToValueAtTime(gain, t + 0.004);
+      env.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+      osc.connect(env).connect(out);
+      osc.start(t);
+      osc.stop(t + decay + 0.05);
+    }
+  }
+
   private lastWood = 0;
 
   /** A wooden "tock" as a fence post is knocked in (or a softer tap for boards). */

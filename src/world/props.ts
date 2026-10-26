@@ -3,8 +3,11 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import { regrow } from '../core/regrow';
+import type { WindField } from '../render/wind';
+import { Flag } from './flag';
+import { ChimeSet } from './chimes';
 
-export type PropKind = 'bench' | 'lantern' | 'birdhouse' | 'gazebo';
+export type PropKind = 'bench' | 'lantern' | 'birdhouse' | 'gazebo' | 'flag' | 'chimes';
 
 type Rng = () => number;
 
@@ -180,6 +183,38 @@ function gazeboPieces(rng: Rng): { geo: THREE.BufferGeometry; roof?: boolean }[]
   return pieces;
 }
 
+/** A white flagpole, ~2.6 m, with a gold ball on top. Origin at its foot. */
+function flagpoleGeometry(rng: Rng): THREE.BufferGeometry {
+  const white = new THREE.Color('#f3efe7');
+  const h = lerp(2.45, 2.7, rng());
+  return mergeGeometries([
+    paint(new THREE.CylinderGeometry(0.1, 0.13, 0.12, 10).translate(0, 0.06, 0), new THREE.Color('#9a958c')),
+    paint(new THREE.CylinderGeometry(0.022, 0.032, h, 8).translate(0, h / 2, 0), white),
+    paint(new THREE.SphereGeometry(0.045, 10, 8).translate(0, h + 0.03, 0), new THREE.Color('#d9b45a')),
+  ]);
+}
+
+/** An iron shepherd's-hook post (~2 m) for hanging wind chimes from its crook at +x. */
+function hookGeometry(): THREE.BufferGeometry {
+  const iron = new THREE.Color('#2f2b28');
+  const crook = new THREE.TorusGeometry(0.17, 0.014, 6, 16, Math.PI);
+  crook.translate(0.17, 1.95, 0);
+  return mergeGeometries([
+    paint(new THREE.CylinderGeometry(0.018, 0.02, 1.95, 8).translate(0, 0.975, 0), iron),
+    paint(crook, iron),
+    paint(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 6).translate(0.34, 1.91, 0), iron),
+  ]);
+}
+
+/** Gentle pennant colourways: two or three soft bands each. */
+const FLAG_COLOURS = [
+  ['#e9a6a0', '#f6e8d6'],
+  ['#9cc3d5', '#f4efe6', '#9cc3d5'],
+  ['#e6c66a', '#f4ead2'],
+  ['#a9c49a', '#f2ecdf', '#d99aa6'],
+  ['#b8a7d6', '#f3ece4'],
+];
+
 interface Prop {
   kind: PropKind;
   group: THREE.Group;
@@ -189,6 +224,8 @@ interface Prop {
   t: number | null;
   delay: number;
   landed: boolean;
+  /** Something that moves with the wind (a flag's cloth, a set of chimes). */
+  anim?: { update(dt: number, dir: THREE.Vector2, strength: number): void };
   /** Seconds since a self-assembling prop (the gazebo) touched down. */
   assemble?: number;
   gone?: boolean;
@@ -209,6 +246,10 @@ export class Props {
   private readonly glow = new THREE.MeshLambertMaterial({ color: '#3a2a1a', emissive: '#ffc277', emissiveIntensity: 1.7, transparent: true, opacity: 0.92 });
   private readonly variants: Record<PropKind, (() => THREE.Mesh[])[]>;
   private time = 0;
+  /** The garden's wind, which flags and chimes answer to. */
+  wind: WindField | null = null;
+  /** A chime tube rang (frequency, 0–1 loudness, where). */
+  onChime: (freq: number, volume: number, at: THREE.Vector3) => void = () => {};
 
   constructor(private readonly onLand: (kind: PropKind, at: THREE.Vector3, piece?: boolean) => void) {
     const vr = createRng(77);
@@ -221,10 +262,14 @@ export class Props {
     const lanterns = [0, 1, 2].map(() => lanternGeometry(vr));
     const houses = [0, 1, 2, 3, 4].map(() => birdhouseGeometry(vr));
     const gazebos = [0, 1, 2].map(() => gazeboPieces(vr));
+    const poles = [0, 1, 2].map(() => flagpoleGeometry(vr));
+    const hook = hookGeometry();
     this.variants = {
       bench: benches.map((g) => () => [mesh(g, this.wood)]),
       lantern: lanterns.map((l) => () => [mesh(l.body, this.wood), mesh(l.glass, this.glow)]),
       birdhouse: houses.map((g) => () => [mesh(g, this.wood)]),
+      flag: poles.map((g) => () => [mesh(g, this.wood)]),
+      chimes: [() => [mesh(hook, this.wood)]],
       gazebo: gazebos.map((pieces) => () =>
         pieces.map((p, i) => {
           const m = mesh(p.geo, p.roof ? this.roof : this.wood);
@@ -262,6 +307,17 @@ export class Props {
     // A gazebo arrives as its deck alone; the rest goes together once it's down.
     if (kind === 'gazebo') for (const c of group.children) c.visible = c.userData.order === 0;
     const prop: Prop = { kind, group, pos: new THREE.Vector3(), yaw: 0, t: null, delay: 0, landed: false };
+    if (kind === 'flag') {
+      const colours = FLAG_COLOURS[Math.floor(this.rng() * FLAG_COLOURS.length)].map((c) => new THREE.Color(c));
+      const flag = new Flag(new THREE.Vector3(0.03, 2.4, 0), lerp(0.85, 1.05, this.rng()), lerp(0.48, 0.58, this.rng()), colours);
+      group.add(flag.mesh);
+      prop.anim = flag;
+    } else if (kind === 'chimes') {
+      const set = new ChimeSet(Math.floor(this.rng() * 1e6), (f, v, at) => this.onChime(f, v, at));
+      set.group.position.set(0.34, 1.86, 0);
+      group.add(set.group);
+      prop.anim = set;
+    }
     this.group.add(group);
     this.props.push(prop);
     return prop;
@@ -336,6 +392,7 @@ export class Props {
         continue;
       }
       if (p.gone) continue;
+      if (p.anim && this.wind) p.anim.update(dt, this.wind.direction, this.wind.sample(p.pos.x, p.pos.z));
       if (p.t === null) {
         // Carried: hovering just above the ground, bobbing softly.
         this.place(p, 0.3 + Math.sin(this.time * 5) * 0.03, 0);
