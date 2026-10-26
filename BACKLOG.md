@@ -46,6 +46,7 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **Bug report (after 3.7):** *Feedback:* "When session resumes, pathways lose the gravel or base, and the path joins are not smooth still." *Changes:* the ground-paint canvas (path gravel, bed soil) now keeps a log of every dab and repaints itself if iOS discards it while the app is backgrounded (checked on returning to the app, after a lost WebGL context, and every 2 s via a marker pixel). Path junctions flare much wider and over a longer run (gravel up to ~1.9×, edging up to ~2.1×, eased in over 2.4 m), and the old path's edging is cleared across the whole mouth, so joins open in a soft curved fillet on both sides.
 - **3.7 → next:** *Feedback:* "Next story" (said while 3.7 was still being finished; 3.7 shipped and left awaiting review). *Changes:* Milestone 4 next.
 - **3.6 → 3.7:** *Feedback:* "Next story" (said while 3.6 was still being finished; 3.6 shipped and left awaiting review). *Changes:* Story 3.7 started.
 - **3.5 → 3.6:** *Feedback:* "Next story" (bunnies accepted). *Changes:* Story 3.6 built.
