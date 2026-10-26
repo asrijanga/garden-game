@@ -6,7 +6,9 @@ import type { Season } from './season';
 
 export type VineKind = 'rose' | 'clematis' | 'honeysuckle' | 'ivy' | 'wisteria';
 
-const STEP = 0.055; // metres of stem between leaf nodes
+const STEP = 0.07; // metres of stem between leaf nodes
+/** Storybook scale (like the birds and bees): life-size leaves and roses vanish from the garden camera. */
+const BIG = 2.3;
 const CAP = { stem: 9000, leaf: 14000, ivy: 9000, rose: 2400, star: 2400, trumpet: 2400, raceme: 1200 };
 
 type Part = keyof typeof CAP;
@@ -84,11 +86,11 @@ function geometries(): Record<Part, THREE.BufferGeometry> {
 
 /** What grows on each kind of vine: its leaves, its flowers (and their colours), and how it grows. */
 const KINDS: Record<VineKind, { leaf: Part; bloom: Part | null; colours: string[]; stem: string; leafTone: string[]; blooms: number; leaves: number; size: number }> = {
-  rose: { leaf: 'leaf', bloom: 'rose', colours: ['#e46f86', '#f2a0b2', '#c9405c', '#fbd0d8', '#fff4f0'], stem: '#5a6a3a', leafTone: ['#4f7f33', '#5a8a3a', '#46752e'], blooms: 0.32, leaves: 1.3, size: 1 },
-  clematis: { leaf: 'leaf', bloom: 'star', colours: ['#8a6ac8', '#b48ae0', '#f4eef8', '#c45a8a'], stem: '#6a5a3a', leafTone: ['#5f8f3c', '#6a9a45'], blooms: 0.28, leaves: 1.0, size: 0.85 },
-  honeysuckle: { leaf: 'leaf', bloom: 'trumpet', colours: ['#f6e6b0', '#f2c86a', '#f4d8c8'], stem: '#7a5a3a', leafTone: ['#6a9a4a', '#5f8f40'], blooms: 0.22, leaves: 1.1, size: 0.8 },
-  ivy: { leaf: 'ivy', bloom: null, colours: [], stem: '#5a4a32', leafTone: ['#2f5a2a', '#3a6a30', '#28502a', '#46783a'], blooms: 0, leaves: 2.2, size: 1.15 },
-  wisteria: { leaf: 'leaf', bloom: 'raceme', colours: ['#a48ad8', '#b9a2e6', '#8f78cc', '#d6cdf2'], stem: '#6e5a44', leafTone: ['#7aa04a', '#6a9440'], blooms: 0.45, leaves: 1.0, size: 1.1 },
+  rose: { leaf: 'leaf', bloom: 'rose', colours: ['#e46f86', '#f2a0b2', '#c9405c', '#fbd0d8', '#fff4f0'], stem: '#5a6a3a', leafTone: ['#4f7f33', '#5a8a3a', '#46752e'], blooms: 0.5, leaves: 1.6, size: 1 },
+  clematis: { leaf: 'leaf', bloom: 'star', colours: ['#8a6ac8', '#b48ae0', '#f4eef8', '#c45a8a'], stem: '#6a5a3a', leafTone: ['#5f8f3c', '#6a9a45'], blooms: 0.45, leaves: 1.3, size: 0.85 },
+  honeysuckle: { leaf: 'leaf', bloom: 'trumpet', colours: ['#f6e6b0', '#f2c86a', '#f4d8c8'], stem: '#7a5a3a', leafTone: ['#6a9a4a', '#5f8f40'], blooms: 0.4, leaves: 1.4, size: 0.8 },
+  ivy: { leaf: 'ivy', bloom: null, colours: [], stem: '#5a4a32', leafTone: ['#2f5a2a', '#3a6a30', '#28502a', '#46783a'], blooms: 0, leaves: 2.6, size: 1.0 },
+  wisteria: { leaf: 'leaf', bloom: 'raceme', colours: ['#a48ad8', '#b9a2e6', '#8f78cc', '#d6cdf2'], stem: '#6e5a44', leafTone: ['#7aa04a', '#6a9440'], blooms: 0.7, leaves: 1.2, size: 1.1 },
 };
 
 /** How much each season flowers (ivy and the leaves carry on regardless). */
@@ -237,7 +239,7 @@ export class Vines {
       if (!first) {
         const d = cur.clone().sub(prev);
         const len = d.length();
-        if (len > 1e-4) this.add('stem', prev, d, 0, this.s.set(1, len * 1.05, 1), stemTone, start - STEP / speed, o.owner);
+        if (len > 1e-4) this.add('stem', prev, d, 0, this.s.set(BIG * 0.8, len * 1.05, BIG * 0.8), stemTone, start - STEP / speed, o.owner);
       }
       first = false;
       prev.copy(cur);
@@ -247,7 +249,7 @@ export class Vines {
         const dir = o.face && o.kind === 'ivy'
           ? o.face.clone().multiplyScalar(0.6).addScaledVector(n1, (rng() - 0.5) * 1.6).add(this.up.clone().multiplyScalar(0.3 + rng() * 0.4))
           : n1.clone().multiplyScalar(rng() < 0.5 ? -1 : 1).addScaledVector(n2, (rng() - 0.5) * 1.4).add(this.up.clone().multiplyScalar(rng() * 0.6));
-        const k = kind.size * lerp(0.75, 1.25, rng());
+        const k = BIG * kind.size * lerp(0.75, 1.25, rng());
         const tones = kind.leafTone;
         const tone = new THREE.Color(tones[Math.floor(rng() * tones.length)]).multiplyScalar(lerp(0.88, 1.08, rng()));
         this.add(kind.leaf, cur, dir, rng() * 6.28, this.s.set(k, k, k), tone, start + 0.4 + rng() * 1.5, o.owner);
@@ -257,9 +259,9 @@ export class Vines {
         const n = kind.bloom === 'raceme' ? 1 : 1 + Math.floor(rng() * 2);
         for (let b = 0; b < n; b++) {
           const dir = kind.bloom === 'raceme' ? this.up.clone() : (o.face ? o.face.clone() : n1.clone().multiplyScalar(rng() < 0.5 ? -1 : 1)).add(this.up.clone().multiplyScalar(0.4)).addScaledVector(n2, (rng() - 0.5) * 0.8);
-          const p = cur.clone().addScaledVector(dir.clone().normalize(), kind.bloom === 'raceme' ? 0 : 0.012).add(new THREE.Vector3((rng() - 0.5) * 0.04, (rng() - 0.5) * 0.03, (rng() - 0.5) * 0.04));
+          const p = cur.clone().addScaledVector(dir.clone().normalize(), kind.bloom === 'raceme' ? 0 : 0.03).add(new THREE.Vector3((rng() - 0.5) * 0.08, (rng() - 0.5) * 0.06, (rng() - 0.5) * 0.08));
           if (kind.bloom === 'raceme') p.y -= 0.01;
-          const k = lerp(0.8, 1.25, rng()) * (kind.bloom === 'raceme' ? lerp(0.8, 1.3, rng()) : 1);
+          const k = BIG * lerp(0.8, 1.25, rng()) * (kind.bloom === 'raceme' ? lerp(0.8, 1.3, rng()) : 1);
           const colour = new THREE.Color(kind.colours[Math.floor(rng() * kind.colours.length)]).multiplyScalar(lerp(0.92, 1.05, rng()));
           this.add(kind.bloom, p, dir, rng() * 6.28, this.s.set(k, k, k), colour, start + lerp(5, 14, rng()), o.owner);
         }
