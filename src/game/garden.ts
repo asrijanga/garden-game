@@ -6,7 +6,7 @@
  *
  * Format (version 1), as JSON:
  *   { v: 1, a: [ [kind, ...settings, points] ] }
- *   kind: 'p' path · 'n' fence (style) · 'r' rocks · 'f' flowers (species id) · 'o' pond · 'e' erase (radius in cm)
+ *   kind: 'p' path · 'n' fence (style) · 'r' rocks · 'd' decor (prop) · 'f' flowers (species id) · 'o' pond · 'e' erase (radius in cm)
  *   points: "x,z,dx,dz,dx,dz…" in centimetres, each after the first relative to the one before.
  */
 
@@ -17,6 +17,7 @@ export type Action =
   | { kind: 'path'; points: number[] }
   | { kind: 'fence'; style: string; points: number[] }
   | { kind: 'rocks'; points: number[] }
+  | { kind: 'prop'; item: string; points: number[] }
   | { kind: 'flowers'; species: string; points: number[] }
   | { kind: 'pond'; points: number[] }
   | { kind: 'erase'; radius: number; points: number[] };
@@ -63,6 +64,8 @@ export function encode(actions: Action[]): string {
         return ['n', act.style, pts];
       case 'rocks':
         return ['r', pts];
+      case 'prop':
+        return ['d', act.item, pts];
       case 'flowers':
         return ['f', act.species, pts];
       case 'pond':
@@ -84,6 +87,7 @@ export function decode(json: string): Action[] {
     if (row[0] === 'p') out.push({ kind: 'path', points: pts });
     else if (row[0] === 'n') out.push({ kind: 'fence', style: String(row[1]), points: pts });
     else if (row[0] === 'r') out.push({ kind: 'rocks', points: pts });
+    else if (row[0] === 'd') out.push({ kind: 'prop', item: String(row[1]), points: pts });
     else if (row[0] === 'f') out.push({ kind: 'flowers', species: String(row[1]), points: pts });
     else if (row[0] === 'o') out.push({ kind: 'pond', points: pts });
     else if (row[0] === 'e') out.push({ kind: 'erase', radius: Number(row[1]) / 100, points: pts });

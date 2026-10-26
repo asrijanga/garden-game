@@ -445,3 +445,10 @@ body.picking .sound-hint {
   .tool { width: 58px; height: 58px; }
   .tool svg { width: 42px; height: 42px; }
 }
+
+/* Seven tools on a small phone: a little more compact so the tray fits the screen. */
+@media (max-width: 419px) {
+  .toolbar { gap: 4px; padding: 7px 7px; }
+  .tool { width: 46px; height: 46px; }
+  .tool svg { width: 34px; height: 34px; }
+}

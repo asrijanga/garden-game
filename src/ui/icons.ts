@@ -19,6 +19,13 @@ export const ICONS = {
     <path d="M5 24.5h38M5 33.5h38" stroke="#a8916f" stroke-width="1" stroke-linecap="round" opacity=".5"/>
     ${[8.5, 16.5, 24.5, 32.5, 40.5].map((x, i) => `<path d="M${x - 2.6} 39V${15 + (i % 2) * 1.5}l2.6-3.5 2.6 3.5V39z" fill="#fbf7ee" stroke="#9c8667" stroke-width="1.5" stroke-linejoin="round"/>`).join('')}
   </svg>`,
+  decor: `<svg viewBox="0 0 48 48" aria-hidden="true">
+    <path d="M8 21h32M8 27h32" stroke="#b58d62" stroke-width="4.4" stroke-linecap="round"/>
+    <path d="M6 33h36" stroke="#c49a6c" stroke-width="5" stroke-linecap="round"/>
+    <path d="M10 18v24M38 18v24M10 33l-2.5 9M38 33l2.5 9" stroke="#7a5a3c" stroke-width="3" stroke-linecap="round"/>
+    <path d="M24 6v8" stroke="#3a332e" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="24" cy="9" r="5" fill="#ffd38a" opacity=".5"/>
+  </svg>`,
   flowers: `<svg viewBox="0 0 48 48" aria-hidden="true">
     <path d="M24 42V24" stroke="#5f8f3e" stroke-width="2.6" stroke-linecap="round"/>
     <path d="M24 36c-6 0-10-3.5-11-8 5 0 9 2.5 11 8zM24 33c5.5-.5 9-4 9.5-8.5-4.8.3-8.5 3-9.5 8.5z" fill="#7fb04f" stroke="#4f7f33" stroke-width="1.5" stroke-linejoin="round"/>

@@ -214,6 +214,27 @@ export class PathBuilder {
     this.lines.get(key)!.push({ x, z, id: this.pathId });
   }
 
+  /** The nearest point on any path's centre line within `reach` metres of (x, z), if any. */
+  nearestPoint(x: number, z: number, reach: number): THREE.Vector2 | null {
+    let best: THREE.Vector2 | null = null;
+    let bestD = reach * reach;
+    const r = Math.ceil(reach / CELL);
+    const cx = Math.floor(x / CELL);
+    const cz = Math.floor(z / CELL);
+    for (let i = cx - r; i <= cx + r; i++) {
+      for (let j = cz - r; j <= cz + r; j++) {
+        for (const p of this.lines.get(i * 4096 + j) ?? []) {
+          const d = (p.x - x) ** 2 + (p.z - z) ** 2;
+          if (d < bestD) {
+            bestD = d;
+            best = new THREE.Vector2(p.x, p.z);
+          }
+        }
+      }
+    }
+    return best;
+  }
+
   /** Forget path centre line within `r` of (x, z), so the lawn there is free again. */
   erase(x: number, z: number, r: number) {
     for (let i = Math.floor((x - r) / CELL); i <= Math.floor((x + r) / CELL); i++) {

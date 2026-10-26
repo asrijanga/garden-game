@@ -1,6 +1,6 @@
 import { ICONS } from './icons';
 
-export type Tool = 'move' | 'path' | 'fence' | 'flowers' | 'pond' | 'erase';
+export type Tool = 'move' | 'path' | 'fence' | 'flowers' | 'pond' | 'decor' | 'erase';
 
 const TOOLS: { id: Tool; label: string }[] = [
   { id: 'move', label: 'Look around' },
@@ -8,6 +8,7 @@ const TOOLS: { id: Tool; label: string }[] = [
   { id: 'fence', label: 'Build' },
   { id: 'flowers', label: 'Flowers' },
   { id: 'pond', label: 'Pond' },
+  { id: 'decor', label: 'Decor' },
   { id: 'erase', label: 'Tidy up' },
 ];
 

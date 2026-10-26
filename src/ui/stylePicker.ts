@@ -1,6 +1,7 @@
 import type { BuildStyle } from '../game/tools';
+import type { PropKind } from '../world/props';
 
-const STYLES: { id: BuildStyle; label: string; icon: string }[] = [
+export const BUILD_CHIPS: { id: BuildStyle; label: string; icon: string }[] = [
   {
     id: 'picket',
     label: 'Picket fence',
@@ -44,18 +45,50 @@ const STYLES: { id: BuildStyle; label: string; icon: string }[] = [
   },
 ];
 
-/** Style chips for the fence tool, floating above the toolbar (same look as the flower picker). */
-export class StylePicker {
-  private readonly el: HTMLDivElement;
-  private readonly chips = new Map<BuildStyle, HTMLButtonElement>();
+export const DECOR_CHIPS: { id: PropKind; label: string; icon: string }[] = [
+  {
+    id: 'bench',
+    label: 'Bench',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M7 15h26M7 20h26" stroke="#a27a52" stroke-width="3.6" stroke-linecap="round"/>
+      <path d="M5 26h30" stroke="#b08a60" stroke-width="4" stroke-linecap="round"/>
+      <path d="M9 13v21M31 13v21M9 26l-2 8M31 26l2 8" stroke="#7a5a3c" stroke-width="2.4" stroke-linecap="round"/>
+    </svg>`,
+  },
+  {
+    id: 'lantern',
+    label: 'Lantern',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="11" r="8" fill="#ffd38a" opacity=".45"/>
+      <path d="M20 17v19M15 36h10" stroke="#3a332e" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M14.5 7h11l-5.5-4z" fill="#3a332e"/>
+      <rect x="16" y="7" width="8" height="9" rx="1" fill="#ffc46e" stroke="#3a332e" stroke-width="1.6"/>
+    </svg>`,
+  },
+  {
+    id: 'birdhouse',
+    label: 'Birdhouse',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M20 26v11" stroke="#8a6a4a" stroke-width="3" stroke-linecap="round"/>
+      <path d="M12 14l8-7 8 7v12H12z" fill="#9cc3d5" stroke="#5e7f8e" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M9 15l11-10 11 10" fill="none" stroke="#b5523b" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="20" cy="18" r="2.6" fill="#2a2018"/>
+    </svg>`,
+  },
+];
 
-  constructor(private readonly onPick: (style: BuildStyle, label: string) => void) {
+/** A row of illustrated choice chips floating above the toolbar (the flower picker's look). */
+export class ChipPicker<T extends string> {
+  private readonly el: HTMLDivElement;
+  private readonly chips = new Map<T, HTMLButtonElement>();
+
+  constructor(items: { id: T; label: string; icon: string }[], private readonly onPick: (id: T, label: string) => void) {
     this.el = document.createElement('div');
     this.el.className = 'flower-picker';
     const row = document.createElement('div');
     row.className = 'flower-picker-row';
     this.el.append(row);
-    for (const s of STYLES) {
+    for (const s of items) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'flower-chip';
@@ -71,10 +104,10 @@ export class StylePicker {
       row.append(b);
     }
     document.body.append(this.el);
-    this.select('picket');
+    this.select(items[0].id);
   }
 
-  select(id: BuildStyle) {
+  select(id: T) {
     for (const [cid, b] of this.chips) b.classList.toggle('active', cid === id);
   }
 

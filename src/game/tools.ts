@@ -6,6 +6,8 @@ import type { TouchMarker } from '../world/touchMarker';
 import type { FlowerBrush } from './flowerBrush';
 import type { PondBrush } from './pondBrush';
 import type { EraseBrush } from './eraseBrush';
+import type { PropBrush } from './propBrush';
+import type { PropKind } from '../world/props';
 import type { FenceBuilder } from './fenceBuilder';
 import type { FenceStyle } from '../world/fences';
 
@@ -19,6 +21,7 @@ const MARKER_COLORS: Record<Tool, string> = {
   fence: '#f6ead2',
   flowers: '#ffd1e0',
   pond: '#cdeefa',
+  decor: '#fff0d2',
   erase: '#ffe2c4',
 };
 
@@ -37,7 +40,7 @@ export interface Brush {
  */
 export class ToolController {
   private readonly pointers = new Set<number>();
-  private stroke: { tool: BuildTool; points: number[]; species: string; style: BuildStyle } | null = null;
+  private stroke: { tool: BuildTool; points: number[]; species: string; style: BuildStyle; item: PropKind } | null = null;
   /** The Build tool's current choice (set from its chips). */
   buildStyle: BuildStyle = 'picket';
   private building: Brush | null = null;
@@ -53,6 +56,7 @@ export class ToolController {
     paths: Brush,
     fences: FenceBuilder,
     rocks: Brush,
+    private readonly decor: PropBrush,
     private readonly flowers: FlowerBrush,
     ponds: PondBrush,
     private readonly eraser: EraseBrush,
@@ -73,7 +77,7 @@ export class ToolController {
         this.building = null;
       },
     };
-    this.brushes = { path: paths, fence: build, flowers, pond: ponds, erase: eraser };
+    this.brushes = { path: paths, fence: build, flowers, pond: ponds, decor, erase: eraser };
     el.addEventListener('pointerdown', this.onDown);
     el.addEventListener('pointermove', this.onMove);
     el.addEventListener('pointerup', this.onUp);
@@ -91,13 +95,15 @@ export class ToolController {
 
   /** Rebuild one saved stroke, exactly as it was first drawn. */
   replay(action: Action) {
-    const tool: BuildTool = action.kind === 'rocks' ? 'fence' : action.kind;
+    const tool: BuildTool = action.kind === 'rocks' ? 'fence' : action.kind === 'prop' ? 'decor' : action.kind;
     const brush = this.brushes[tool];
     const selected = this.flowers.selected;
     const style = this.buildStyle;
     if (action.kind === 'flowers') this.flowers.selected = action.species;
     if (action.kind === 'fence') this.buildStyle = action.style as FenceStyle;
     if (action.kind === 'rocks') this.buildStyle = 'rocks';
+    const item = this.decor.kind;
+    if (action.kind === 'prop') this.decor.kind = action.item as PropKind;
     if (action.kind === 'erase') this.eraser.radius = action.radius;
     const pts = action.points;
     for (let i = 0; i < pts.length; i += 2) {
@@ -108,6 +114,7 @@ export class ToolController {
     brush.end();
     this.flowers.selected = selected;
     this.buildStyle = style;
+    this.decor.kind = item;
   }
 
   /** Where the finger is, on the ground, rounded to the centimetre (as saved). */
@@ -136,7 +143,7 @@ export class ToolController {
       this.eraser.radius = roundCm(Math.min(2.2, Math.max(0.7, this.rig.distance * 0.028)));
       this.marker.brush = this.eraser.radius;
     }
-    this.stroke = { tool, points: [hit.x, hit.z], species: this.flowers.selected, style: this.buildStyle };
+    this.stroke = { tool, points: [hit.x, hit.z], species: this.flowers.selected, style: this.buildStyle, item: this.decor.kind };
     this.marker.down(hit);
     this.brushes[tool].begin(hit);
   };
@@ -167,6 +174,7 @@ export class ToolController {
     const points = s.points;
     if (s.tool === 'flowers') this.onAction({ kind: 'flowers', species: s.species, points });
     else if (s.tool === 'fence' && s.style === 'rocks') this.onAction({ kind: 'rocks', points });
+    else if (s.tool === 'decor') this.onAction({ kind: 'prop', item: s.item, points });
     else if (s.tool === 'fence') this.onAction({ kind: 'fence', style: s.style, points });
     else if (s.tool === 'erase') this.onAction({ kind: 'erase', radius: this.eraser.radius, points });
     else this.onAction({ kind: s.tool, points });

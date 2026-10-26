@@ -23,7 +23,9 @@ import { PondBrush } from './game/pondBrush';
 import { EraseBrush } from './game/eraseBrush';
 import { FenceBuilder } from './game/fenceBuilder';
 import { Fences } from './world/fences';
-import { StylePicker } from './ui/stylePicker';
+import { ChipPicker, BUILD_CHIPS, DECOR_CHIPS } from './ui/stylePicker';
+import { Props } from './world/props';
+import { PropBrush } from './game/propBrush';
 import { Boulders } from './world/boulders';
 import { RockBrush } from './game/rockBrush';
 import { createMotes } from './world/motes';
@@ -148,7 +150,7 @@ mountSoundControls(ambience);
 // --- Tools: what your finger does -----------------------------------------------------------
 const marker = new TouchMarker();
 scene.add(marker.mesh);
-const TOOL_PITCH = { move: 1, path: 0.9, fence: 0.95, flowers: 1.2, pond: 0.8, erase: 1.05 };
+const TOOL_PITCH = { move: 1, path: 0.9, fence: 0.95, flowers: 1.2, pond: 0.8, decor: 1.1, erase: 1.05 };
 let tools: ToolController | null = null;
 const dust = new Dust();
 scene.add(dust.points);
@@ -281,7 +283,27 @@ addEventListener('pagehide', () => store.save());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) store.save();
 });
-const stylePicker = new StylePicker((style, label) => {
+// Garden props: set down with a soft wooden thud.
+const props = new Props((_kind, at) => {
+  dust.puff(at, 4, 0.4);
+  ambience.wood(0.8);
+});
+scene.add(props.group);
+const propBrush = new PropBrush(
+  props,
+  (x, z) => ground.heightAt(x, z),
+  (x, z, reach) => paths.nearestPoint(x, z, reach),
+  (x, z) => paths.distanceToPaths(x, z),
+  (x, z) => ponds.waterDepth(x, z),
+  (x, z) => cottage.contains(x, z, 0.4) || ground.forestness(x, z) > 0.4 || ponds.contains(x, z, 0.2),
+  () => toolbar.showLabel('Not quite there: try open lawn', 1600),
+);
+const decorPicker = new ChipPicker(DECOR_CHIPS, (kind, label) => {
+  propBrush.kind = kind;
+  ambience.tap(1.15);
+  toolbar.showLabel(label, 1400);
+});
+const stylePicker = new ChipPicker(BUILD_CHIPS, (style, label) => {
   if (tools) tools.buildStyle = style;
   ambience.tap(1.1);
   toolbar.showLabel(label, 1600);
@@ -303,13 +325,13 @@ const eraser = new EraseBrush(
     dust,
     paths,
     beds: flowerBrush,
-    fences: { erase: (x, z, r) => [...fenceBuilder.erase(x, z, r), ...boulders.erase(x, z, r)] },
+    fences: { erase: (x, z, r) => [...fenceBuilder.erase(x, z, r), ...boulders.erase(x, z, r), ...props.erase(x, z, r)] },
     heightAt: (x, z) => ground.heightAt(x, z),
     occupied: (x, z) => cottage.contains(x, z, 0.4) || paths.distanceToPaths(x, z) < 1.0 || flowerBrush.distanceToBeds(x, z) < 0.15 || ponds.contains(x, z, 0.4),
   },
   (amount) => ambience.erase(amount),
 );
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, renderer, scene, fences, fenceBuilder, boulders });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, renderer, scene, fences, fenceBuilder, boulders, props });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -319,6 +341,7 @@ tools = new ToolController(
   pathBrush,
   fenceBuilder,
   rockBrush,
+  propBrush,
   flowerBrush,
   pondBrush,
   eraser,
@@ -327,7 +350,8 @@ tools = new ToolController(
   (tool) => {
     picker.setVisible(tool === 'flowers');
     stylePicker.setVisible(tool === 'fence');
-    document.body.classList.toggle('picking', tool === 'flowers' || tool === 'fence');
+    decorPicker.setVisible(tool === 'decor');
+    document.body.classList.toggle('picking', tool === 'flowers' || tool === 'fence' || tool === 'decor');
   },
 );
 const controller = tools;
@@ -449,6 +473,7 @@ function frame(time: number) {
     stones.update(dt);
     fences.update(dt);
     boulders.update(dt);
+    props.update(dt);
     edgePlants.update(dt);
     flowers.update(dt);
     bees.update(dt);
@@ -465,7 +490,7 @@ function frame(time: number) {
   ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));
   const buzz = bees.buzzNear(camera.position);
   ambience.buzz(buzz.level, buzz.pitch);
-  if (stones.busy || pondPlants.busy || fences.busy || boulders.busy) renderer.shadowMap.needsUpdate = true;
+  if (stones.busy || pondPlants.busy || fences.busy || boulders.busy || props.busy) renderer.shadowMap.needsUpdate = true;
   post.render(dt);
 }
 
