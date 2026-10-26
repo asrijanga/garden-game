@@ -94,7 +94,15 @@ export class GroundPaint {
    * the width is set by `radius` alone.
    */
   private dab(x: number, z: number, radius: number, r: number, g: number, b: number, record = true) {
-    if (record) this.log.push({ k: 0, x, z, rad: radius, r, g, b });
+    if (record) {
+      this.log.push({ k: 0, x, z, rad: radius, r, g, b });
+      // Anything still fading away from an earlier erase finishes now, so it can never eat
+      // into paint laid after it (a garden being rebuilt replays strokes far faster than the fade).
+      if (this.clearing.length) {
+        for (const c of this.clearing) this.clearNow(c.x, c.z, c.r, 1);
+        this.clearing.length = 0;
+      }
+    }
     const [cx, cy] = this.toCanvas(x, z);
     const rad = (radius / (PAINT_HALF * 2)) * SIZE;
     const grad = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
