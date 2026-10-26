@@ -438,11 +438,12 @@ const perchingBirds = new PerchingBirds(perchesNow, fromTheWoods, (at) => {
 scene.add(perchingBirds.group);
 // Open bed flowers with their species, refreshed a few times a second (visitors pick favourites).
 let headsCache: { pos: THREE.Vector3; species: string }[] = [];
-let headsAge = Infinity;
+let headsAt = -Infinity;
 const openHeads = () => {
-  if (headsAge > 0.4) {
+  const now = performance.now();
+  if (now - headsAt > 400) {
     headsCache = flowers.openHeads();
-    headsAge = 0;
+    headsAt = now;
   }
   return headsCache;
 };
@@ -871,7 +872,6 @@ function frame(time: number) {
     bunnies.update(dt);
     ducks.update(dt);
     hummingbirds.update(dt);
-    headsAge += dt;
     perchingBirds.update(dt);
     butterflies.update(dt);
     dragonflies.update(dt);
