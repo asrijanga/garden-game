@@ -9,7 +9,7 @@ export function icon(sp: FlowerSpecies | null): string {
       ${bloom(12, 18, '#c78bc9', 6)}${bloom(28, 16, '#f0b73d', 6)}${bloom(20, 12, '#f08fb4', 7)}
     </svg>`;
   }
-  const c = sp.colors[0];
+  const c = sp.colors[0].split('|')[0];
   const stem = `<path d="M20 38V20" stroke="#5f8f3e" stroke-width="2" stroke-linecap="round"/><path d="M20 31c-4 0-7-2-8-5 4 0 7 1.5 8 5z" fill="#6fa848"/>`;
   const f = sp.form;
   if (f.kind === 'cup') {
@@ -21,6 +21,19 @@ export function icon(sp: FlowerSpecies | null): string {
     return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 38V8" stroke="#5f8f3e" stroke-width="2" stroke-linecap="round"/>${dots}</svg>`;
   }
   const svg = (inner: string) => `<svg viewBox="0 0 40 40" aria-hidden="true">${stem}${inner}</svg>`;
+  if (f.kind === 'rose') {
+    // A rose: a spiral of petals in a cup (a simple five-petalled one for the wild rose).
+    const edge = sp.colors[0].split('|');
+    const base = edge[0];
+    const tip = edge[1] ?? base;
+    if (f.type === 'wild') return svg(`${bloom(20, 15, base, 5, 8, '#f2c230', 6)}<circle cx="20" cy="15" r="2.6" fill="#f2c230"/>`);
+    const leaf = `<path d="M20 31c-5 0-8-3-8-6 4 0 7 2 8 6zM20 27c4 0 7-2 7-5-3 0-6 1-7 5z" fill="#3f6f32"/>`;
+    return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 38V20" stroke="#4a6a32" stroke-width="2" stroke-linecap="round"/>${leaf}
+      <circle cx="20" cy="14" r="9" fill="${tip}" stroke="rgba(0,0,0,.2)" stroke-width=".7"/>
+      <path d="M13 15c1-5 5-7 8-6M27 14c-1 4-4 7-8 6M15 18c2 2 6 3 9 0" stroke="rgba(0,0,0,.28)" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+      <circle cx="20" cy="13" r="4.2" fill="${base}" stroke="rgba(0,0,0,.22)" stroke-width=".7"/>
+      <path d="M18 12c1-1.5 3-1.5 4 0" stroke="rgba(0,0,0,.3)" stroke-width="1" fill="none"/></svg>`;
+  }
   if (f.kind === 'cluster' && f.shape === 'globe') {
     // Allium: a ball of stars on a tall bare stem.
     const dots = Array.from({ length: 18 }, (_, i) => {
@@ -84,6 +97,9 @@ export class FlowerPicker {
   private readonly chips = new Map<string, HTMLButtonElement>();
   private readonly blooming = new Set<string>();
   private readonly kept = new Set<string>();
+  private readonly colours: HTMLDivElement;
+  /** The colour chosen for each species with a colour choice (-1: mixed). */
+  private readonly colour = new Map<string, number>();
   /** Opens the flower book (set by whoever owns it). */
   onBook: () => void = () => {};
 
@@ -128,8 +144,42 @@ export class FlowerPicker {
       this.chips.set(id, b);
       row.append(b);
     }
+    // A row of colour swatches above the chips, for flowers that offer a colour choice (roses).
+    this.colours = document.createElement('div');
+    this.colours.className = 'colour-row';
+    this.colours.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.el.prepend(this.colours);
     document.body.append(this.el);
     this.select(MIX_ID);
+  }
+
+  /** Show the colour swatches for a species with a colour choice (or hide them). */
+  private showColours(sp: FlowerSpecies | undefined) {
+    this.colours.replaceChildren();
+    const choosy = sp && sp.form.kind === 'rose';
+    this.colours.classList.toggle('show', !!choosy);
+    if (!sp || !choosy) return;
+    const current = this.colour.get(sp.id) ?? -1;
+    const add = (i: number, label: string, html: string) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'colour-swatch' + (i === current ? ' active' : '') + (i < 0 ? ' mixed' : '');
+      b.setAttribute('aria-label', label);
+      b.innerHTML = html;
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.colour.set(sp.id, i);
+        for (const el of this.colours.children) el.classList.toggle('active', el === b);
+        const id = i < 0 ? sp.id : `${sp.id}:${i}`;
+        this.onPick(id, i < 0 ? `${sp.name}: mixed colours` : `${sp.name}: ${label.toLowerCase()}`);
+      });
+      this.colours.append(b);
+    };
+    add(-1, 'Mixed colours', `<span style="background:conic-gradient(${sp.colors.slice(0, 6).map((c) => c.split('|')[0]).join(',')})"></span>`);
+    sp.colors.forEach((c, i) => {
+      const [a, b] = c.split('|');
+      add(i, b ? 'Two-tone' : 'This colour', `<span style="background:${b ? `radial-gradient(circle, ${a} 35%, ${b} 100%)` : a}"></span>`);
+    });
   }
 
   /** Choose a species (from a chip or the book), as if its chip were tapped. */
@@ -138,7 +188,10 @@ export class FlowerPicker {
     const label = sp?.name ?? 'Seasonal mix';
     this.select(id);
     this.chips.get(id)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-    this.onPick(id, this.blooming.has(id) ? `${label}: blooming now` : `${label}: buds until its season`);
+    this.showColours(sp);
+    // Keep the colour chosen for this species last time.
+    const colour = sp ? (this.colour.get(sp.id) ?? -1) : -1;
+    this.onPick(colour >= 0 ? `${id}:${colour}` : id, this.blooming.has(id) ? `${label}: blooming now` : `${label}: buds until its season`);
   }
 
   select(id: string) {

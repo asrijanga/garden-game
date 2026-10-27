@@ -29,6 +29,8 @@ class FlowerMesh {
   axis: number[] = [];
   close: number[] = [];
   glow: number[] = [];
+  /** How far toward the petal's edge (0 heart … 1 tip): bicolour flowers blend to their edge colour. */
+  edge: number[] = [];
   /** Optional rotation applied to everything added (used to tilt a whole bloom, e.g. pansies). */
   private xo: THREE.Vector3 | null = null;
   private xq: THREE.Quaternion | null = null;
@@ -46,7 +48,7 @@ class FlowerMesh {
     return this.xq ? v.clone().applyQuaternion(this.xq) : v;
   }
 
-  tri(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, opts: { n?: THREE.Vector3; shade?: [number, number, number]; color: THREE.Color; petal?: boolean; hinge?: THREE.Vector3; axis?: THREE.Vector3; close?: number; glow?: number }) {
+  tri(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, opts: { n?: THREE.Vector3; shade?: [number, number, number]; color: THREE.Color; petal?: boolean; hinge?: THREE.Vector3; axis?: THREE.Vector3; close?: number; glow?: number; edge?: [number, number, number] }) {
     let n = opts.n ?? new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
     if (n.y < 0 && !opts.n) n.negate();
     n = this.td(n);
@@ -64,6 +66,7 @@ class FlowerMesh {
       this.axis.push(ax.x, ax.y, ax.z);
       this.close.push(opts.close ?? 0);
       this.glow.push(opts.glow ?? (opts.petal ? 1 : 0));
+      this.edge.push(opts.edge ? opts.edge[i] : 0);
     });
   }
 
@@ -87,6 +90,7 @@ class FlowerMesh {
       this.axis.push(0, 1, 0);
       this.close.push(0);
       this.glow.push(petal ? 1 : 0);
+      this.edge.push(0);
     }
   }
 
@@ -100,6 +104,7 @@ class FlowerMesh {
     g.setAttribute('aAxis', new THREE.Float32BufferAttribute(this.axis, 3));
     g.setAttribute('aClose', new THREE.Float32BufferAttribute(this.close, 1));
     g.setAttribute('aGlow', new THREE.Float32BufferAttribute(this.glow, 1));
+    g.setAttribute('aEdge', new THREE.Float32BufferAttribute(this.edge, 1));
     return g;
   }
 }
@@ -209,7 +214,8 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
       .addScaledVector(UP, t * t * len * curl) // the tip curls up
       .addScaledVector(d, -t * t * len * cupIn) // cupped petals curve inward
       .addScaledVector(crease, (1 - Math.abs(w)) * width * 0.08 * Math.sin(t * Math.PI)); // soft centre crease
-  const opts = (sh: [number, number, number]) => ({ color: WHITE, petal: true, hinge, axis, close: Math.max(0, open - closeTo), shade: sh });
+  const edgeAt = (t: number) => Math.min(1, Math.max(0, (t - 0.3) / 0.7)) ** 1.5;
+  const opts = (sh: [number, number, number], ts: [number, number, number]) => ({ color: WHITE, petal: true, hinge, axis, close: Math.max(0, open - closeTo), shade: sh, edge: ts.map(edgeAt) as [number, number, number] });
   // Deeper colour at the heart, glowing toward the tip.
   // A dark "face" toward the heart (pansies, poppies) when blotch > 0.
   const blotch = style.blotch ?? 0;
@@ -226,10 +232,10 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
     const l1 = at(t1, -w1);
     const c1 = at(centreT(t1), 0);
     const r1 = at(t1, w1);
-    m.tri(l0, l1, c1, opts([shadeAt(t0, 1), shadeAt(t1, 1), shadeAt(t1, 0)]));
-    m.tri(l0, c1, c0, opts([shadeAt(t0, 1), shadeAt(t1, 0), shadeAt(t0, 0)]));
-    m.tri(c0, c1, r1, opts([shadeAt(t0, 0), shadeAt(t1, 0), shadeAt(t1, 1)]));
-    m.tri(c0, r1, r0, opts([shadeAt(t0, 0), shadeAt(t1, 1), shadeAt(t0, 1)]));
+    m.tri(l0, l1, c1, opts([shadeAt(t0, 1), shadeAt(t1, 1), shadeAt(t1, 0)], [t0, t1, t1]));
+    m.tri(l0, c1, c0, opts([shadeAt(t0, 1), shadeAt(t1, 0), shadeAt(t0, 0)], [t0, t1, t0]));
+    m.tri(c0, c1, r1, opts([shadeAt(t0, 0), shadeAt(t1, 0), shadeAt(t1, 1)], [t0, t1, t1]));
+    m.tri(c0, r1, r0, opts([shadeAt(t0, 0), shadeAt(t1, 1), shadeAt(t0, 1)], [t0, t1, t0]));
   }
 }
 
@@ -290,6 +296,169 @@ export function foliageGeometry(seed: number): THREE.BufferGeometry {
   return m.build();
 }
 
+const ROSE_STEM = new THREE.Color('#4a6a32');
+const ROSE_LEAF = new THREE.Color('#3f6f32');
+const THORN = new THREE.Color('#8a4a3a');
+
+/** A thin tapering cane through `pts`, with a few small hooked thorns along it. */
+function cane(m: FlowerMesh, pts: THREE.Vector3[], r0: number, rng: () => number) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i];
+    const b = pts[i + 1];
+    const ra = r0 * (1 - (i / pts.length) * 0.5);
+    const rb = r0 * (1 - ((i + 1) / pts.length) * 0.5);
+    const dir = b.clone().sub(a).normalize();
+    const u = new THREE.Vector3().crossVectors(dir, Math.abs(dir.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : UP).normalize();
+    const w = new THREE.Vector3().crossVectors(dir, u);
+    for (let k = 0; k < 4; k++) {
+      const a0 = (k / 4) * Math.PI * 2;
+      const a1 = ((k + 1) / 4) * Math.PI * 2;
+      const o = (ang: number, r: number) => u.clone().multiplyScalar(Math.cos(ang) * r).addScaledVector(w, Math.sin(ang) * r);
+      const n = o((a0 + a1) / 2, 1);
+      m.tri(a.clone().add(o(a0, ra)), b.clone().add(o(a1, rb)), b.clone().add(o(a0, rb)), { n, color: ROSE_STEM });
+      m.tri(a.clone().add(o(a0, ra)), a.clone().add(o(a1, ra)), b.clone().add(o(a1, rb)), { n, color: ROSE_STEM });
+    }
+    // Thorns: little red-brown hooks, pointing a touch downward.
+    if (rng() < 0.7) {
+      const ang = rng() * Math.PI * 2;
+      const out = u.clone().multiplyScalar(Math.cos(ang)).addScaledVector(w, Math.sin(ang));
+      const base = a.clone().lerp(b, rng()).addScaledVector(out, ra * 0.8);
+      const tip = base.clone().addScaledVector(out, r0 * 2.2).addScaledVector(dir, -r0 * 0.8);
+      const side = dir.clone().multiplyScalar(r0 * 0.9);
+      m.tri(base.clone().sub(side), base.clone().add(side), tip, { color: THORN });
+    }
+  }
+}
+
+/** A rose leaf: five glossy, toothed leaflets along a stalk (a pair, a pair, and one at the tip). */
+function roseLeaf(m: FlowerMesh, base: THREE.Vector3, dir: THREE.Vector3, len: number, rng: () => number) {
+  const side = new THREE.Vector3().crossVectors(dir, UP).normalize();
+  if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
+  const tone = ROSE_LEAF.clone().multiplyScalar(lerp(0.85, 1.12, rng()));
+  const leaflet = (at: THREE.Vector3, d: THREE.Vector3, l: number) => {
+    const s = new THREE.Vector3().crossVectors(d, UP).normalize().multiplyScalar(l * 0.32);
+    if (s.lengthSq() < 1e-8) s.copy(side).multiplyScalar(l * 0.32);
+    const mid = at.clone().addScaledVector(d, l * 0.5);
+    const tip = at.clone().addScaledVector(d, l);
+    // A saw-toothed edge: the widest points nudged out a little, unevenly.
+    const tooth = 1 + (rng() - 0.5) * 0.25;
+    m.tri(at, mid.clone().addScaledVector(s, tooth), tip, { color: tone, shade: [0.8, 1.05, 1] });
+    m.tri(at, tip, mid.clone().addScaledVector(s, -tooth), { color: tone, shade: [0.8, 1, 1.08] });
+  };
+  for (let k = 0; k < 2; k++) {
+    const at = base.clone().addScaledVector(dir, len * (0.35 + k * 0.3));
+    for (const sgn of [-1, 1]) {
+      const d = dir.clone().multiplyScalar(0.45).addScaledVector(side, sgn).add(new THREE.Vector3(0, 0.15, 0)).normalize();
+      leaflet(at, d, len * lerp(0.42, 0.5, rng()));
+    }
+  }
+  leaflet(base.clone().addScaledVector(dir, len * 0.85), dir.clone().add(new THREE.Vector3(0, 0.1, 0)).normalize(), len * 0.55);
+}
+
+/**
+ * A rose bloom at `top`: petals in a golden-angle spiral, wrapped tight and cupped at the heart,
+ * opening and curling back toward the outside. `opened` (0 bud … 1 full) sets how far this bloom
+ * has opened, so one bush carries buds, half-open and open roses together.
+ */
+function roseBloom(m: FlowerMesh, top: THREE.Vector3, size: number, petals: number, opened: number, wild: boolean, rng: () => number) {
+  sepals(m, top, size * 0.7, rng);
+  if (wild) {
+    // A simple open five-petalled rose with a boss of golden stamens.
+    const off = rng() * Math.PI * 2;
+    for (let i = 0; i < 5; i++) {
+      const az = off + (i / 5) * Math.PI * 2 + (rng() - 0.5) * 0.15;
+      petal(m, top.clone(), az, lerp(0.5, 1.35, opened), size * lerp(0.92, 1.08, rng()), size * 1.05, 0.12, 0.1, rng, { notch: true });
+    }
+    m.addGeometry(new THREE.IcosahedronGeometry(size * 0.18, 1).scale(1, 0.5, 1).translate(top.x, top.y + size * 0.05, top.z), new THREE.Color('#d8c050'), false, top);
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const dot = new THREE.IcosahedronGeometry(size * 0.05, 0).translate(top.x + Math.cos(a) * size * 0.26, top.y + size * 0.1, top.z + Math.sin(a) * size * 0.26);
+      m.addGeometry(dot, new THREE.Color('#f2c230'), false, top);
+    }
+    return;
+  }
+  const off = rng() * Math.PI * 2;
+  for (let i = petals - 1; i >= 0; i--) {
+    const k = i / (petals - 1); // 0 = the heart … 1 = the outermost
+    const az = off + i * 2.39996 + (rng() - 0.5) * 0.2;
+    // Inner petals stand tight and upright; outer ones open (more so on an open bloom) and curl back.
+    const reach = k * (0.35 + opened * 0.65);
+    const open = lerp(0.12, 0.35, k) + reach * 1.35;
+    const len = size * lerp(0.42, 1.0, Math.sqrt(k)) * lerp(0.92, 1.08, rng());
+    const width = len * lerp(0.95, 1.15, rng());
+    const ring = size * 0.18 * k;
+    const hinge = top.clone().add(new THREE.Vector3(Math.cos(az) * ring, size * 0.12 * (1 - k), Math.sin(az) * ring));
+    const cup = lerp(0.45, 0.05, k) * (1 - opened * 0.4);
+    petal(m, hinge, az, open, len, width, cup, 0.06, rng);
+  }
+}
+
+/**
+ * A rose bush of one of six habits, built of thorny canes with five-leaflet leaves and roses in
+ * every stage from bud to full bloom. Returns where the highest bloom sits.
+ */
+function roseBush(m: FlowerMesh, type: 'tea' | 'floribunda' | 'cabbage' | 'climber' | 'wild' | 'mini', height: number, size: number, rng: () => number): THREE.Vector3 {
+  const petals = type === 'cabbage' ? 42 : type === 'tea' ? 26 : type === 'mini' ? 16 : type === 'floribunda' ? 20 : 22;
+  const canes = type === 'tea' ? 2 : type === 'cabbage' ? 3 : type === 'floribunda' ? 3 : type === 'climber' ? 3 : type === 'wild' ? 4 : 4;
+  let top = new THREE.Vector3(0, 0, 0);
+  for (let c = 0; c < canes; c++) {
+    const az = (c / canes) * Math.PI * 2 + rng() * 1.2;
+    const d = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
+    // Climbers and wild roses arch outward; the rest grow fairly upright.
+    const arch = type === 'climber' ? lerp(0.25, 0.4, rng()) : type === 'wild' ? lerp(0.15, 0.25, rng()) : lerp(0.02, 0.08, rng());
+    const h = height * lerp(0.75, 1.05, rng()) * (c === 0 ? 1 : 0.85);
+    const pts: THREE.Vector3[] = [];
+    const segs = 6;
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const out = arch * Math.sin(t * Math.PI * 0.6) + c * 0.012;
+      const droop = type === 'climber' || type === 'wild' ? Math.max(0, t - 0.75) * arch * 0.6 : 0;
+      pts.push(new THREE.Vector3(d.x * out, h * t - droop, d.z * out));
+    }
+    cane(m, pts, type === 'mini' ? 0.0035 : 0.005, rng);
+    // Leaves all along (climbers more), each a spray of five.
+    const leaves = type === 'climber' ? 5 : type === 'mini' ? 2 : 3;
+    for (let l = 0; l < leaves; l++) {
+      const t = lerp(0.2, 0.85, (l + rng() * 0.6) / leaves);
+      const at = pts[Math.floor(t * segs)].clone().lerp(pts[Math.min(segs, Math.floor(t * segs) + 1)], (t * segs) % 1);
+      const la = rng() * Math.PI * 2;
+      const dir = new THREE.Vector3(Math.cos(la), lerp(-0.1, 0.4, rng()), Math.sin(la)).normalize();
+      roseLeaf(m, at, dir, (type === 'mini' ? 0.06 : 0.085) * lerp(0.85, 1.15, rng()), rng);
+    }
+    // Blooms: one at the tip (a cluster on floribundas and patio roses; along the cane on climbers and wild roses).
+    const tip = pts[segs];
+    const blooms: THREE.Vector3[] = [];
+    if (type === 'floribunda' || type === 'mini') {
+      const n = type === 'mini' ? 3 + Math.floor(rng() * 3) : 3 + Math.floor(rng() * 3);
+      for (let b = 0; b < n; b++) {
+        const a = (b / n) * Math.PI * 2 + rng();
+        const r = b === 0 ? 0 : size * lerp(1.4, 2.0, rng());
+        blooms.push(tip.clone().add(new THREE.Vector3(Math.cos(a) * r, -r * 0.4 - (b ? size * 0.3 : 0), Math.sin(a) * r)));
+      }
+    } else if (type === 'climber' || type === 'wild') {
+      for (const t of [1, 0.78, 0.6]) {
+        const i = Math.round(t * segs);
+        blooms.push(pts[i].clone().add(new THREE.Vector3((rng() - 0.5) * size, size * 0.4, (rng() - 0.5) * size)));
+      }
+    } else blooms.push(tip.clone());
+    for (const [b, at] of blooms.entries()) {
+      // A mix of stages on every bush: mostly open, some half, the odd tight bud.
+      const r = rng();
+      const opened = b === 0 && type !== 'wild' ? lerp(0.55, 1, rng()) : r < 0.2 ? 0.05 : r < 0.5 ? 0.45 : lerp(0.7, 1, rng());
+      if (b > 0) {
+        // A short stalk from the cane to each side bloom.
+        const from = tip.clone().lerp(at, 0.2);
+        from.y = Math.min(from.y, at.y);
+        m.tri(from.clone().add(new THREE.Vector3(-0.002, 0, 0)), at, from.clone().add(new THREE.Vector3(0.002, 0, 0)), { color: ROSE_STEM });
+      }
+      const s = size * (opened < 0.2 ? 0.55 : 1) * lerp(0.9, 1.1, rng());
+      roseBloom(m, at, s, opened < 0.2 ? Math.round(petals * 0.4) : petals, opened, type === 'wild', rng);
+      if (at.y > top.y) top = at.clone();
+    }
+  }
+  return top;
+}
+
 /** Storybook proportions: blooms drawn about twice life size so they read from the garden camera. */
 const HEAD = 2.8;
 
@@ -298,6 +467,12 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number): THREE.BufferGeo
   const rng = createRng(seed);
   const m = new FlowerMesh();
   const height = lerp(sp.height[0], sp.height[1], rng());
+  if (sp.form.kind === 'rose') {
+    const top = roseBush(m, sp.form.type, height, sp.form.size * HEAD, rng);
+    const geo = m.build();
+    geo.userData.headY = top.y;
+    return geo;
+  }
   const lean = new THREE.Vector3((rng() - 0.5) * 0.06, 0, (rng() - 0.5) * 0.06);
   const top = stem(m, height, lean, rng);
   const base = sp.form;
@@ -462,7 +637,7 @@ export class Flowers {
   private readonly uniforms = { uFlowerTime: { value: 0 } };
   private readonly grid = new Map<string, { x: number; z: number; r: number }[]>();
   private readonly blooms: Pending[] = [];
-  private readonly heads: { pos: THREE.Vector3; openAt: number; species: string }[] = [];
+  private readonly heads: { pos: THREE.Vector3; openAt: number; species: string; color: THREE.Color }[] = [];
   /** Every plant placed, by 1 m cell, so the eraser can find them. */
   private readonly placed = new Map<string, Placed[]>();
   private readonly wilting: { p: Placed; t: number }[] = [];
@@ -488,13 +663,13 @@ export class Flowers {
             '#include <common>',
             /* glsl */ `#include <common>
             uniform float uFlowerTime;
-            attribute float aIsPetal, aClose, aBirth, aBloomMax, aGlow;
-            attribute vec3 aHinge, aAxis, aPetalColor;
+            attribute float aIsPetal, aClose, aBirth, aBloomMax, aGlow, aEdge;
+            attribute vec3 aHinge, aAxis, aPetalColor, aEdgeColor;
             varying float vGlow;`,
           )
           .replace(
             '#include <color_vertex>',
-            '#include <color_vertex>\nvColor.rgb = mix(vColor.rgb, vColor.rgb * aPetalColor, aIsPetal);',
+            '#include <color_vertex>\nvColor.rgb = mix(vColor.rgb, vColor.rgb * mix(aPetalColor, aEdgeColor, aEdge), aIsPetal);',
           )
           .replace(
             '#include <begin_vertex>',
@@ -560,6 +735,7 @@ export class Flowers {
     geo.setAttribute('aBirth', new THREE.InstancedBufferAttribute(new Float32Array(capacity).fill(1e6), 1));
     geo.setAttribute('aBloomMax', new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1));
     geo.setAttribute('aPetalColor', new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
+    geo.setAttribute('aEdgeColor', new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
     const mesh = new THREE.InstancedMesh(geo, material, capacity);
     mesh.count = 0;
     mesh.visible = false;
@@ -575,7 +751,7 @@ export class Flowers {
     this.write(mesh, x, y, z, yaw, scale, delay + regrow.offset, 1, color);
   }
 
-  private write(mesh: THREE.InstancedMesh, x: number, y: number, z: number, yaw: number, scale: number, delay: number, bloomMax: number, color: THREE.Color): boolean {
+  private write(mesh: THREE.InstancedMesh, x: number, y: number, z: number, yaw: number, scale: number, delay: number, bloomMax: number, color: THREE.Color, edge: THREE.Color = color): boolean {
     if (mesh.count >= (mesh.geometry.attributes.aBirth as THREE.InstancedBufferAttribute).count) return false;
     const i = mesh.count++;
     mesh.visible = true;
@@ -597,6 +773,7 @@ export class Flowers {
     set('aBirth', [this.time + delay]);
     set('aBloomMax', [bloomMax]);
     set('aPetalColor', [color.r, color.g, color.b]);
+    set('aEdgeColor', [edge.r, edge.g, edge.b]);
     return true;
   }
 
@@ -615,10 +792,10 @@ export class Flowers {
     return false;
   }
 
-  plant(sp: FlowerSpecies, variant: number, x: number, y: number, z: number, yaw: number, scale: number, delay: number, bloomMax: number, color: THREE.Color) {
+  plant(sp: FlowerSpecies, variant: number, x: number, y: number, z: number, yaw: number, scale: number, delay: number, bloomMax: number, color: THREE.Color, edge?: THREE.Color) {
     delay += regrow.offset;
     const mesh = this.variants(sp)[variant % VARIANTS];
-    if (!this.write(mesh, x, y, z, yaw, scale, delay, bloomMax, color)) return;
+    if (!this.write(mesh, x, y, z, yaw, scale, delay, bloomMax, color, edge)) return;
     const birth = this.time + delay;
 
     const key = `${Math.floor(x)},${Math.floor(z)}`;
@@ -627,7 +804,7 @@ export class Flowers {
     if (bloomMax > 0.5) {
       this.blooms.push({ at: birth + BLOOM_START + 0.6, pos: new THREE.Vector3(x, y, z) });
       const headY = (mesh.geometry.userData.headY as number) ?? 0.4;
-      this.heads.push({ pos: new THREE.Vector3(x, y + headY * scale + 0.03, z), openAt: birth + BLOOM_END, species: sp.id });
+      this.heads.push({ pos: new THREE.Vector3(x, y + headY * scale + 0.03, z), openAt: birth + BLOOM_END, species: sp.id, color: (edge ?? color).clone() });
     }
   }
 
@@ -670,7 +847,7 @@ export class Flowers {
   }
 
   /** Open blooms with their species (for visitors with favourite flowers). */
-  openHeads(): { pos: THREE.Vector3; species: string }[] {
+  openHeads(): { pos: THREE.Vector3; species: string; color: THREE.Color }[] {
     return this.heads.filter((h) => this.time >= h.openAt);
   }
 

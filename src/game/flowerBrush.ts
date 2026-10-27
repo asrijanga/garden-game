@@ -342,8 +342,18 @@ export class FlowerBrush {
     }
   }
 
+  /**
+   * The chosen species and, for those with a colour choice (roses), which colour: the selection
+   * is saved as "species" or "species:colourIndex".
+   */
+  private choice(): { id: string; colour: number } {
+    const [id, c] = this.selected.split(':');
+    return { id, colour: c === undefined ? -1 : Number(c) };
+  }
+
   private pickSpecies(): FlowerSpecies {
-    if (this.selected !== MIX_ID) return SPECIES.find((s) => s.id === this.selected) ?? SPECIES[0];
+    const { id } = this.choice();
+    if (id !== MIX_ID) return SPECIES.find((s) => s.id === id) ?? SPECIES[0];
     const blooming = SPECIES.filter((s) => this.inSeason(s));
     const pool = blooming.length ? blooming : SPECIES;
     return pool[Math.floor(this.rng() * pool.length)];
@@ -385,8 +395,16 @@ export class FlowerBrush {
       if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.67) continue;
       // Room round each plant: a cottage-garden scatter, not a carpet.
       if (this.flowers.isCrowded(x, z, sp.spacing * FLOWER_SCALE * SPACING)) continue;
-      const base = new THREE.Color(sp.colors[Math.floor(this.rng() * sp.colors.length)]);
-      const color = base.offsetHSL((this.rng() - 0.5) * 0.03, (this.rng() - 0.5) * 0.1, (this.rng() - 0.5) * 0.06);
+      // A colour from the species' list (or the one chosen for it); "base|edge" is a bicolour.
+      const pick = Math.floor(this.rng() * sp.colors.length);
+      const { id: chosenId, colour: chosen } = this.choice();
+      const entry = sp.colors[sp.id === chosenId && chosen >= 0 && chosen < sp.colors.length ? chosen : pick];
+      const [baseHex, edgeHex] = entry.split('|');
+      const dh = (this.rng() - 0.5) * 0.03;
+      const ds = (this.rng() - 0.5) * 0.1;
+      const dl = (this.rng() - 0.5) * 0.06;
+      const color = new THREE.Color(baseHex).offsetHSL(dh, ds, dl);
+      const edge = edgeHex ? new THREE.Color(edgeHex).offsetHSL(dh, ds, dl) : undefined;
       // The wave: plants further from the stroke sprout a little later.
       const delay = this.strokeTime * 0.2 + 0.1 + (r / PLANT_RADIUS) * 0.9 + this.rng() * 0.25;
       this.flowers.plant(
@@ -401,6 +419,7 @@ export class FlowerBrush {
         // Out of season: plump, half-open buds in their colour, so the bed clearly looks planted.
         this.inSeason(sp) ? lerp(0.9, 1, this.rng()) : lerp(0.3, 0.4, this.rng()),
         color,
+        edge,
       );
     }
   }

@@ -16,6 +16,7 @@ import { Vines } from './world/vines';
 import { Bunnies } from './world/bunnies';
 import { Ducks } from './world/ducks';
 import { Hummingbirds } from './world/hummingbirds';
+import { FallingPetals } from './world/petals';
 import { GroundPaint } from './world/groundPaint';
 import { Stones } from './world/stones';
 import { EdgePlants } from './world/edgePlants';
@@ -456,7 +457,7 @@ const perchingBirds = new PerchingBirds(perchesNow, fromTheWoods, (at) => {
 });
 scene.add(perchingBirds.group);
 // Open bed flowers with their species, refreshed a few times a second (visitors pick favourites).
-let headsCache: { pos: THREE.Vector3; species: string }[] = [];
+let headsCache: { pos: THREE.Vector3; species: string; color: THREE.Color }[] = [];
 let headsAt = -Infinity;
 const openHeads = () => {
   const now = performance.now();
@@ -602,7 +603,11 @@ const hummingbirds = new Hummingbirds(season, {
 });
 scene.add(hummingbirds.group);
 
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, paint, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
+// Rose petals now and then drifting down on the breeze.
+const petals = new FallingPetals(openHeads, (x, z) => ground.heightAt(x, z), () => new THREE.Vector2(wind.direction.x, wind.direction.y).multiplyScalar(0.2 + wind.sample(0, 0) * 0.5));
+scene.add(petals.mesh);
+
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, paint, petals, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -893,6 +898,7 @@ function frame(time: number) {
     bunnies.update(dt);
     ducks.update(dt);
     hummingbirds.update(dt);
+    petals.update(dt);
     perchingBirds.update(dt);
     butterflies.update(dt);
     dragonflies.update(dt);

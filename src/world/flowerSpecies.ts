@@ -37,6 +37,13 @@ export type FlowerForm =
   | { kind: 'cup'; petals: number; length: number; width: number; open: number }
   | { kind: 'spike'; florets: number; spikeLength: number; floretSize: number; bell: boolean }
   | {
+      kind: 'rose';
+      /** Hybrid tea, floribunda, English/cabbage, climber, shrub/wild, miniature/patio. */
+      type: 'tea' | 'floribunda' | 'cabbage' | 'climber' | 'wild' | 'mini';
+      /** Bloom radius (metres, before storybook scaling). */
+      size: number;
+    }
+  | {
       kind: 'cluster';
       florets: number;
       radius: number;
@@ -56,6 +63,29 @@ export interface FlowerSpecies {
   /** Minimum spacing between plants, metres. */
   spacing: number;
 }
+
+/**
+ * Rose colours, from classic red to white, with blends and bicolours written "base|edge"
+ * (the petal shades from one at the heart to the other at its edge).
+ */
+const ROSE_COLOURS = [
+  '#c8102e', // classic red
+  '#a8102a', // crimson
+  '#6e0f22', // burgundy
+  '#f6c6cc', // blush
+  '#e8407a', // hot pink
+  '#f2735a', // coral
+  '#f6b48a', // peach
+  '#f2a05a', // apricot
+  '#f6d23a', // sunshine yellow
+  '#f6ecd0', // cream
+  '#fbf8f2', // white
+  '#c8b0dc', // lavender
+  '#b48aa8', // mauve
+  '#f6d23a|#e8407a', // yellow blushing pink at the edges
+  '#fbf8f2|#c8102e', // white edged in red
+  '#f6b48a|#f6ecd0', // peach fading to cream
+];
 
 export const SPECIES: FlowerSpecies[] = [
   {
@@ -573,6 +603,61 @@ export const SPECIES: FlowerSpecies[] = [
     colors: ['#f6d64a', '#f2c21c'],
     form: { kind: 'cup', petals: 6, length: 0.024, width: 0.02, open: 0.8 },
     spacing: 0.08,
+  },
+  // --- Roses (late spring to autumn) ---
+  {
+    id: 'rose-tea',
+    name: 'Hybrid tea rose',
+    seasons: ['spring', 'summer', 'autumn'],
+    height: [0.6, 0.8],
+    colors: ROSE_COLOURS,
+    form: { kind: 'rose', type: 'tea', size: 0.03 },
+    spacing: 0.26,
+  },
+  {
+    id: 'rose-floribunda',
+    name: 'Floribunda rose',
+    seasons: ['spring', 'summer', 'autumn'],
+    height: [0.45, 0.6],
+    colors: ROSE_COLOURS,
+    form: { kind: 'rose', type: 'floribunda', size: 0.021 },
+    spacing: 0.26,
+  },
+  {
+    id: 'rose-cabbage',
+    name: 'English rose',
+    seasons: ['spring', 'summer', 'autumn'],
+    height: [0.55, 0.72],
+    colors: ['#f2a6c0', '#f6c6cc', '#e8407a', '#f6ecd0', '#fbf8f2', '#f6b48a', '#f2a05a', '#c8102e', '#6e0f22', '#b48aa8', '#f6ecd0|#f2a6c0', '#f6b48a|#f6ecd0'],
+    form: { kind: 'rose', type: 'cabbage', size: 0.034 },
+    spacing: 0.3,
+  },
+  {
+    id: 'rose-climber',
+    name: 'Climbing rose',
+    seasons: ['spring', 'summer', 'autumn'],
+    height: [0.9, 1.2],
+    colors: ROSE_COLOURS,
+    form: { kind: 'rose', type: 'climber', size: 0.024 },
+    spacing: 0.34,
+  },
+  {
+    id: 'rose-wild',
+    name: 'Wild rose',
+    seasons: ['spring', 'summer'],
+    height: [0.5, 0.7],
+    colors: ['#f6c6cc', '#f2a6c0', '#fbf8f2', '#e8407a', '#fbf8f2|#f2a6c0'],
+    form: { kind: 'rose', type: 'wild', size: 0.024 },
+    spacing: 0.3,
+  },
+  {
+    id: 'rose-mini',
+    name: 'Patio rose',
+    seasons: ['spring', 'summer', 'autumn'],
+    height: [0.24, 0.34],
+    colors: ROSE_COLOURS,
+    form: { kind: 'rose', type: 'mini', size: 0.016 },
+    spacing: 0.17,
   },
 ];
 
