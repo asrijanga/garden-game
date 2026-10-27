@@ -23,6 +23,10 @@ export class GroundPaint {
   private y0 = 0;
   private x1 = -1;
   private y1 = -1;
+  private patch = new Uint8Array(SIZE * 64 * 4);
+  private renderer: THREE.WebGLRenderer | null = null;
+  /** A full upload is still waiting for the texture to reach the GPU. */
+  private pendingFull = true;
   private readonly clearing: { x: number; z: number; r: number; t: number }[] = [];
   /**
    * Everything painted, in order, so the canvas can be repainted if the browser throws it
@@ -69,7 +73,15 @@ export class GroundPaint {
     }
   }
 
-  /** Copy the changed patch into the texture's pixels and queue just those rows for upload. */
+  /** Upload changed patches straight to the GPU (once the texture is there), in a single call. */
+  attach(renderer: THREE.WebGLRenderer) {
+    this.renderer = renderer;
+  }
+
+  /**
+   * Copy the changed patch into our pixels, and send just that rectangle to the GPU in one call
+   * (three.js would send a dirty region row by row: a hundred calls a frame while erasing).
+   */
   private flush() {
     if (this.x0 > this.x1) return;
     const x0 = Math.max(0, Math.floor(this.x0) - 1);
@@ -82,16 +94,32 @@ export class GroundPaint {
     const h = y1 - y0;
     if (w <= 0 || h <= 0) return;
     const px = this.ctx.getImageData(x0, y0, w, h).data;
-    const whole = w * h > SIZE * SIZE * 0.4;
+    // Rows go in upside down (canvas top = texture bottom), as a canvas texture's would; the
+    // patch is packed bottom row first for its own upload.
+    if (this.patch.length < w * h * 4) this.patch = new Uint8Array(SIZE * Math.max(h, 64) * 4);
     for (let row = 0; row < h; row++) {
-      // Rows go in upside down (canvas top = texture bottom), as a canvas texture's would.
-      const ty = SIZE - 1 - (y0 + row);
-      const start = (ty * SIZE + x0) * 4;
-      this.data.set(px.subarray(row * w * 4, (row + 1) * w * 4), start);
-      if (!whole) this.texture.addUpdateRange(start, w * 4);
+      const src = px.subarray(row * w * 4, (row + 1) * w * 4);
+      this.data.set(src, ((SIZE - 1 - (y0 + row)) * SIZE + x0) * 4);
+      this.patch.set(src, (h - 1 - row) * w * 4);
     }
-    if (whole) this.texture.clearUpdateRanges();
-    this.texture.needsUpdate = true;
+    const r = this.renderer;
+    const tex = r ? (r.properties.get(this.texture) as { __webglTexture?: WebGLTexture }).__webglTexture : undefined;
+    if (!r || !tex || this.pendingFull) {
+      // Not on the GPU yet (or a whole repaint): let three.js upload the lot.
+      this.texture.needsUpdate = true;
+      this.pendingFull = !tex;
+      return;
+    }
+    const gl = r.getContext() as WebGL2RenderingContext;
+    const st = r.state;
+    st.bindTexture(gl.TEXTURE_2D, tex);
+    st.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    st.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    st.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    st.pixelStorei(gl.UNPACK_ROW_LENGTH, 0);
+    st.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0);
+    st.pixelStorei(gl.UNPACK_SKIP_ROWS, 0);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, x0, SIZE - y1, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.patch, 0);
   }
 
   /** Has the browser wiped the canvas behind our back? */

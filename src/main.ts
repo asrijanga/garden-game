@@ -122,6 +122,7 @@ sun.shadow.radius = 4;
 scene.add(sun);
 
 const paint = new GroundPaint();
+paint.attach(renderer);
 const pondTexture = createPondTexture();
 const ground = new Ground(WORLD_SEED, palette, paint.texture, pondTexture);
 scene.add(ground.mesh);
