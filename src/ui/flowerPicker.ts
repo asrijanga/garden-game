@@ -98,6 +98,7 @@ export class FlowerPicker {
   private readonly blooming = new Set<string>();
   private readonly kept = new Set<string>();
   private readonly colours: HTMLDivElement;
+  private readonly coloursBar: HTMLDivElement;
   /** The colour chosen for each species with a colour choice (-1: mixed). */
   private readonly colour = new Map<string, number>();
   /** Opens the flower book (set by whoever owns it). */
@@ -145,10 +146,14 @@ export class FlowerPicker {
       row.append(b);
     }
     // A row of colour swatches above the chips, for flowers that offer a colour choice (roses).
+    // (Its own strip, floating just above the chips: inside the scrolling row it would be clipped.)
+    this.coloursBar = document.createElement('div');
+    this.coloursBar.className = 'colour-bar';
     this.colours = document.createElement('div');
     this.colours.className = 'colour-row';
-    this.colours.addEventListener('pointerdown', (e) => e.stopPropagation());
-    this.el.prepend(this.colours);
+    this.coloursBar.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.coloursBar.append(this.colours);
+    document.body.append(this.coloursBar);
     document.body.append(this.el);
     this.select(MIX_ID);
   }
@@ -206,5 +211,8 @@ export class FlowerPicker {
 
   setVisible(v: boolean) {
     this.el.classList.toggle('show', v);
+    this.coloursBar.classList.toggle('show', v);
+    if (!v) document.body.classList.remove('choosing-colour');
+    else if (this.colours.classList.contains('show')) document.body.classList.add('choosing-colour');
   }
 }

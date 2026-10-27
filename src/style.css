@@ -647,3 +647,27 @@ body.picking .sound-hint {
 body.picking.choosing-colour .tool-label {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 226px);
 }
+.colour-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 184px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  touch-action: pan-x;
+  z-index: 9;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.colour-bar::-webkit-scrollbar {
+  display: none;
+}
+.colour-bar.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.colour-row {
+  padding: 6px 16px 6px;
+}
