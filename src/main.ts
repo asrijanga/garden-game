@@ -24,6 +24,7 @@ import { PathBuilder } from './game/pathBuilder';
 import { FlowerBrush } from './game/flowerBrush';
 import { Flowers } from './world/flowers';
 import { SPECIES } from './world/flowerSpecies';
+import { FlowerBook } from './ui/flowerBook';
 import { FlowerPicker } from './ui/flowerPicker';
 import { Bees } from './world/bees';
 import { Ponds, createPondTexture } from './world/pond';
@@ -375,6 +376,12 @@ const picker = new FlowerPicker(flowerBrush.ordered(), (sp) => flowerBrush.inSea
   ambience.tap(1.3);
   toolbar.showLabel(label, 1800);
 });
+// The flower book: every species to browse, blooming-now first.
+const flowerBook = new FlowerBook(SPECIES, season, (id) => picker.pick(id));
+picker.onBook = () => {
+  ambience.tap(1.1);
+  flowerBook.setVisible(true);
+};
 const eraser = new EraseBrush(
   {
     stones,

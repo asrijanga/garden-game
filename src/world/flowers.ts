@@ -350,6 +350,13 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number): THREE.BufferGeo
       centre.translate(top.x, top.y + f.centerSize * 0.25, top.z);
       m.addGeometry(centre, new THREE.Color(f.center), false, top);
     }
+    if (f.corona) {
+      // Daffodil: a frilled trumpet standing up out of the middle.
+      const len = f.length * f.corona.length;
+      const cup = new THREE.CylinderGeometry(f.centerSize * 1.9, f.centerSize * 1.1, len, 12, 1, true);
+      cup.translate(top.x, top.y + len * 0.5, top.z);
+      m.addGeometry(cup, new THREE.Color(f.corona.color), false, top);
+    }
     if (f.stamens) {
       // Anemone: a ring of golden stamens round the green centre.
       const c = new THREE.Color(f.stamens);
@@ -362,19 +369,32 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number): THREE.BufferGeo
     }
     m.setTilt(null, null);
   } else if (f.kind === 'cluster') {
-    // Sedum: a flat-topped dome of tiny star florets.
+    // Sedum and yarrow: a flat-topped head of tiny star florets; hydrangea a rounded mophead;
+    // allium a ball of stars held up on its bare stem.
+    const shape = f.shape ?? 'flat';
     for (let i = 0; i < f.florets; i++) {
-      const r = Math.sqrt(rng()) * f.radius;
-      const a = rng() * Math.PI * 2;
-      const y = top.y + (1 - (r / f.radius) ** 2) * f.radius * 0.35;
-      const attach = new THREE.Vector3(top.x + Math.cos(a) * r, y, top.z + Math.sin(a) * r);
+      let attach: THREE.Vector3;
+      if (shape === 'globe') {
+        // Evenly round the sphere (a Fibonacci spiral), with a little jitter.
+        const t = (i + 0.5) / f.florets;
+        const phi = Math.acos(1 - 2 * t);
+        const th = i * 2.39996 + rng() * 0.3;
+        const r = f.radius * lerp(0.92, 1.05, rng());
+        attach = new THREE.Vector3(top.x + Math.sin(phi) * Math.cos(th) * r, top.y + f.radius * 0.85 + Math.cos(phi) * r, top.z + Math.sin(phi) * Math.sin(th) * r);
+      } else {
+        const r = Math.sqrt(rng()) * f.radius;
+        const a = rng() * Math.PI * 2;
+        const rise = shape === 'dome' ? 0.85 : 0.35;
+        const y = top.y + (1 - (r / f.radius) ** 2) * f.radius * rise + (shape === 'dome' ? f.floretSize * rng() : 0);
+        attach = new THREE.Vector3(top.x + Math.cos(a) * r, y, top.z + Math.sin(a) * r);
+      }
       const g = new THREE.OctahedronGeometry(f.floretSize * lerp(0.8, 1.2, rng()), 0);
       g.scale(1, 0.5, 1);
       g.translate(attach.x, attach.y, attach.z);
       m.addGeometry(g, WHITE, true, top);
     }
-    // Short branching stalks under the dome.
-    for (let i = 0; i < 5; i++) {
+    // Short branching stalks under the dome (an allium's stalks are hidden inside its ball).
+    for (let i = 0; i < (shape === 'globe' ? 0 : 5); i++) {
       const a = (i / 5) * Math.PI * 2;
       const tip = top.clone().add(new THREE.Vector3(Math.cos(a) * f.radius * 0.6, f.radius * 0.1, Math.sin(a) * f.radius * 0.6));
       const side = new THREE.Vector3(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(0.004);
@@ -451,7 +471,12 @@ export class Flowers {
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
 
-  constructor(species: FlowerSpecies[], private readonly onBloom: (p: THREE.Vector3) => void) {
+  private readonly material: THREE.MeshLambertMaterial;
+
+  constructor(
+    private readonly species: FlowerSpecies[],
+    private readonly onBloom: (p: THREE.Vector3) => void,
+  ) {
     const material = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     addWind(
       material,
@@ -513,11 +538,22 @@ export class Flowers {
       this.foliage.push(this.makeMesh(foliageGeometry(500 + v * 31), material, FOLIAGE_CAPACITY));
     }
 
-    species.forEach((sp, si) => {
-      const list: THREE.InstancedMesh[] = [];
-      for (let v = 0; v < VARIANTS; v++) list.push(this.makeMesh(flowerGeometry(sp, 1000 + si * 97 + v * 13), material, CAPACITY));
+    this.material = material;
+  }
+
+  /**
+   * A species' meshes, made the first time it's planted (with 50+ species, building them all up
+   * front would hold tens of megabytes of empty instance buffers on the phone).
+   */
+  private variants(sp: FlowerSpecies): THREE.InstancedMesh[] {
+    let list = this.meshes.get(sp.id);
+    if (!list) {
+      const si = this.species.indexOf(sp);
+      list = [];
+      for (let v = 0; v < VARIANTS; v++) list.push(this.makeMesh(flowerGeometry(sp, 1000 + si * 97 + v * 13), this.material, CAPACITY));
       this.meshes.set(sp.id, list);
-    });
+    }
+    return list;
   }
 
   private makeMesh(geo: THREE.BufferGeometry, material: THREE.Material, capacity: number): THREE.InstancedMesh {
@@ -581,7 +617,7 @@ export class Flowers {
 
   plant(sp: FlowerSpecies, variant: number, x: number, y: number, z: number, yaw: number, scale: number, delay: number, bloomMax: number, color: THREE.Color) {
     delay += regrow.offset;
-    const mesh = this.meshes.get(sp.id)![variant % VARIANTS];
+    const mesh = this.variants(sp)[variant % VARIANTS];
     if (!this.write(mesh, x, y, z, yaw, scale, delay, bloomMax, color)) return;
     const birth = this.time + delay;
 
