@@ -8,8 +8,8 @@ import type { Wildflowers } from '../world/wildflowers';
 
 const STEP = 0.12; // metres the path advances per smoothing step
 const STONE_SPACING = 0.8; // centre stones
-const GRAVEL_RADIUS = 0.8; // painted gravel; its visible edge (~80% of this) sits under the edging
-const CURB_OFFSET = 0.62; // centre line → edging stone centre
+const GRAVEL_RADIUS = 0.6; // painted gravel; its visible edge (~80% of this) sits under the edging
+const CURB_OFFSET = 0.46; // centre line → edging stone centre
 const INSIDE = CURB_OFFSET - 0.1; // closer than this to a centre line = inside that path
 const CELL = 1; // spatial hash for path centre lines
 const LEAD = 0.55; // the finger leads the path by this much before it moves on (ignores jitter)
@@ -136,7 +136,7 @@ export class PathBuilder {
     const gravel = GRAVEL_RADIUS * (1 + flare * flare * 0.9);
     const curbOffset = CURB_OFFSET * (1 + flare * flare * 1.1);
     this.paint.wear(w.x, w.y, gravel, 1, 1);
-    this.wildflowers.clearNear(w.x, w.y, 1.1 + flare);
+    this.wildflowers.clearNear(w.x, w.y, 0.85 + flare);
 
     // Merging: the old path's edging that now sits inside our (flared) gravel is lifted away.
     this.stones.removeNear(w.x, w.y, INSIDE * (1 + flare * flare * 1.6), 'curb', this.pathId);
@@ -195,10 +195,10 @@ export class PathBuilder {
     // Clover and tiny flowers grow along the outside of the edging a moment later.
     if (this.rng() < 0.25) {
       const s = this.rng() < 0.5 ? -1 : 1;
-      const o = lerp(0.82, 1.0, this.rng());
+      const o = lerp(0.62, 0.78, this.rng());
       const ex = w.x + perp.x * s * o + (this.rng() - 0.5) * 0.2;
       const ez = w.y + perp.y * s * o + (this.rng() - 0.5) * 0.2;
-      if (!this.blocked(ex, ez) && this.distanceTo(ex, ez, false) > 0.78 && !this.stones.isOccupied(ex, ez, 0.12)) {
+      if (!this.blocked(ex, ez) && this.distanceTo(ex, ez, false) > 0.58 && !this.stones.isOccupied(ex, ez, 0.12)) {
         this.edges.add(ex, this.ground.heightAt(ex, ez), ez, lerp(0.7, 1.6, this.rng()));
       }
     }

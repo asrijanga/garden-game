@@ -305,7 +305,7 @@ export class FlowerBrush {
     edge.sort((a, b) => a.order - b.order);
     let delay = 0.15;
     for (const e of edge) {
-      if (this.blocked(e.x, e.z) || this.distanceToPaths(e.x, e.z) < 0.7) continue;
+      if (this.blocked(e.x, e.z) || this.distanceToPaths(e.x, e.z) < 0.52) continue;
       if (this.stones.isOccupied(e.x, e.z, EDGE_SPACING * 0.5, 'rock')) continue;
       const size = lerp(0.2, 0.3, this.rng() ** 1.3);
       // Tangent from the field's gradient, so stones run along the curve.
@@ -336,7 +336,7 @@ export class FlowerBrush {
   }
 
   private dab(c: THREE.Vector2) {
-    if (this.blocked(c.x, c.y) || this.distanceToPaths(c.x, c.y) < 0.7) return;
+    if (this.blocked(c.x, c.y) || this.distanceToPaths(c.x, c.y) < 0.52) return;
     this.paint.bed(c.x, c.y, BED_RADIUS);
     const centre = c.clone();
     this.beds.push({ c: centre, stroke: this.strokeId });
@@ -350,7 +350,7 @@ export class FlowerBrush {
       const r = Math.sqrt(this.rng()) * PLANT_RADIUS * 0.95;
       const x = c.x + Math.cos(a) * r;
       const z = c.y + Math.sin(a) * r;
-      if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.8 || this.foliageNear(x, z, FOLIAGE_SPACING)) continue;
+      if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.62 || this.foliageNear(x, z, FOLIAGE_SPACING)) continue;
       this.addFoliageSpot(x, z);
       const green = new THREE.Color(greens[Math.floor(this.rng() * greens.length)]).multiplyScalar(lerp(0.9, 1.1, this.rng()));
       this.flowers.plantFoliage(x, this.ground.heightAt(x, z) - 0.02, z, this.rng() * Math.PI * 2, lerp(1.0, 1.6, this.rng()), this.strokeTime * 0.2 + this.rng() * 0.4, green);
@@ -364,7 +364,7 @@ export class FlowerBrush {
       const r = Math.sqrt(this.rng()) * PLANT_RADIUS;
       const x = c.x + Math.cos(a) * r;
       const z = c.y + Math.sin(a) * r;
-      if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.85) continue;
+      if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.67) continue;
       // Room round each plant: a cottage-garden scatter, not a carpet.
       if (this.flowers.isCrowded(x, z, sp.spacing * FLOWER_SCALE * SPACING)) continue;
       const base = new THREE.Color(sp.colors[Math.floor(this.rng() * sp.colors.length)]);

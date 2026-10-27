@@ -260,7 +260,7 @@ const rockBrush = new RockBrush(
   boulders,
   wildflowers,
   (x, z) => ground.heightAt(x, z),
-  (x, z) => cottage.contains(x, z, 0.5) || ground.forestness(x, z) > 0.45 || paths.distanceToPaths(x, z) < 1.0 || ponds.contains(x, z, -0.4),
+  (x, z) => cottage.contains(x, z, 0.5) || ground.forestness(x, z) > 0.45 || paths.distanceToPaths(x, z) < 0.8 || ponds.contains(x, z, -0.4),
 );
 // Arched footbridges across ponds.
 const bridgeBuilder = new BridgeBuilder(
@@ -296,7 +296,7 @@ const pondBrush = new PondBrush(
   dust,
   season,
   (x, z) =>
-    cottage.contains(x, z, 0.4) || ground.forestness(x, z) > 0.3 || paths.distanceToPaths(x, z) < 1.0 || flowerBrush.distanceToBeds(x, z) < 0.3,
+    cottage.contains(x, z, 0.4) || ground.forestness(x, z) > 0.3 || paths.distanceToPaths(x, z) < 0.8 || flowerBrush.distanceToBeds(x, z) < 0.3,
 );
 
 const toolbar = new Toolbar((tool) => {
@@ -389,14 +389,14 @@ const eraser = new EraseBrush(
     beds: flowerBrush,
     fences: { erase: (x, z, r) => [...fenceBuilder.erase(x, z, r), ...boulders.erase(x, z, r), ...props.erase(x, z, r)] },
     heightAt: (x, z) => ground.heightAt(x, z),
-    occupied: (x, z) => cottage.contains(x, z, 0.4) || paths.distanceToPaths(x, z) < 1.0 || flowerBrush.distanceToBeds(x, z) < 0.15 || ponds.contains(x, z, 0.4),
+    occupied: (x, z) => cottage.contains(x, z, 0.4) || paths.distanceToPaths(x, z) < 0.8 || flowerBrush.distanceToBeds(x, z) < 0.15 || ponds.contains(x, z, 0.4),
   },
   (amount) => ambience.erase(amount),
 );
 // The untended meadow slowly fills with wildflowers while you play (remembered between visits);
 // anything you build keeps them back, and they creep in again when it's cleared.
 const meadow = new Meadow(ground, season, WORLD_SEED + 13, (x, z) =>
-  cottage.contains(x, z, 0.5) || paths.distanceToPaths(x, z) < 1.05 || flowerBrush.distanceToBeds(x, z) < 0.25 || ponds.contains(x, z, 0.5) ||
+  cottage.contains(x, z, 0.5) || paths.distanceToPaths(x, z) < 0.85 || flowerBrush.distanceToBeds(x, z) < 0.25 || ponds.contains(x, z, 0.5) ||
   boulders.occupied(x, z, 0.3) || props.near(x, z, 0.5) || fences.postNear(x, z, 0.2) !== null);
 scene.add(meadow.group);
 const MEADOW_KEY = 'garden-meadow';

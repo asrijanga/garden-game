@@ -9,7 +9,7 @@ const SAMPLE = 0.1; // metres between smoothed stroke samples
 const SPAN: Record<FenceStyle, number> = { picket: 2.0, rustic: 2.4, hedge: 1.4, wall: 2.0 };
 /** How far the line may bow away from a straight run before a corner post goes in. */
 const CORNER = 0.16;
-const PATH_CLEAR = 1.0; // keep this far from a path's centre line (its gravel edge)
+const PATH_CLEAR = 0.78; // keep this far from a path's centre line (its gravel edge)
 const PICKET_TINTS = ['#ffffff', '#fbf8f2', '#f4f0e8', '#ece6da'];
 const LOG_TINTS = ['#ffffff', '#f2eee8', '#e6dfd5', '#d9d2c8'];
 // Weathered grey stone: some warmer, some cooler, the odd darker or rust-stained one.
