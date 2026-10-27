@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { touch } from '../render/touch';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import { regrow } from '../core/regrow';
@@ -178,10 +179,10 @@ export class Vines {
     this.q.multiply(new THREE.Quaternion().setFromAxisAngle(this.up, roll));
     mesh.setMatrixAt(i, this.m.compose(pos, this.q, scale));
     mesh.setColorAt(i, color);
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    touch(mesh.instanceMatrix, i);
+    if (mesh.instanceColor) touch(mesh.instanceColor, i);
     this.life[part].setXY(i, start, 1e9);
-    this.life[part].needsUpdate = true;
+    touch(this.life[part], i);
     this.placed.push({ part, index: i, x: pos.x, z: pos.z, owner });
   }
 
@@ -294,7 +295,7 @@ export class Vines {
       if (!test(p)) continue;
       const life = this.life[p.part];
       life.setY(p.index, Math.min(life.getY(p.index), t));
-      life.needsUpdate = true;
+      touch(life, p.index);
       this.placed.splice(i, 1);
       n++;
     }

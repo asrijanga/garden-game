@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { touch } from '../render/touch';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createNoise2D } from '../core/noise';
 import { createRng, lerp } from '../core/random';
@@ -8,7 +9,7 @@ import type { Season } from './season';
 
 const SITES = 1500;
 const GROW_PER_SECOND = 1.3; // the meadow fills over ~20 minutes of play
-const CHECKS_PER_FRAME = 40;
+const CHECKS_PER_FRAME = 16;
 
 type Rng = () => number;
 
@@ -98,6 +99,7 @@ interface Site {
 export class Meadow {
   readonly group = new THREE.Group();
   private readonly sites: Site[] = [];
+  private readonly changing = new Set<number>();
   private cursor = 0;
   /** How many sites (in growth order) are allowed to bloom so far. */
   grown = 0;
@@ -179,7 +181,7 @@ export class Meadow {
     const k = Math.max(0.0001, s.scale);
     this.m.copy(s.m).multiply(this.sc.makeScale(k, k, k));
     s.mesh.setMatrixAt(s.index, this.m);
-    s.mesh.instanceMatrix.needsUpdate = true;
+    touch(s.mesh.instanceMatrix, s.index);
   }
 
   update(dt: number) {
@@ -191,10 +193,15 @@ export class Meadow {
       this.cursor = (i + 1) % this.sites.length;
       const s = this.sites[i];
       s.want = i < limit && !this.blocked(s.x, s.z) ? 1 : 0;
+      if (s.want !== s.scale) this.changing.add(i);
     }
-    for (let i = 0; i < Math.min(this.sites.length, limit); i++) {
+    // Only the sites still growing or fading need their matrices written.
+    for (const i of this.changing) {
       const s = this.sites[i];
-      if (s.scale === s.want) continue;
+      if (s.scale === s.want) {
+        this.changing.delete(i);
+        continue;
+      }
       // Spring up gently; when something's built, step aside quickly.
       s.scale = s.want > s.scale ? Math.min(1, s.scale + dt * 0.5) : Math.max(0, s.scale - dt * 3);
       this.write(s);

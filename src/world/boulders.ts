@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { touch } from '../render/touch';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import { regrow } from '../core/regrow';
@@ -170,11 +171,11 @@ export class Boulders {
     const tone = lerp(0.85, 1.12, this.rng());
     const warm = (this.rng() - 0.5) * 0.06;
     mesh.setColorAt(index, new THREE.Color(tone * (1 + warm), tone, tone * (1 - warm)));
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    if (mesh.instanceColor) touch(mesh.instanceColor, index);
     // Rocks rebuilt from a save are old friends: their moss is already grown.
     const moss = mesh.geometry.attributes.aMossStart as THREE.InstancedBufferAttribute;
     moss.setX(index, regrow.offset > 0 || regrow.instant ? -1e4 : this.uniforms.uMossTime.value + delay + this.rng() * 20);
-    moss.needsUpdate = true;
+    touch(moss, index);
     const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler((this.rng() - 0.5) * 0.35, this.rng() * Math.PI * 2, (this.rng() - 0.5) * 0.35));
     const scale = new THREE.Vector3(size * lerp(0.85, 1.15, this.rng()), size * lerp(0.8, 1.2, this.rng()), size * lerp(0.85, 1.15, this.rng()));
     const rock: Rock = { mesh, index, pos: new THREE.Vector3(x, y - size * lerp(0.05, 0.12, this.rng()), z), quat, scale, size, delay: delay + regrow.offset, t: 0, landed: false };
@@ -200,7 +201,7 @@ export class Boulders {
     this.s.set(this.s.x * (1 + squash * 0.3), this.s.y * (1 - squash), this.s.z * (1 + squash * 0.3));
     this.m.compose(this.p.copy(k.pos).setY(k.pos.y + lift), k.quat, this.s);
     k.mesh.setMatrixAt(k.index, this.m);
-    k.mesh.instanceMatrix.needsUpdate = true;
+    touch(k.mesh.instanceMatrix, k.index);
   }
 
   update(dt: number) {
@@ -235,7 +236,7 @@ export class Boulders {
       if (l.t >= 1) {
         this.m.makeScale(0, 0, 0);
         l.rock.mesh.setMatrixAt(l.rock.index, this.m);
-        l.rock.mesh.instanceMatrix.needsUpdate = true;
+        touch(l.rock.mesh.instanceMatrix, l.rock.index);
         this.leaving.splice(i, 1);
       } else this.write(l.rock, 1 - l.t * l.t, -l.t * l.rock.size * 0.6);
     }

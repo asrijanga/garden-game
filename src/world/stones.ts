@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { touch } from '../render/touch';
 import { regrow } from '../core/regrow';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -226,7 +227,7 @@ export class Stones {
         s.removed = true;
         this.m.makeScale(0, 0, 0);
         s.mesh.setMatrixAt(s.index, this.m);
-        s.mesh.instanceMatrix.needsUpdate = true;
+        touch(s.mesh.instanceMatrix, s.index);
       }
     }
   }
@@ -239,7 +240,7 @@ export class Stones {
       s.removed = true;
       this.m.makeScale(0, 0, 0);
       s.mesh.setMatrixAt(s.index, this.m);
-      s.mesh.instanceMatrix.needsUpdate = true;
+      touch(s.mesh.instanceMatrix, s.index);
     }
   }
 
@@ -263,7 +264,7 @@ export class Stones {
     if (mesh.count >= CAPACITY) return;
     const index = mesh.count++;
     mesh.setColorAt(index, tone);
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    if (mesh.instanceColor) touch(mesh.instanceColor, index);
     const stone: Placed = { kind, mesh, index, pos: new THREE.Vector3(x, y, z), scale: scale.clone(), yaw, r, owner };
     const k = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
     if (!this.grid.has(k)) this.grid.set(k, []);
@@ -279,7 +280,7 @@ export class Stones {
     this.s.set(st.scale.x * k * (1 + squash * 0.4), st.scale.y * k * (1 - squash), st.scale.z * k * (1 + squash * 0.4));
     this.m.compose(this.p.set(st.pos.x, st.pos.y + lift, st.pos.z), this.q, this.s);
     st.mesh.setMatrixAt(st.index, this.m);
-    st.mesh.instanceMatrix.needsUpdate = true;
+    touch(st.mesh.instanceMatrix, st.index);
   }
 
   /** Back to an untouched garden (before an undo replays what remains). */
@@ -306,7 +307,7 @@ export class Stones {
       if (s.t >= 1) {
         this.m.makeScale(0, 0, 0);
         s.stone.mesh.setMatrixAt(s.stone.index, this.m);
-        s.stone.mesh.instanceMatrix.needsUpdate = true;
+        touch(s.stone.mesh.instanceMatrix, s.stone.index);
         this.sinking.splice(i, 1);
       }
     }

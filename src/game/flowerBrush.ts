@@ -36,6 +36,8 @@ export class FlowerBrush {
   private strokeTime = 0;
   /** Every dab of every bed so far (centre + which stroke made it), and the stroke in progress. */
   private readonly beds: { c: THREE.Vector2; stroke: number }[] = [];
+  /** Bed dabs by 1 m cell, for quick "how far is the nearest bed?" checks. */
+  private readonly bedCells = new Map<number, THREE.Vector2[]>();
   private stroke: THREE.Vector2[] = [];
   private strokeId = 0;
   private readonly fieldIds: number[] = [];
@@ -94,6 +96,7 @@ export class FlowerBrush {
     for (let i = this.beds.length - 1; i >= 0; i--) {
       if (Math.hypot(this.beds[i].c.x - x, this.beds[i].c.y - z) < r) this.beds.splice(i, 1);
     }
+    for (const [k, list] of this.bedCells) this.bedCells.set(k, list.filter((c) => Math.hypot(c.x - x, c.y - z) >= r));
   }
 
   /** Back to an untouched garden (before an undo replays what remains). */
@@ -102,6 +105,7 @@ export class FlowerBrush {
     this.last = null;
     this.strokeTime = 0;
     this.beds.length = 0;
+    this.bedCells.clear();
     this.stroke = [];
     this.strokeId = 0;
     this.foliageAt.clear();
@@ -129,9 +133,19 @@ export class FlowerBrush {
   }
 
   /** Rough distance from (x, z) to the edge of the nearest flower bed (negative inside). */
+  /**
+   * Distance from (x, z) to the nearest bed's edge (negative inside). Only looked for nearby:
+   * anything further than ~1 m reads as 1.5 (every caller only asks "is a bed within a step?").
+   */
   distanceToBeds(x: number, z: number): number {
-    let d = Infinity;
-    for (const b of this.beds) d = Math.min(d, Math.hypot(x - b.c.x, z - b.c.y) - EDGE_RADIUS);
+    let d = 1.5;
+    const reach = EDGE_RADIUS + 1.5;
+    for (let i = Math.floor(x - reach); i <= Math.floor(x + reach); i++) {
+      for (let j = Math.floor(z - reach); j <= Math.floor(z + reach); j++) {
+        const cell = this.bedCells.get(i * 4096 + j);
+        if (cell) for (const c of cell) d = Math.min(d, Math.hypot(x - c.x, z - c.y) - EDGE_RADIUS);
+      }
+    }
     return d;
   }
 
@@ -340,6 +354,10 @@ export class FlowerBrush {
     this.paint.bed(c.x, c.y, BED_RADIUS);
     const centre = c.clone();
     this.beds.push({ c: centre, stroke: this.strokeId });
+    const key = Math.floor(centre.x) * 4096 + Math.floor(centre.y);
+    let cell = this.bedCells.get(key);
+    if (!cell) this.bedCells.set(key, (cell = []));
+    cell.push(centre);
     this.stroke.push(centre);
     this.wildflowers.clearNear(c.x, c.y, BED_RADIUS);
     // Leafy foliage first: the bed fills with green, then the flowers rise out of it.

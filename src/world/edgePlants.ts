@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { touch } from '../render/touch';
 import { regrow } from '../core/regrow';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
@@ -113,7 +114,7 @@ export class EdgePlants {
       ? new THREE.Color(this.flowerTints[Math.floor(this.rng() * this.flowerTints.length)]).lerp(new THREE.Color('#ffffff'), 0.45)
       : new THREE.Color('#ffffff').multiplyScalar(lerp(0.88, 1.08, this.rng()));
     mesh.setColorAt(index, tint);
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    if (mesh.instanceColor) touch(mesh.instanceColor, index);
     const g: Growing = { mesh, index, pos: new THREE.Vector3(x, y, z), yaw: this.rng() * Math.PI * 2, size: lerp(0.8, 1.3, this.rng()), delay: delay + regrow.offset, t: 0 };
     this.growing.push(g);
     this.all.push(g);
@@ -148,7 +149,7 @@ export class EdgePlants {
     const s = g.size * scale;
     this.m.compose(g.pos, this.q, new THREE.Vector3(s, s, s));
     g.mesh.setMatrixAt(g.index, this.m);
-    g.mesh.instanceMatrix.needsUpdate = true;
+    touch(g.mesh.instanceMatrix, g.index);
   }
 
   update(dt: number) {

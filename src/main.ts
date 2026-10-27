@@ -856,6 +856,8 @@ void rebuild();
 
 // --- Loop -----------------------------------------------------------------------------------
 const timer = new THREE.Timer();
+let shadowAge = 0;
+let wasSettling = false;
 let elapsed = 0;
 
 function frame(time: number) {
@@ -904,7 +906,15 @@ function frame(time: number) {
   // One soft buzz voice: the bees', or a hummingbird's higher, airier hum when one is closer.
   if (hum > buzz.level) ambience.buzz(hum * 0.7, 2.3);
   else ambience.buzz(buzz.level, buzz.pitch);
-  if (stones.busy || pondPlants.busy || fences.busy || boulders.busy || props.busy) renderer.shadowMap.needsUpdate = true;
+  // Shadows are drawn from the whole scene (the forest too), so while things settle they're
+  // redrawn a few times a second rather than every frame, then once more when all is still.
+  const settling = stones.busy || pondPlants.busy || fences.busy || boulders.busy || props.busy;
+  shadowAge += dt;
+  if ((settling && shadowAge > 0.12) || (wasSettling && !settling)) {
+    renderer.shadowMap.needsUpdate = true;
+    shadowAge = 0;
+  }
+  wasSettling = settling;
   post.render(dt);
 }
 

@@ -10,9 +10,19 @@ const SIZE = 512; // ~10 cm per texel
  * Blue = flower-bed soil.
  */
 export class GroundPaint {
-  readonly texture: THREE.CanvasTexture;
+  /**
+   * Painted on a 2D canvas, but uploaded from our own pixel copy, a few rows at a time: only
+   * the patch that changed goes to the GPU (re-sending the whole 1 MB image every frame while
+   * drawing a path was a big cause of lag).
+   */
+  readonly texture: THREE.DataTexture;
+  private readonly data = new Uint8Array(SIZE * SIZE * 4);
   private readonly ctx: CanvasRenderingContext2D;
-  private dirty = false;
+  /** The changed patch of the canvas since the last upload (pixels; empty when x0 > x1). */
+  private x0 = 0;
+  private y0 = 0;
+  private x1 = -1;
+  private y1 = -1;
   private readonly clearing: { x: number; z: number; r: number; t: number }[] = [];
   /**
    * Everything painted, in order, so the canvas can be repainted if the browser throws it
@@ -26,8 +36,9 @@ export class GroundPaint {
     canvas.width = canvas.height = SIZE;
     // CPU-backed: on iOS a GPU canvas must be read back before every upload to WebGL, which stalls.
     this.ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    this.texture = new THREE.DataTexture(this.data, SIZE, SIZE, THREE.RGBAFormat);
     this.blank();
-    this.texture = new THREE.CanvasTexture(canvas);
+    this.flush();
     this.texture.colorSpace = THREE.NoColorSpace;
     this.texture.minFilter = THREE.LinearFilter;
     this.texture.magFilter = THREE.LinearFilter;
@@ -41,6 +52,46 @@ export class GroundPaint {
     this.ctx.fillRect(0, 0, SIZE, SIZE);
     this.ctx.fillStyle = 'rgb(0,0,1)';
     this.ctx.fillRect(0, 0, 1, 1);
+    this.mark(0, 0, SIZE, SIZE);
+  }
+
+  private mark(ax: number, ay: number, bx: number, by: number) {
+    if (this.x0 > this.x1) {
+      this.x0 = ax;
+      this.y0 = ay;
+      this.x1 = bx;
+      this.y1 = by;
+    } else {
+      this.x0 = Math.min(this.x0, ax);
+      this.y0 = Math.min(this.y0, ay);
+      this.x1 = Math.max(this.x1, bx);
+      this.y1 = Math.max(this.y1, by);
+    }
+  }
+
+  /** Copy the changed patch into the texture's pixels and queue just those rows for upload. */
+  private flush() {
+    if (this.x0 > this.x1) return;
+    const x0 = Math.max(0, Math.floor(this.x0) - 1);
+    const y0 = Math.max(0, Math.floor(this.y0) - 1);
+    const x1 = Math.min(SIZE, Math.ceil(this.x1) + 1);
+    const y1 = Math.min(SIZE, Math.ceil(this.y1) + 1);
+    this.x1 = -1;
+    this.x0 = 0;
+    const w = x1 - x0;
+    const h = y1 - y0;
+    if (w <= 0 || h <= 0) return;
+    const px = this.ctx.getImageData(x0, y0, w, h).data;
+    const whole = w * h > SIZE * SIZE * 0.4;
+    for (let row = 0; row < h; row++) {
+      // Rows go in upside down (canvas top = texture bottom), as a canvas texture's would.
+      const ty = SIZE - 1 - (y0 + row);
+      const start = (ty * SIZE + x0) * 4;
+      this.data.set(px.subarray(row * w * 4, (row + 1) * w * 4), start);
+      if (!whole) this.texture.addUpdateRange(start, w * 4);
+    }
+    if (whole) this.texture.clearUpdateRanges();
+    this.texture.needsUpdate = true;
   }
 
   /** Has the browser wiped the canvas behind our back? */
@@ -54,17 +105,15 @@ export class GroundPaint {
    * the log and re-upload it. Cheap to call: it only checks one pixel unless something's wrong.
    */
   restore(force = false) {
-    if (!force && !this.wiped()) {
-      this.texture.needsUpdate = true;
-      return;
-    }
+    if (!force && !this.wiped()) return;
     this.blank();
     for (const op of this.log) {
       if (op.k === 0) this.dab(op.x, op.z, op.rad, op.r, op.g, op.b, false);
       else this.clearNow(op.x, op.z, op.rad, 1);
     }
     for (const c of this.clearing) this.clearNow(c.x, c.z, c.r, c.t);
-    this.texture.needsUpdate = true;
+    this.mark(0, 0, SIZE, SIZE);
+    this.flush();
   }
 
   private clearNow(x: number, z: number, radius: number, t: number) {
@@ -82,6 +131,7 @@ export class GroundPaint {
     this.ctx.arc(cx, cy, rad, 0, Math.PI * 2);
     this.ctx.fill();
     this.ctx.globalCompositeOperation = 'source-over';
+    this.mark(cx - rad, cy - rad, cx + rad, cy + rad);
   }
 
   private toCanvas(x: number, z: number): [number, number] {
@@ -118,7 +168,7 @@ export class GroundPaint {
     this.ctx.arc(cx, cy, rad, 0, Math.PI * 2);
     this.ctx.fill();
     this.ctx.globalCompositeOperation = 'source-over';
-    this.dirty = true;
+    this.mark(cx - rad, cy - rad, cx + rad, cy + rad);
   }
 
   /** Wear a dab of path earth (or gravel, when `sand` is 1) into the lawn at (x, z). */
@@ -142,7 +192,6 @@ export class GroundPaint {
     this.blank();
     this.clearing.length = 0;
     this.log.length = 0;
-    this.dirty = true;
   }
 
   /** Upload changes at most once per frame (and now and then, make sure the canvas is still ours). */
@@ -151,7 +200,6 @@ export class GroundPaint {
       const c = this.clearing[i];
       c.t = Math.min(1, c.t + dt / 0.9);
       this.clearNow(c.x, c.z, c.r, c.t);
-      this.dirty = true;
       if (c.t >= 1) this.clearing.splice(i, 1);
     }
     this.checkIn -= dt;
@@ -159,13 +207,11 @@ export class GroundPaint {
       this.checkIn = 2;
       if (this.wiped()) this.restore(true);
     }
-    if (!this.dirty) return;
-    this.texture.needsUpdate = true;
-    this.dirty = false;
+    this.flush();
   }
 }
 
-/** GLSL: world xz → paint-texture uv (canvas textures are flipped vertically on upload). */
+/** GLSL: world xz → paint-texture uv (rows are stored flipped, as a canvas texture's would be). */
 export const paintUvGLSL = /* glsl */ `
 vec2 paintUv(vec2 xz) {
   vec2 uv = (xz + ${PAINT_HALF.toFixed(1)}) / ${(PAINT_HALF * 2).toFixed(1)};

@@ -46,6 +46,10 @@ export class ToolController {
   private building: Brush | null = null;
   private readonly p = new THREE.Vector3();
   private readonly brushes: Record<BuildTool, Brush>;
+  private pending = false;
+  private pendingX = 0;
+  private pendingY = 0;
+  private raf = 0;
   /** Where a finger touches the ground (down, and as a stroke moves), whatever the tool. */
   onTouch: (p: THREE.Vector3, tool: Tool, down: boolean) => void = () => {};
 
@@ -125,7 +129,11 @@ export class ToolController {
 
   /** Where the finger is, on the ground, rounded to the centimetre (as saved). */
   private pick(e: PointerEvent): THREE.Vector3 | null {
-    const hit = this.picker.pick(e.clientX, e.clientY, this.p);
+    return this.pickAt(e.clientX, e.clientY);
+  }
+
+  private pickAt(clientX: number, clientY: number): THREE.Vector3 | null {
+    const hit = this.picker.pick(clientX, clientY, this.p);
     if (!hit) return null;
     hit.x = roundCm(hit.x);
     hit.z = roundCm(hit.z);
@@ -157,7 +165,19 @@ export class ToolController {
 
   private onMove = (e: PointerEvent) => {
     if (!this.stroke || this.pointers.size > 1) return;
-    const hit = this.pick(e);
+    // A mouse or fast touch can report moves far more often than the screen redraws: keep only
+    // the latest, and handle it once per frame (the brushes fill in between points themselves).
+    this.pendingX = e.clientX;
+    this.pendingY = e.clientY;
+    this.pending = true;
+    if (!this.raf) this.raf = requestAnimationFrame(this.flushMove);
+  };
+
+  private flushMove = () => {
+    this.raf = 0;
+    if (!this.pending || !this.stroke || this.pointers.size > 1) return;
+    this.pending = false;
+    const hit = this.pickAt(this.pendingX, this.pendingY);
     if (!hit) return;
     this.marker.move(hit);
     const pts = this.stroke.points;
@@ -169,6 +189,8 @@ export class ToolController {
   };
 
   private onUp = (e: PointerEvent) => {
+    // Don't lose the last little bit of the stroke.
+    if (this.pending && this.pointers.size === 1) this.flushMove();
     this.pointers.delete(e.pointerId);
     this.endStroke();
   };

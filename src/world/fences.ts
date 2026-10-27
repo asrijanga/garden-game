@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { touch } from '../render/touch';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
@@ -9,6 +10,10 @@ export type FenceStyle = 'picket' | 'rustic' | 'hedge' | 'wall';
 export type PartShape = 'picketPost' | 'picket' | 'rail' | 'logPost' | 'log' | 'hedge' | 'wallStone';
 /** How a part arrives: knocked in from above, popped into place, or grown up out of the lawn. */
 import type { Perch } from './perchingBirds';
+
+/** Shapes that stand on the ground (as opposed to rails and pickets hung between posts). */
+const SOLID = new Set<PartShape>(['picketPost', 'logPost', 'hedge', 'wallStone']);
+const cellKey = (x: number, z: number) => Math.floor(x) * 4096 + Math.floor(z);
 
 export type Arrival = 'drop' | 'pop' | 'grow';
 
@@ -197,6 +202,8 @@ export class Fences {
   readonly group = new THREE.Group();
   private readonly meshes = new Map<PartShape, THREE.InstancedMesh[]>();
   private readonly parts = new Map<number, Part>();
+  /** Posts, hedges and wall stones by 1 m cell, so "is anything solid here?" needn't scan every part. */
+  private readonly cells = new Map<number, Part[]>();
   private readonly moving = new Set<Part>();
   private readonly leaving: { part: Part; t: number }[] = [];
   private rng = createRng(1717);
@@ -258,6 +265,7 @@ export class Fences {
   reset() {
     for (const list of this.meshes.values()) for (const m of list) m.count = 0;
     this.parts.clear();
+    this.cells.clear();
     this.moving.clear();
     this.leaving.length = 0;
     this.rng = createRng(1717);
@@ -275,19 +283,36 @@ export class Fences {
     if (mesh.count >= CAPACITY[shape]) return null;
     const index = mesh.count++;
     mesh.setColorAt(index, tint);
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    if (mesh.instanceColor) touch(mesh.instanceColor, index);
     const part: Part = { id: this.nextId++, shape, mesh, index, pos: pos.clone(), quat: quat.clone(), scale: scale.clone(), half, arrival, delay: delay + regrow.offset, t: 0, owner };
     this.parts.set(part.id, part);
+    if (SOLID.has(shape)) {
+      const key = cellKey(pos.x, pos.z);
+      let list = this.cells.get(key);
+      if (!list) this.cells.set(key, (list = []));
+      list.push(part);
+    }
     this.moving.add(part);
     this.write(part, 0.0001, 0);
     return part;
+  }
+
+  /** Posts, hedge sections and wall stones within reach of (x, z), from the spatial grid. */
+  private *solidAround(x: number, z: number, reach: number): Generator<Part> {
+    const r = reach + 0.6; // the widest part's own half-size
+    for (let i = Math.floor(x - r); i <= Math.floor(x + r); i++) {
+      for (let j = Math.floor(z - r); j <= Math.floor(z + r); j++) {
+        const list = this.cells.get(i * 4096 + j);
+        if (list) yield* list;
+      }
+    }
   }
 
   /** The nearest post (of any fence) within `r` of (x, z). */
   postNear(x: number, z: number, r: number): Part | null {
     let best: Part | null = null;
     let bestD = r * r;
-    for (const p of this.parts.values()) {
+    for (const p of this.solidAround(x, z, r)) {
       if (p.gone || (p.shape !== 'picketPost' && p.shape !== 'logPost')) continue;
       const d = (p.pos.x - x) ** 2 + (p.pos.z - z) ** 2;
       if (d < bestD) {
@@ -313,8 +338,8 @@ export class Fences {
 
   /** Is there something solid underfoot within `r` of (x, z): a post, a hedge, a wall stone? */
   solidNear(x: number, z: number, r: number): boolean {
-    for (const p of this.parts.values()) {
-      if (p.gone || p.shape === 'picket' || p.shape === 'rail' || p.shape === 'log') continue;
+    for (const p of this.solidAround(x, z, r)) {
+      if (p.gone) continue;
       const reach = r + (p.shape === 'hedge' ? 0.3 : p.shape === 'wallStone' ? Math.max(p.scale.x, p.scale.z) * 0.5 : 0.05);
       if ((p.pos.x - x) ** 2 + (p.pos.z - z) ** 2 < reach * reach) return true;
     }
@@ -327,6 +352,11 @@ export class Fences {
     part.gone = true;
     this.moving.delete(part);
     this.parts.delete(part.id);
+    if (SOLID.has(part.shape)) {
+      const key = cellKey(part.pos.x, part.pos.z);
+      const list = this.cells.get(key);
+      if (list) this.cells.set(key, list.filter((p) => p !== part));
+    }
     this.leaving.push({ part, t: 0 });
   }
 
@@ -363,7 +393,7 @@ export class Fences {
     else s.multiplyScalar(k).multiply(this.p.set(1 + squash * 0.4, 1 - squash, 1 + squash * 0.4));
     this.m.compose(this.p.copy(p.pos).setY(p.pos.y + lift), p.quat, s);
     p.mesh.setMatrixAt(p.index, this.m);
-    p.mesh.instanceMatrix.needsUpdate = true;
+    touch(p.mesh.instanceMatrix, p.index);
   }
 
   update(dt: number) {
@@ -405,7 +435,7 @@ export class Fences {
       if (l.t >= 1) {
         this.m.makeScale(0, 0, 0);
         l.part.mesh.setMatrixAt(l.part.index, this.m);
-        l.part.mesh.instanceMatrix.needsUpdate = true;
+        touch(l.part.mesh.instanceMatrix, l.part.index);
         this.leaving.splice(i, 1);
       } else this.write(l.part, Math.max(0.0001, k), -l.t * 0.3);
     }
