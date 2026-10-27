@@ -99,12 +99,14 @@ class FlowerMesh {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nrm, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
-    g.setAttribute('aIsPetal', new THREE.Float32BufferAttribute(this.petal, 1));
+    // Petal flag, unfurl angle, glow and edge share one attribute: WebGL allows only 16 vertex
+    // inputs, and the instance matrix alone takes four.
+    const info = new Float32Array(this.petal.length * 4);
+    for (let i = 0; i < this.petal.length; i++) info.set([this.petal[i], this.close[i], this.glow[i], this.edge[i]], i * 4);
+    g.setAttribute('aInfo', new THREE.BufferAttribute(info, 4));
     g.setAttribute('aHinge', new THREE.Float32BufferAttribute(this.hinge, 3));
     g.setAttribute('aAxis', new THREE.Float32BufferAttribute(this.axis, 3));
-    g.setAttribute('aClose', new THREE.Float32BufferAttribute(this.close, 1));
-    g.setAttribute('aGlow', new THREE.Float32BufferAttribute(this.glow, 1));
-    g.setAttribute('aEdge', new THREE.Float32BufferAttribute(this.edge, 1));
+
     return g;
   }
 }
@@ -663,7 +665,14 @@ export class Flowers {
             '#include <common>',
             /* glsl */ `#include <common>
             uniform float uFlowerTime;
-            attribute float aIsPetal, aClose, aBirth, aBloomMax, aGlow, aEdge;
+            attribute vec4 aInfo;
+            attribute vec2 aLife;
+            #define aIsPetal aInfo.x
+            #define aClose aInfo.y
+            #define aGlow aInfo.z
+            #define aEdge aInfo.w
+            #define aBirth aLife.x
+            #define aBloomMax aLife.y
             attribute vec3 aHinge, aAxis, aPetalColor, aEdgeColor;
             varying float vGlow;`,
           )
@@ -732,8 +741,10 @@ export class Flowers {
   }
 
   private makeMesh(geo: THREE.BufferGeometry, material: THREE.Material, capacity: number): THREE.InstancedMesh {
-    geo.setAttribute('aBirth', new THREE.InstancedBufferAttribute(new Float32Array(capacity).fill(1e6), 1));
-    geo.setAttribute('aBloomMax', new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1));
+    // Birth time and how far it blooms, together (x, y).
+    const life = new Float32Array(capacity * 2);
+    for (let i = 0; i < capacity; i++) life[i * 2] = 1e6;
+    geo.setAttribute('aLife', new THREE.InstancedBufferAttribute(life, 2));
     geo.setAttribute('aPetalColor', new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
     geo.setAttribute('aEdgeColor', new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
     const mesh = new THREE.InstancedMesh(geo, material, capacity);
@@ -752,7 +763,7 @@ export class Flowers {
   }
 
   private write(mesh: THREE.InstancedMesh, x: number, y: number, z: number, yaw: number, scale: number, delay: number, bloomMax: number, color: THREE.Color, edge: THREE.Color = color): boolean {
-    if (mesh.count >= (mesh.geometry.attributes.aBirth as THREE.InstancedBufferAttribute).count) return false;
+    if (mesh.count >= (mesh.geometry.attributes.aLife as THREE.InstancedBufferAttribute).count) return false;
     const i = mesh.count++;
     mesh.visible = true;
     this.q.setFromAxisAngle(UP, yaw);
@@ -770,8 +781,7 @@ export class Flowers {
       a.addUpdateRange(i * a.itemSize, a.itemSize);
       a.needsUpdate = true;
     };
-    set('aBirth', [this.time + delay]);
-    set('aBloomMax', [bloomMax]);
+    set('aLife', [this.time + delay, bloomMax]);
     set('aPetalColor', [color.r, color.g, color.b]);
     set('aEdgeColor', [edge.r, edge.g, edge.b]);
     return true;

@@ -158,6 +158,7 @@ export class FlowerPicker {
     this.colours.replaceChildren();
     const choosy = sp && sp.form.kind === 'rose';
     this.colours.classList.toggle('show', !!choosy);
+    document.body.classList.toggle('choosing-colour', !!choosy);
     if (!sp || !choosy) return;
     const current = this.colour.get(sp.id) ?? -1;
     const add = (i: number, label: string, html: string) => {

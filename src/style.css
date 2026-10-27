@@ -643,3 +643,7 @@ body.picking .sound-hint {
   transform: translateY(-3px) scale(1.1);
   box-shadow: 0 2px 0 #d8a85c, 0 0 0 2px rgba(255, 236, 190, 0.95), 0 4px 10px rgba(80, 50, 15, 0.3);
 }
+/* While colour swatches show, float the tool label above them too. */
+body.picking.choosing-colour .tool-label {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 226px);
+}
