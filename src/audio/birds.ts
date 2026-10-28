@@ -33,16 +33,25 @@ export class Birds {
     this.pace = season === 'spring' ? 0.7 : season === 'summer' ? 0.85 : season === 'autumn' ? 1.1 : 2.4;
   }
 
+  /** How lively the birds are (a dawn chorus ≈ 3, midday 1, silent at night or in heavy rain). */
+  activity = 1;
+
   /** Uses the real audio clock, so birds keep their pace whatever the frame rate. */
   update() {
     if (this.ctx.currentTime < this.nextAt) return;
+    if (this.activity < 0.05) {
+      // Asleep (or sheltering): look again in a little while.
+      this.nextAt = this.ctx.currentTime + 4;
+      return;
+    }
     const kind = PHRASES[Math.floor(this.rng() * PHRASES.length)];
     const pan = lerp(-0.85, 0.85, this.rng());
     const at = this.ctx.currentTime + 0.05;
     this.sing(kind, at, pan, lerp(0.75, 1.0, this.rng()));
     // Sometimes a second bird answers from across the clearing.
-    if (this.rng() < 0.35) this.sing(kind, at + lerp(1.4, 3.0, this.rng()), -pan * lerp(0.6, 1, this.rng()), lerp(0.55, 0.8, this.rng()));
-    this.nextAt = this.ctx.currentTime + lerp(10, 25, this.rng()) * this.pace;
+    // At dawn they answer each other more.
+    if (this.rng() < Math.min(0.8, 0.35 * this.activity)) this.sing(kind, at + lerp(1.4, 3.0, this.rng()), -pan * lerp(0.6, 1, this.rng()), lerp(0.55, 0.8, this.rng()));
+    this.nextAt = this.ctx.currentTime + (lerp(10, 25, this.rng()) * this.pace) / Math.max(0.3, this.activity);
   }
 
   /** A garden bird close by: a quick chirp or a little warble, panned to where it sits. */
@@ -143,7 +152,7 @@ export class Birds {
   }
 }
 
-function forestImpulse(ctx: AudioContext, seconds: number): AudioBuffer {
+export function forestImpulse(ctx: AudioContext, seconds: number): AudioBuffer {
   const rng = createRng(99);
   const length = Math.floor(ctx.sampleRate * seconds);
   const buffer = ctx.createBuffer(2, length, ctx.sampleRate);

@@ -1,6 +1,7 @@
 import { createRng, lerp } from '../core/random';
 import type { Season } from '../world/season';
 import { Birds } from './birds';
+import { NatureSounds, type Mood } from './nature';
 
 /**
  * A very calm bed of air and distant trees, with the occasional bird, synthesised with Web
@@ -41,6 +42,9 @@ export class Ambience {
   private treeLevel = 0;
   private time = 0;
   private birds: Birds | null = null;
+  private nature: NatureSounds | null = null;
+  /** Time of day, weather and ponds, for the creatures that sing (or don't) to suit them. */
+  private mood: Mood = { time: 0.55, night: 0, rain: 0, wet: 0, ponds: false };
 
   constructor(private readonly season: Season) {}
   /** Debug/testing: pin the wind input (set via ?debug in the console). */
@@ -158,11 +162,18 @@ export class Ambience {
 
     this.layers = { air, gust, gustFilter, trees, treesPan, leaves, leavesPan };
     this.birds = new Birds(ctx, master, this.season);
+    this.nature = new NatureSounds(ctx, master, this.season);
+    this.nature.mood = this.mood;
     this.applyMute(4); // slow, gentle fade-in
   }
 
   private rain: GainNode | null = null;
   private rainLevel = 0;
+
+  /** Tell the garden's creatures what it's like out (time of day, rain, wetness, ponds). */
+  setMood(m: Mood) {
+    Object.assign(this.mood, m);
+  }
 
   /** How hard it's raining (0–1); the hiss follows gently. */
   setRain(level: number) {
@@ -633,7 +644,9 @@ export class Ambience {
     L.treesPan.pan.setTargetAtTime(Math.sin(this.time * 0.07) * 0.3, now, 2.0);
     L.leaves.gain.setTargetAtTime((0.0002 + this.flurry * 0.0008) * (0.4 + envelope), now, 0.8);
     L.leavesPan.pan.setTargetAtTime(this.leafPan, now, 1.0);
+    if (this.birds && this.nature) this.birds.activity = this.nature.birdActivity();
     this.birds?.update();
+    this.nature?.update();
   }
 }
 

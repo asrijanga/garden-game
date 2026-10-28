@@ -74,6 +74,11 @@ export class Weather {
     this.dirty = true;
   }
 
+  /** How wet the garden still is (0–1). */
+  get wetness(): number {
+    return this.wet;
+  }
+
   /** How hard it's raining now (0–1). */
   get raining(): number {
     return this.mix.rain;

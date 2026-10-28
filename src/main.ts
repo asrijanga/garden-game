@@ -1002,6 +1002,7 @@ function frame(time: number) {
     night.update(dt);
     if (weather.update(dt, camera, rig.target, weatherWind.set(wind.direction.x, wind.direction.y).multiplyScalar(0.3 + wind.sample(rig.target.x, rig.target.z) * 0.7))) applyTime(dayTime);
     ambience.setRain(weather.raining);
+    ambience.setMood({ time: dayTime, night: Math.min(1, Math.max(0, (dayTime - 0.78) / 0.22)), rain: weather.raining, wet: weather.wetness, ponds: ponds.bodies.size > 0 });
     perchingBirds.update(dt);
     butterflies.update(dt);
     dragonflies.update(dt);
