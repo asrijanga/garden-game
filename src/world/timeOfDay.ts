@@ -13,7 +13,7 @@ interface Key {
   ground: THREE.Color;
   skyIntensity: number;
   haze: THREE.Color;
-  /** How close the haze comes in (dawn mist < 1). */
+  /** How close the haze comes in (dawn mist < 1; > 1 keeps it out among the trees at dusk and night). */
   mist: number;
   lift: THREE.Color;
   gain: THREE.Color;
@@ -62,9 +62,9 @@ export class TimeOfDay {
       // Golden afternoon: the garden's usual look.
       k(0.55, 38.3, 0, C(palette.sun), 3.0, C(palette.sky), C('#6b5a3a'), 1.35, C(palette.fog), 1.0, '#2a1a10', '#fff4e6', 1.08, 0.55, 1),
       // Dusk: a deep orange sun going down, a warm glowing haze.
-      k(0.78, 9, 45, C('#ffa868'), 2.4, mix('#f6b88a', palette.sky, 0.4), C('#5a4a40'), 1.15, mix(palette.fog, '#f0b898', 0.6), 0.95, '#2a1610', '#fff0dc', 1.12, 0.7, 0.85),
+      k(0.78, 9, 45, C('#ffa868'), 2.4, mix('#f6b88a', palette.sky, 0.4), C('#5a4a40'), 1.15, mix(palette.fog, '#f6c8a0', 0.6), 1.45, '#2a1610', '#fff0dc', 1.1, 0.7, 0.85),
       // Night: cool moonlight, a deep blue sky; the cottage windows glow.
-      k(1.0, 50, 120, C('#a8c0ff'), 1.0, C('#3a4c88'), C('#232634'), 0.8, C('#243058'), 0.95, '#121a30', '#dce6ff', 0.82, 0.9, 0.5),
+      k(1.0, 50, 120, C('#a8c0ff'), 1.0, C('#3a4c88'), C('#232634'), 0.8, C('#2a3866'), 1.7, '#121a30', '#dce6ff', 0.85, 0.9, 0.5),
     ];
   }
 
