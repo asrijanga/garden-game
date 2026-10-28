@@ -43,7 +43,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 4.1 A huge flower collection | ✅ Done | 57 species (was 14), every season covered: spring (daffodil with its trumpet, crocus, hyacinth, bluebell, snowdrop, primrose, forget-me-not, lily of the valley, iris, peony, grape hyacinth, ranunculus, hellebore, sweet pea), summer (sunflower, zinnia, marigold, petunia, snapdragon, delphinium, hollyhock, lupin, coneflower, shasta daisy, cornflower, geranium, hydrangea, allium, yarrow, phlox, verbena, lily, daylily, gladiolus, calendula, nasturtium, sweet William, blanket flower), autumn/winter (sneezeweed, goldenrod, cyclamen, heather, winter aconite) alongside the originals. New shape options: a corona trumpet on radial blooms; clusters can be flat, domed mopheads or a ball of stars on a bare stem. **Flower book**: a first chip opens a paper page of every species, "Blooming now" first, then by the season each next flowers, with art, name, season dots and colour swatches; tapping one picks it. The chip row now holds the book, the seasonal mix and what's blooming now (a species picked from the book keeps its chip). Flower meshes are built the first time a species is planted (57 × 5 pre-built variants would hold ~36 MB of empty buffers). Seasonal-mix beds now draw from the larger in-season list. |
 | 4.1b A rose garden | ✅ Done | Six rose habits as new species (a new `rose` form): hybrid tea (one high-centred bloom on a tall cane), floribunda (clusters), English rose (big, round, ~40 petals), climber (long arching canes, blooms along them), wild rose (open five petals, golden stamens), patio rose (compact, covered in small blooms). Blooms are petals on a golden-angle spiral, tight and cupped at the heart, opening and curling back outside; every bush mixes tight buds, half-open and open roses. Thorny canes, glossy five-leaflet leaves. 16 colours from classic red to white, lavender and mauve, plus bicolours written `base|edge` (yellow blushing pink, white edged red, peach to cream): petals now carry an edge factor and plants an edge colour, so any flower can shade heart → edge. Picking a rose shows colour swatches (with "mixed"); the choice is saved in the stroke (`species:colour`). Roses join the seasonal mix (wild roses spring–summer only). Petals now and then drop from open roses and tumble down on the breeze, lie a while, and fade. (Bare winter canes with hips not done: out of season they show as buds like other flowers.) Fixed along the way: the flower shader had hit WebGL's 16 vertex-input limit, so per-vertex and per-instance values are now packed. |
 | 4.1c Water flowers | 👀 Awaiting feedback | Painting with the Flowers tool across a pond plants water flowers instead of a bed (no soil, no border), each kind in its home zone by water depth: deep floaters (lotus with floating and raised round leaves, a tall stem and a cupped bloom round a golden seed pod; water lilies in white, pink, red, yellow, peach and a bicolour among notched pads; water hyacinth rosettes with pale lavender spikes), shallow marginals (water iris with sword leaves and a flag flower, marsh marigold's golden cups, pickerelweed's violet spikes, arrowhead's white three-petalled whorls over arrow leaves), and the damp bank (water forget-me-not). Planted in soft drifts, growing and blooming through the usual GPU growth with the bloom chime; bees and the other visitors find the open blooms. A "Water mix" chip plus a chip and book card for each; picking one says "paint across a pond", and a water flower never plants a bed on dry land. Each blooms in its real season (buds otherwise). Not done: bronze autumn leaves, nodding seed pods, pads bobbing on ripples, drifting petals on the water. Old flower strokes that crossed a pond now plant water flowers there. |
-| 4.2 – 6.x | ⬜ Not started | See milestones below |
+| 4.2 – 6.x (+ follow-ups 3.8, 3.9, 4.1d, 4.1e, 6.6–6.8) | ⬜ Not started | See milestones below |
 
 Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · ✅ Done
 
@@ -430,6 +430,21 @@ Demo script: plant a bed of lavender and salvia, wait for butterflies to settle 
 
 ## Milestone 4 — A world of flowers, through the real seasons
 
+### Story 3.8 — Little living-world details (S) — *follow-up*
+Small things left over from Milestone 3:
+- **Moss on path and edging stones:** it gathers slowly, as it already does on boulders (from 3.2).
+- **A faint rustle** when a bunny hops through flowers, only when zoomed in close (from 3.5).
+- **Wind-borne petals and seeds** riding the gusts in spring and summer (the optional part of 3.1); autumn's falling leaves belong to 4.2.
+
+### Story 3.9 — Close-up polish pass (S) — *follow-up*
+These were only checked from the default camera, never zoomed right in. Review each up close and tune whatever reads poorly:
+- butterflies' wing patterns and the morpho shimmer;
+- hummingbirds' throats and hovering;
+- the bunnies' sit-up, wash, lie-down and binky poses;
+- ducks dabbling and preening;
+- a single rose bloom;
+- lotus stems and raised leaves from a low angle.
+
 ### Story 4.1 — A huge flower collection (L)
 - Grow the collection to **50+ species**, with a data-driven species definition (shape generator, palettes, height, bloom seasons). No vegetables or utility plants.
 - A beautiful **flower book** to browse and pick species, sorted by "blooming now".
@@ -474,6 +489,18 @@ Demo script: plant a bed of mixed-colour roses beside a path, zoom in on a singl
 
 Demo script: dig a pond, choose the water mix, and paint across it. Watch lotus pads unfurl in the deep middle, irises rise at the edges, and blooms open in a wave.
 
+### Story 4.1d — Roses through the year (S) — *follow-up*
+- **Winter:** roses rest as bare thorny canes with a few red hips, instead of showing as buds.
+- **Autumn:** hips appear among the last blooms.
+- **Climbers:** climbing roses on fences and the cottage (from 3.4) use the new rose bloom shape, so all roses match.
+
+### Story 4.1e — Living water flowers (M) — *follow-up*
+- **Floating pads:** they bob gently on the wind-driven ripples.
+- **Autumn:** leaves turn bronze and lotus seed pods nod in the breeze.
+- **Winter:** only a few dark pads stay on the water.
+- **Drifting petals:** now and then a petal drifts across the water.
+- **Creatures:** dragonflies land on iris and lotus; ducks steer round lotus leaves; fish glide under the pads.
+
 ### Story 4.2 — Real seasons, beautifully (L)
 - Seasons already follow the real date (from 1.1). Add the full feel: **spring** cherry blossoms and drifting petals, **summer** lush and buzzing, **autumn** amber leaves falling and gathering, **winter** quiet snowfall, frosted hedges and snow on the roof, with glowing windows.
 - Flowers change with the season: some bloom, some fade to seed heads, some rest.
@@ -508,9 +535,25 @@ Demo script: dig a pond, choose the water mix, and paint across it. Watch lotus 
 ### Story 6.4 — Stays smooth everywhere: automatic quality tiers (M)
 ### Story 6.5 — The "wow" first 10 seconds (M)
 
+### Story 6.6 — Keep my garden safe (S) — *follow-up*
+- **Ask the browser to keep the save:** request persistent storage (`navigator.storage.persist()`) so iOS doesn't clear the garden.
+- **Backup:** a quiet "Back up my garden" option that saves a small file, and restores it from that file.
+
+### Story 6.7 — Fast undo for big gardens (M) — *follow-up*
+- Undo currently replays every stroke from scratch, which gets slower as a garden grows.
+- **Checkpoints:** keep quiet snapshots every so often, so undo only replays the last few strokes.
+- **Still exact:** undo must keep rebuilding the garden identically.
+
+### Story 6.8 — Performance pass 3 (M) — *follow-up*
+- **Measure on a real iPhone:** use the `?fps` meter in a large garden, since the headless profiler can't time the GPU.
+- **Remove first-time hitches:** build flower and creature shapes ahead of time instead of the first time each is planted or appears.
+- **Cheaper forest shadows:** bake the forest's shadows once, as they never change.
+- **Profile what's left:** look at the remaining drawing cost (bloom, edge smoothing).
+
 ---
 
 ## Parking lot (ideas to revisit)
+- **Watch for:** a long press while drawing a path "becoming bigger and ugly". Not reproduced in testing; the junction flare was made gentler. Revisit with a screenshot if it happens again.
 - **Crazy-paving flagstones** (Voronoi stones bent along the path) and **auto-connecting paths to the cottage door** were built in 1.5 and removed for simplicity. Revisit later, keeping the path starting exactly under the finger.
 - **More path styles that blend procedurally** (stepping stones, cobbles, gravel, mossy stones were prototyped in 1.5 and parked; future: styles that transition smoothly into each other).
 - Haptics (iOS Safari has limited vibration support).
