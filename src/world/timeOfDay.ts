@@ -1,0 +1,105 @@
+import * as THREE from 'three';
+import type { SeasonPalette } from './season';
+
+/** One moment of the day: where the light comes from, its colours, and the mood of the picture. */
+interface Key {
+  at: number;
+  /** Sun (or moon) height and turn, in degrees (turn 0 = the afternoon sun from the front left). */
+  elevation: number;
+  turn: number;
+  sun: THREE.Color;
+  sunIntensity: number;
+  sky: THREE.Color;
+  ground: THREE.Color;
+  skyIntensity: number;
+  haze: THREE.Color;
+  /** How close the haze comes in (dawn mist < 1). */
+  mist: number;
+  lift: THREE.Color;
+  gain: THREE.Color;
+  saturation: number;
+  bloom: number;
+  /** Overall brightness of reflections in the water. */
+  glow: number;
+}
+
+export interface Lighting {
+  sunDir: THREE.Vector3;
+  sun: THREE.Color;
+  sunIntensity: number;
+  sky: THREE.Color;
+  ground: THREE.Color;
+  skyIntensity: number;
+  haze: THREE.Color;
+  mist: number;
+  lift: THREE.Color;
+  gain: THREE.Color;
+  saturation: number;
+  bloom: number;
+  glow: number;
+  /** 0 by day … 1 at night (for lamps, windows, fireflies). */
+  night: number;
+}
+
+const C = (hex: string) => new THREE.Color(hex);
+const mix = (a: string, b: string, k: number) => C(a).lerp(C(b), k);
+
+/**
+ * The day's light, from dawn mist through the golden afternoon (the garden's usual look) and dusk
+ * into moonlit night, built on the season's own palette. `light(p)` blends the nearest keys
+ * (p: 0 dawn … 1 night).
+ */
+export class TimeOfDay {
+  private readonly keys: Key[];
+
+  constructor(palette: SeasonPalette) {
+    const k = (at: number, elevation: number, turn: number, sun: THREE.Color, sunIntensity: number, sky: THREE.Color, ground: THREE.Color, skyIntensity: number, haze: THREE.Color, mist: number, lift: string, gain: string, saturation: number, bloom: number, glow: number): Key => ({ at, elevation, turn, sun, sunIntensity, sky, ground, skyIntensity, haze, mist, lift: C(lift), gain: C(gain), saturation, bloom, glow });
+    this.keys = [
+      // Dawn: a low pink sun from the far side, lilac sky, mist lying close.
+      k(0.0, 7, -95, C('#ffc2a0'), 1.5, mix(palette.sky, '#e8c4dc', 0.55), C('#5a4a40'), 1.0, mix(palette.fog, '#f0d0d8', 0.55), 0.55, '#2a1a24', '#ffeef0', 0.98, 0.6, 0.85),
+      // Morning: clear, fresh light.
+      k(0.3, 30, -55, mix(palette.sun, '#ffffff', 0.5), 2.7, C(palette.sky), C('#6b5a3a'), 1.3, C(palette.fog), 1.0, '#221a14', '#fff8f0', 1.05, 0.5, 1),
+      // Golden afternoon: the garden's usual look.
+      k(0.55, 38.3, 0, C(palette.sun), 3.0, C(palette.sky), C('#6b5a3a'), 1.35, C(palette.fog), 1.0, '#2a1a10', '#fff4e6', 1.08, 0.55, 1),
+      // Dusk: a deep orange sun going down, a warm glowing haze.
+      k(0.78, 6, 45, C('#ff9a5a'), 1.6, mix('#f2a87a', palette.sky, 0.35), C('#4a3a3a'), 0.85, mix(palette.fog, '#e8a888', 0.7), 0.8, '#2a1418', '#ffe2cc', 1.1, 0.75, 0.8),
+      // Night: cool moonlight, a deep blue sky; the cottage windows glow.
+      k(1.0, 50, 120, C('#9ab4ff'), 0.55, C('#2a3a66'), C('#1a1a22'), 0.42, C('#1c2440'), 0.9, '#0a0e1a', '#c8d4ff', 0.8, 0.95, 0.4),
+    ];
+  }
+
+  light(p: number): Lighting {
+    p = Math.min(1, Math.max(0, p));
+    let i = 0;
+    while (i < this.keys.length - 2 && p > this.keys[i + 1].at) i++;
+    const a = this.keys[i];
+    const b = this.keys[i + 1];
+    const t0 = (p - a.at) / (b.at - a.at);
+    const t = t0 * t0 * (3 - 2 * t0);
+    const n = (x: number, y: number) => x + (y - x) * t;
+    const c = (x: THREE.Color, y: THREE.Color) => x.clone().lerp(y, t);
+    // The sun swings round from the morning side to the evening side (the afternoon sun is the
+    // garden's usual light from the front left).
+    const base = Math.atan2(0.48, -0.62);
+    const turn = THREE.MathUtils.degToRad(n(a.turn, b.turn));
+    const el = THREE.MathUtils.degToRad(n(a.elevation, b.elevation));
+    const az = base + turn;
+    const sunDir = new THREE.Vector3(Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)).normalize();
+    return {
+      sunDir,
+      sun: c(a.sun, b.sun),
+      sunIntensity: n(a.sunIntensity, b.sunIntensity),
+      sky: c(a.sky, b.sky),
+      ground: c(a.ground, b.ground),
+      skyIntensity: n(a.skyIntensity, b.skyIntensity),
+      haze: c(a.haze, b.haze),
+      mist: n(a.mist, b.mist),
+      lift: c(a.lift, b.lift),
+      gain: c(a.gain, b.gain),
+      saturation: n(a.saturation, b.saturation),
+      bloom: n(a.bloom, b.bloom),
+      glow: n(a.glow, b.glow),
+      night: Math.min(1, Math.max(0, (p - 0.78) / 0.22)),
+    };
+  }
+}

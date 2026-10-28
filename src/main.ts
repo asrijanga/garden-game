@@ -18,6 +18,8 @@ import { Ducks } from './world/ducks';
 import { Hummingbirds } from './world/hummingbirds';
 import { FallingPetals } from './world/petals';
 import { SeasonFx } from './world/seasonFx';
+import { TimeOfDay } from './world/timeOfDay';
+import { mountTimeDial } from './ui/timeDial';
 import { GroundPaint } from './world/groundPaint';
 import { Stones } from './world/stones';
 import { EdgePlants } from './world/edgePlants';
@@ -109,7 +111,8 @@ bindWind(wind);
 
 // Warm, low afternoon sun from the front left, so the cottage glows and shadows fall behind.
 const sunDir = new THREE.Vector3(-0.62, 0.62, 0.48).normalize();
-scene.add(new THREE.HemisphereLight(palette.sky, '#6b5a3a', 1.35));
+const hemi = new THREE.HemisphereLight(palette.sky, '#6b5a3a', 1.35);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(palette.sun, 3.0);
 sun.position.copy(sunDir).multiplyScalar(60);
 sun.castShadow = true;
@@ -628,6 +631,28 @@ const seasonFx = new SeasonFx(
 );
 scene.add(seasonFx.group);
 
+// --- Time of day ---------------------------------------------------------------------------
+// The light, haze, water and colour grade follow the sun dial (golden afternoon by default).
+const timeOfDay = new TimeOfDay(palette);
+const applyTime = (p: number) => {
+  const l = timeOfDay.light(p);
+  sun.color.copy(l.sun);
+  sun.intensity = l.sunIntensity;
+  sun.position.copy(l.sunDir).multiplyScalar(60);
+  hemi.color.copy(l.sky);
+  hemi.groundColor.copy(l.ground);
+  hemi.intensity = l.skyIntensity;
+  haze.copy(l.haze);
+  mist = l.mist;
+  if (scene.fog instanceof THREE.Fog) {
+    scene.fog.color.copy(haze);
+    scene.fog.near = fogNear * mist;
+    scene.fog.far = fogFar * (0.6 + 0.4 * mist);
+  }
+  post.setGrade(l.lift, l.gain, l.saturation, l.bloom);
+  ponds.setLight(l.sunDir, l.sky, l.haze, l.glow);
+  renderer.shadowMap.needsUpdate = true;
+};
 if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, paint, petals, seasonFx, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
@@ -786,9 +811,14 @@ function refreshHistoryButtons() {
 
 // --- Post-processing ----------------------------------------------------------------------
 const post = new PostFX(renderer, scene, camera);
+// (After the post-processing exists: the dial applies the saved time straight away.)
+mountTimeDial(applyTime);
 if (debug) Object.assign(window, { post });
 
 let started = false;
+let fogNear = 30;
+let fogFar = 70;
+let mist = 1;
 function resize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -799,7 +829,9 @@ function resize() {
   rig.fit(full);
   if (!started) rig.distance = full;
   camera.updateProjectionMatrix();
-  scene.fog = new THREE.Fog(haze, full * 0.95, full * 2.3);
+  fogNear = full * 0.95;
+  fogFar = full * 2.3;
+  scene.fog = new THREE.Fog(haze, fogNear * mist, fogFar * (0.6 + 0.4 * mist));
   post.setSize(w, h, pixelRatio());
   (motes.material as THREE.ShaderMaterial).uniforms.uPixelRatio.value = pixelRatio();
   cottage.setPixelRatio(pixelRatio());

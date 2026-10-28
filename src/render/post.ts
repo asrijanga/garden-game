@@ -177,6 +177,15 @@ export class PostFX {
     this.sceneRT = target(width, height, samples);
   }
 
+  /** The colour grade (lift/gain/saturation) and bloom strength, e.g. for the time of day. */
+  setGrade(lift: THREE.Color, gain: THREE.Color, saturation: number, bloom: number) {
+    const u = this.final.uniforms;
+    (u.uLift.value as THREE.Color).copy(lift);
+    (u.uGain.value as THREE.Color).copy(gain);
+    u.uSaturation.value = saturation;
+    u.uBloom.value = bloom;
+  }
+
   setSize(width: number, height: number, pixelRatio: number) {
     const w = Math.round(width * pixelRatio);
     const h = Math.round(height * pixelRatio);

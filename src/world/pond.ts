@@ -23,6 +23,9 @@ const BLEND = 1.0; // radius of the soft curve where separate ponds meet
 const NONE = -99;
 const FILL_TIME = 3.2;
 const RIPPLES = 8;
+const WHITE_SKY = new THREE.Color('#ffffff');
+const BLUE_SKY = new THREE.Color('#7fb2dc');
+const TREELINE = new THREE.Color('#2f4a2e');
 const WAKES = 8;
 
 /** Dig depth (R), shore halo (G) and height above the waterline (B), read by the lawn shader. One texel per field vertex. */
@@ -218,6 +221,15 @@ export class Ponds {
   }
 
   /** Expanding rings on the water at (x, z). */
+  /** Follow the time of day: the sun's direction (for glints), the sky and treeline reflected. */
+  setLight(sunDir: THREE.Vector3, sky: THREE.Color, haze: THREE.Color, glow = 1) {
+    const u = this.waterMat.uniforms;
+    (u.uSunDir.value as THREE.Vector3).copy(sunDir);
+    (u.uSkyLow.value as THREE.Color).copy(sky).lerp(WHITE_SKY, 0.35).multiplyScalar(glow);
+    (u.uSkyHigh.value as THREE.Color).copy(sky).lerp(BLUE_SKY, 0.45).multiplyScalar(glow);
+    (u.uTree.value as THREE.Color).copy(TREELINE).lerp(haze, 0.25);
+  }
+
   /** A soft V of wake behind something paddling (slot 0–7), pointing along `yaw`; strength 0 clears it. */
   setWake(slot: number, x: number, z: number, yaw: number, strength: number) {
     (this.waterMat.uniforms.uWakes.value[slot % WAKES] as THREE.Vector4).set(x, z, yaw, strength);
