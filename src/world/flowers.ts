@@ -115,7 +115,7 @@ const STEM = new THREE.Color('#4f8a3a');
 const LEAF = new THREE.Color('#5f9a42');
 const WHITE = new THREE.Color('#ffffff');
 
-function stem(m: FlowerMesh, height: number, lean: THREE.Vector3, rng: () => number) {
+function stem(m: FlowerMesh, height: number, lean: THREE.Vector3, rng: () => number, withLeaves = true) {
   const segs = 4;
   const r0 = 0.0055;
   const pts: THREE.Vector3[] = [];
@@ -138,7 +138,7 @@ function stem(m: FlowerMesh, height: number, lean: THREE.Vector3, rng: () => num
     }
   }
   // A few leaves along the stem (a rosette near the ground for short plants).
-  const leaves = height < 0.26 ? 5 : 2 + Math.floor(rng() * 2);
+  const leaves = !withLeaves ? 0 : height < 0.26 ? 5 : 2 + Math.floor(rng() * 2);
   for (let i = 0; i < leaves; i++) {
     const az = rng() * Math.PI * 2;
     const y = height < 0.26 ? 0.015 + rng() * 0.03 : lerp(0.06, height * 0.5, rng());
@@ -461,6 +461,210 @@ function roseBush(m: FlowerMesh, type: 'tea' | 'floribunda' | 'cabbage' | 'climb
   return top;
 }
 
+const PAD = new THREE.Color('#4f8a3a');
+const PAD_DARK = new THREE.Color('#3f7a32');
+
+/** A floating leaf: a disc (with the lily pad's notch) lying on the water, at height y. */
+function pad(m: FlowerMesh, cx: number, cz: number, r: number, y: number, notch: boolean, cupped: number, rng: () => number) {
+  const n = 16;
+  const gap = notch ? 0.5 : 0;
+  const a0 = rng() * Math.PI * 2;
+  const centre = new THREE.Vector3(cx, y - cupped * r, cz);
+  const tone = (rng() < 0.5 ? PAD : PAD_DARK).clone().multiplyScalar(lerp(0.9, 1.1, rng()));
+  for (let i = 0; i < n; i++) {
+    const t0 = gap / 2 + (i / n) * (Math.PI * 2 - gap);
+    const t1 = gap / 2 + ((i + 1) / n) * (Math.PI * 2 - gap);
+    const rr0 = r * (1 + Math.sin(t0 * 3 + a0) * 0.04);
+    const rr1 = r * (1 + Math.sin(t1 * 3 + a0) * 0.04);
+    const p0 = new THREE.Vector3(cx + Math.cos(a0 + t0) * rr0, y, cz + Math.sin(a0 + t0) * rr0);
+    const p1 = new THREE.Vector3(cx + Math.cos(a0 + t1) * rr1, y, cz + Math.sin(a0 + t1) * rr1);
+    m.tri(centre, p1, p0, { color: tone, shade: [0.85, 1.05, 1.05], n: UP });
+  }
+}
+
+/** An upright leaf on a stalk: a broad heart (round) or an arrow, standing out of the water. */
+function standingLeaf(m: FlowerMesh, base: THREE.Vector3, h: number, len: number, az: number, arrow: boolean, rng: () => number) {
+  const d = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
+  const top = base.clone().add(new THREE.Vector3(d.x * 0.02, h, d.z * 0.02));
+  // The stalk.
+  const side = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(0.003);
+  m.tri(base.clone().sub(side), top, base.clone().add(side), { color: STEM });
+  // The blade, tilted out from the stalk, pointing up and away.
+  const up = d.clone().multiplyScalar(0.6).addScaledVector(UP, 0.8).normalize();
+  const across = new THREE.Vector3(-d.z, 0, d.x);
+  const tone = LEAF.clone().multiplyScalar(lerp(0.85, 1.05, rng()));
+  const tip = top.clone().addScaledVector(up, len);
+  const w = len * (arrow ? 0.45 : 0.5);
+  if (arrow) {
+    // An arrowhead: a pointed blade with two back-swept lobes.
+    const mid = top.clone().addScaledVector(up, len * 0.3);
+    const lobeL = top.clone().addScaledVector(up, -len * 0.45).addScaledVector(across, w);
+    const lobeR = top.clone().addScaledVector(up, -len * 0.45).addScaledVector(across, -w);
+    m.tri(top, mid.clone().addScaledVector(across, w * 0.7), tip, { color: tone, shade: [0.85, 1, 1.05] });
+    m.tri(top, tip, mid.clone().addScaledVector(across, -w * 0.7), { color: tone, shade: [0.85, 1.05, 1] });
+    m.tri(top, lobeL, mid.clone().addScaledVector(across, w * 0.7), { color: tone, shade: [0.85, 0.95, 1] });
+    m.tri(top, mid.clone().addScaledVector(across, -w * 0.7), lobeR, { color: tone, shade: [0.85, 1, 0.95] });
+  } else {
+    const mid = top.clone().addScaledVector(up, len * 0.45);
+    for (const sg of [-1, 1]) {
+      m.tri(top, mid.clone().addScaledVector(across, sg * w), tip, { color: tone, shade: [0.85, 1, 1.05] });
+      m.tri(top, top.clone().addScaledVector(across, sg * w * 0.6).addScaledVector(up, -len * 0.08), mid.clone().addScaledVector(across, sg * w), { color: tone, shade: [0.85, 0.95, 1] });
+    }
+  }
+}
+
+/** A sword-shaped leaf (iris), rising in a gentle arch from the water. */
+function sword(m: FlowerMesh, base: THREE.Vector3, h: number, az: number, rng: () => number) {
+  const d = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
+  const s = new THREE.Vector3(-d.z, 0, d.x);
+  const lean = lerp(0.08, 0.22, rng());
+  const w = lerp(0.012, 0.018, rng());
+  const tone = LEAF.clone().multiplyScalar(lerp(0.85, 1.05, rng()));
+  const at = (t: number) => base.clone().addScaledVector(UP, t * h).addScaledVector(d, t * t * h * lean);
+  const rows = 5;
+  for (let i = 0; i < rows; i++) {
+    const t0 = i / rows;
+    const t1 = (i + 1) / rows;
+    const w0 = w * (1 - t0 * 0.7);
+    const w1 = i === rows - 1 ? 0 : w * (1 - t1 * 0.7);
+    m.tri(at(t0).addScaledVector(s, -w0), at(t1).addScaledVector(s, -w1), at(t1).addScaledVector(s, w1), { color: tone, shade: [0.8, 1, 1] });
+    m.tri(at(t0).addScaledVector(s, -w0), at(t1).addScaledVector(s, w1), at(t0).addScaledVector(s, w0), { color: tone, shade: [0.8, 1, 0.95] });
+  }
+}
+
+/** A simple bloom of `n` petals at `top` (petal colour from the plant), with a heart. */
+function simpleBloom(m: FlowerMesh, top: THREE.Vector3, n: number, len: number, width: number, open: number, cup: number, heart: THREE.Color | null, rng: () => number, style: PetalStyle = {}) {
+  const off = rng() * Math.PI * 2;
+  for (let i = 0; i < n; i++) {
+    const az = off + (i / n) * Math.PI * 2 + (rng() - 0.5) * 0.15;
+    petal(m, top.clone(), az, open + (rng() - 0.5) * 0.1, len * lerp(0.9, 1.1, rng()), width, cup, 0.1, rng, style);
+  }
+  if (heart) m.addGeometry(new THREE.IcosahedronGeometry(len * 0.22, 1).scale(1, 0.55, 1).translate(top.x, top.y + len * 0.06, top.z), heart, false, top);
+}
+
+/**
+ * Water flowers, built around the water's surface at y = 0: floating pads and blooms (lotus,
+ * lilies, water hyacinth), and marginals standing up out of the shallows (iris, marsh
+ * marigold, pickerelweed, arrowhead). Returns where the main bloom sits.
+ */
+function aquatic(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'flag' | 'marigold' | 'pickerel' | 'arrowhead', height: number, size: number, rng: () => number): THREE.Vector3 {
+  const O = new THREE.Vector3(0, 0, 0);
+  switch (type) {
+    case 'lily': {
+      // A cluster of notched pads, and one star-shaped bloom floating among them.
+      for (let i = 0; i < 4; i++) {
+        const a = i * 1.7 + rng();
+        const r = i === 0 ? 0 : lerp(0.12, 0.2, rng());
+        pad(m, Math.cos(a) * r, Math.sin(a) * r, lerp(0.09, 0.13, rng()), 0.004, true, 0, rng);
+      }
+      const top = new THREE.Vector3(0.03, 0.02, 0.02);
+      simpleBloom(m, top, 9, size, size * 0.42, 1.05, 0.05, new THREE.Color('#f2c230'), rng, { pointed: true });
+      simpleBloom(m, top.clone().add(new THREE.Vector3(0, 0.006, 0)), 8, size * 0.8, size * 0.38, 0.65, 0.12, null, rng, { pointed: true });
+      return top;
+    }
+    case 'lotus': {
+      // Big round leaves, some floating, some held up on stalks; a tall stem with a cupped bloom
+      // around a golden seed-pod heart.
+      for (let i = 0; i < 3; i++) {
+        const a = i * 2.1 + rng();
+        pad(m, Math.cos(a) * lerp(0.1, 0.2, rng()), Math.sin(a) * lerp(0.1, 0.2, rng()), lerp(0.13, 0.18, rng()), 0.004, false, 0.04, rng);
+      }
+      for (let i = 0; i < 2; i++) {
+        const a = rng() * Math.PI * 2;
+        const x = Math.cos(a) * 0.08;
+        const z = Math.sin(a) * 0.08;
+        const h = height * lerp(0.4, 0.65, rng());
+        m.tri(new THREE.Vector3(x - 0.003, 0, z), new THREE.Vector3(x, h, z), new THREE.Vector3(x + 0.003, 0, z), { color: STEM });
+        pad(m, x, z, lerp(0.12, 0.16, rng()), h, false, 0.18, rng);
+      }
+      const top = stem(m, height, new THREE.Vector3((rng() - 0.5) * 0.06, 0, (rng() - 0.5) * 0.06), rng, false);
+      sepals(m, top, size * 0.5, rng);
+      // Two rings of broad, cupped, pointed petals.
+      simpleBloom(m, top, 8, size * 1.1, size * 0.7, 0.85, 0.3, null, rng, { pointed: true });
+      simpleBloom(m, top.clone().add(new THREE.Vector3(0, 0.004, 0)), 7, size * 0.9, size * 0.6, 0.45, 0.35, null, rng, { pointed: true });
+      // The seed pod: a flat-topped cone, golden-green, with dark seeds on top.
+      const podR = size * 0.32;
+      m.addGeometry(new THREE.CylinderGeometry(podR, podR * 0.6, podR * 0.8, 12).translate(top.x, top.y + podR * 0.45, top.z), new THREE.Color('#c8c050'), false, top);
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2;
+        const r = i === 0 ? 0 : podR * 0.55;
+        m.addGeometry(new THREE.IcosahedronGeometry(podR * 0.14, 0).translate(top.x + Math.cos(a) * r, top.y + podR * 0.86, top.z + Math.sin(a) * r), new THREE.Color('#5a5a2a'), false, top);
+      }
+      return top;
+    }
+    case 'hyacinth': {
+      // A glossy rosette floating on the water, and a short spike of pale flowers.
+      for (let i = 0; i < 6; i++) {
+        const az = (i / 6) * Math.PI * 2 + rng() * 0.3;
+        standingLeaf(m, new THREE.Vector3(Math.cos(az) * 0.02, 0.005, Math.sin(az) * 0.02), 0.02, lerp(0.05, 0.07, rng()), az, false, rng);
+      }
+      const top = new THREE.Vector3(0, height, 0);
+      m.tri(new THREE.Vector3(-0.003, 0, 0), top, new THREE.Vector3(0.003, 0, 0), { color: STEM });
+      for (let i = 0; i < 7; i++) {
+        const az = i * 2.4;
+        const y = height - i * size * 0.9;
+        const f = new THREE.Vector3(Math.cos(az) * size * 0.8, y, Math.sin(az) * size * 0.8);
+        simpleBloom(m, f, 6, size, size * 0.6, 1.2, 0.05, null, rng);
+      }
+      return top;
+    }
+    case 'flag': {
+      // A fan of tall sword leaves, and a flag flower: three falls drooping, three standards up.
+      for (let i = 0; i < 6; i++) sword(m, new THREE.Vector3((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.04), height * lerp(0.7, 1.05, rng()), rng() * Math.PI * 2, rng);
+      const top = stem(m, height, new THREE.Vector3(0.02, 0, 0.01), rng, false);
+      const off = rng() * Math.PI * 2;
+      for (let i = 0; i < 3; i++) {
+        petal(m, top.clone(), off + (i / 3) * Math.PI * 2, 1.85, size, size * 0.55, 0.05, 0.1, rng, { blotch: 0.5 });
+        petal(m, top.clone(), off + (i / 3) * Math.PI * 2 + Math.PI / 3, 0.35, size * 0.8, size * 0.4, 0.2, 0.05, rng);
+      }
+      return top;
+    }
+    case 'marigold': {
+      // Round, glossy leaves on short stalks, and a few golden cups.
+      for (let i = 0; i < 4; i++) {
+        const az = (i / 4) * Math.PI * 2 + rng();
+        standingLeaf(m, O.clone(), height * lerp(0.3, 0.5, rng()), lerp(0.06, 0.08, rng()), az, false, rng);
+      }
+      let top = O;
+      for (let i = 0; i < 3; i++) {
+        const a = rng() * Math.PI * 2;
+        const h = height * lerp(0.75, 1.05, rng());
+        const at = new THREE.Vector3(Math.cos(a) * 0.04, h, Math.sin(a) * 0.04);
+        m.tri(new THREE.Vector3(-0.002, 0, 0), at, new THREE.Vector3(0.002, 0, 0), { color: STEM });
+        simpleBloom(m, at, 5, size, size * 0.9, 0.85, 0.2, new THREE.Color('#e8a020'), rng);
+        if (at.y > top.y) top = at;
+      }
+      return top;
+    }
+    case 'pickerel': {
+      // Glossy heart-shaped leaves held up on stalks, and a spike of violet-blue florets.
+      for (let i = 0; i < 4; i++) standingLeaf(m, O.clone(), height * lerp(0.45, 0.7, rng()), lerp(0.08, 0.11, rng()), rng() * Math.PI * 2, false, rng);
+      const top = stem(m, height, new THREE.Vector3(0.01, 0, 0.01), rng, false);
+      for (let i = 0; i < 18; i++) {
+        const az = i * 2.39996;
+        const y = top.y - (i / 18) * size * 7;
+        const g = new THREE.OctahedronGeometry(size * lerp(0.7, 0.45, i / 18), 0).scale(0.8, 1.2, 0.8).translate(top.x + Math.cos(az) * size * 0.6, y, top.z + Math.sin(az) * size * 0.6);
+        m.addGeometry(g, WHITE, true, top);
+      }
+      return top;
+    }
+    case 'arrowhead': {
+      // Arrow-shaped leaves on stalks; a stem with whorls of small white three-petalled flowers.
+      for (let i = 0; i < 4; i++) standingLeaf(m, O.clone(), height * lerp(0.4, 0.65, rng()), lerp(0.1, 0.13, rng()), rng() * Math.PI * 2, true, rng);
+      const top = stem(m, height, new THREE.Vector3(0.01, 0, -0.01), rng, false);
+      for (let w = 0; w < 3; w++) {
+        const y = top.y - w * size * 3;
+        for (let i = 0; i < 3; i++) {
+          const az = (i / 3) * Math.PI * 2 + w;
+          const f = new THREE.Vector3(top.x + Math.cos(az) * size * 1.2, y, top.z + Math.sin(az) * size * 1.2);
+          simpleBloom(m, f, 3, size, size * 0.9, 1.2, 0.1, new THREE.Color('#e8d040'), rng);
+        }
+      }
+      return top;
+    }
+  }
+}
+
 /** Storybook proportions: blooms drawn about twice life size so they read from the garden camera. */
 const HEAD = 2.8;
 
@@ -469,6 +673,12 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number): THREE.BufferGeo
   const rng = createRng(seed);
   const m = new FlowerMesh();
   const height = lerp(sp.height[0], sp.height[1], rng());
+  if (sp.form.kind === 'aquatic') {
+    const top = aquatic(m, sp.form.type, height, sp.form.size * HEAD, rng);
+    const geo = m.build();
+    geo.userData.headY = top.y;
+    return geo;
+  }
   if (sp.form.kind === 'rose') {
     const top = roseBush(m, sp.form.type, height, sp.form.size * HEAD, rng);
     const geo = m.build();

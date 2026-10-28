@@ -37,6 +37,12 @@ export type FlowerForm =
   | { kind: 'cup'; petals: number; length: number; width: number; open: number }
   | { kind: 'spike'; florets: number; spikeLength: number; floretSize: number; bell: boolean }
   | {
+      kind: 'aquatic';
+      type: 'lotus' | 'lily' | 'hyacinth' | 'flag' | 'marigold' | 'pickerel' | 'arrowhead';
+      /** Bloom size (metres, before storybook scaling). */
+      size: number;
+    }
+  | {
       kind: 'rose';
       /** Hybrid tea, floribunda, English/cabbage, climber, shrub/wild, miniature/patio. */
       type: 'tea' | 'floribunda' | 'cabbage' | 'climber' | 'wild' | 'mini';
@@ -62,6 +68,8 @@ export interface FlowerSpecies {
   form: FlowerForm;
   /** Minimum spacing between plants, metres. */
   spacing: number;
+  /** Water plants: deep-water floaters, shallow-water marginals, or the damp bank. */
+  zone?: 'deep' | 'shallow' | 'bank';
 }
 
 /**
@@ -659,7 +667,90 @@ export const SPECIES: FlowerSpecies[] = [
     form: { kind: 'rose', type: 'mini', size: 0.016 },
     spacing: 0.17,
   },
+  // --- Water flowers (planted by painting across a pond) ---
+  {
+    id: 'lotus',
+    name: 'Lotus',
+    seasons: ['summer'],
+    height: [0.5, 0.7],
+    colors: ['#f2a6c0', '#fbf8f2', '#fbf8f2|#e8608a', '#f6c6cc'],
+    form: { kind: 'aquatic', type: 'lotus', size: 0.05 },
+    spacing: 0.45,
+    zone: 'deep',
+  },
+  {
+    id: 'waterlily',
+    name: 'Water lily',
+    seasons: ['summer'],
+    height: [0.02, 0.03],
+    colors: ['#fbf8f2', '#f2a6c0', '#e8406a', '#f6d23a', '#f6b48a', '#fbf8f2|#f2a6c0'],
+    form: { kind: 'aquatic', type: 'lily', size: 0.036 },
+    spacing: 0.4,
+    zone: 'deep',
+  },
+  {
+    id: 'waterhyacinth',
+    name: 'Water hyacinth',
+    seasons: ['summer', 'autumn'],
+    height: [0.14, 0.2],
+    colors: ['#c8b4ec', '#b8a2e6', '#d6c8f2'],
+    form: { kind: 'aquatic', type: 'hyacinth', size: 0.014 },
+    spacing: 0.3,
+    zone: 'deep',
+  },
+  {
+    id: 'waterflag',
+    name: 'Water iris',
+    seasons: ['spring', 'summer'],
+    height: [0.55, 0.75],
+    colors: ['#f2d23a', '#6a5ac8', '#4a6ad0', '#8a6ad6'],
+    form: { kind: 'aquatic', type: 'flag', size: 0.05 },
+    spacing: 0.24,
+    zone: 'shallow',
+  },
+  {
+    id: 'marshmarigold',
+    name: 'Marsh marigold',
+    seasons: ['spring'],
+    height: [0.16, 0.26],
+    colors: ['#f6c21c', '#f6d23a'],
+    form: { kind: 'aquatic', type: 'marigold', size: 0.024 },
+    spacing: 0.22,
+    zone: 'shallow',
+  },
+  {
+    id: 'pickerelweed',
+    name: 'Pickerelweed',
+    seasons: ['summer', 'autumn'],
+    height: [0.4, 0.55],
+    colors: ['#7a7ae0', '#8a8ae8', '#9a8ad6'],
+    form: { kind: 'aquatic', type: 'pickerel', size: 0.016 },
+    spacing: 0.24,
+    zone: 'shallow',
+  },
+  {
+    id: 'arrowhead',
+    name: 'Arrowhead',
+    seasons: ['summer'],
+    height: [0.35, 0.5],
+    colors: ['#fbf8f2', '#f6f2ea'],
+    form: { kind: 'aquatic', type: 'arrowhead', size: 0.018 },
+    spacing: 0.24,
+    zone: 'shallow',
+  },
+  {
+    id: 'waterforgetmenot',
+    name: 'Water forget-me-not',
+    seasons: ['spring', 'summer'],
+    height: [0.12, 0.2],
+    colors: ['#8ab8f2', '#a6c8f4', '#7aa8ea'],
+    form: { kind: 'cluster', florets: 30, radius: 0.06, floretSize: 0.008, shape: 'dome' },
+    spacing: 0.14,
+    zone: 'bank',
+  },
 ];
 
 /** "Seasonal mix": the species in bloom now, mixed together. */
 export const MIX_ID = 'mix';
+/** "Water mix": water flowers suited to each spot of a pond. */
+export const WATER_MIX_ID = 'water-mix';

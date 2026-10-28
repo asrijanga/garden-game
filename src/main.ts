@@ -219,6 +219,16 @@ const flowerBrush = new FlowerBrush(
   (x, z) => cottage.contains(x, z, 0.3) || ground.forestness(x, z) > 0.4 || ponds.contains(x, z, 0.9),
   (x, z) => paths.distanceToPaths(x, z),
   stones,
+  {
+    // Deep middle, shallows, or the damp bank just outside the water.
+    zone: (x, z) => {
+      const d = ponds.waterDepth(x, z);
+      if (d > 0.28) return 'deep';
+      if (d > 0.03) return 'shallow';
+      return d === 0 && ponds.contains(x, z, 0.7) && !ponds.contains(x, z, 0.05) ? 'bank' : null;
+    },
+    level: (x, z) => ponds.levelAt(x, z),
+  },
 );
 // Fences and hedges: posts knocked in with a wooden "tock", hedges rustling up.
 const fences = new Fences((shape, at) => {

@@ -1,7 +1,13 @@
-import { MIX_ID, type FlowerSpecies } from '../world/flowerSpecies';
+import { MIX_ID, WATER_MIX_ID, type FlowerSpecies } from '../world/flowerSpecies';
 
 /** A small illustrated flower icon for a species chip (inline SVG, 40×40). */
-export function icon(sp: FlowerSpecies | null): string {
+export function icon(sp: FlowerSpecies | null, water = false): string {
+  if (!sp && water) {
+    // Water mix: a lily and a lotus over a ripple.
+    return `<svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="31" rx="15" ry="4" fill="#9cc8e8"/>
+      <ellipse cx="11" cy="30" rx="6" ry="2.2" fill="#5f9a42"/><path d="M26 30V14" stroke="#5f8f3e" stroke-width="2"/>
+      ${bloom(12, 26, '#fbf8f2', 8, 4, '#f2c230', 4)}${bloom(26, 13, '#f2a6c0', 7, 6, '#e8d060', 6)}</svg>`;
+  }
   if (!sp) {
     // Seasonal mix: a little posy of three blooms.
     return `<svg viewBox="0 0 40 40" aria-hidden="true">
@@ -21,6 +27,19 @@ export function icon(sp: FlowerSpecies | null): string {
     return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 38V8" stroke="#5f8f3e" stroke-width="2" stroke-linecap="round"/>${dots}</svg>`;
   }
   const svg = (inner: string) => `<svg viewBox="0 0 40 40" aria-hidden="true">${stem}${inner}</svg>`;
+  if (f.kind === 'aquatic') {
+    // Water flowers: a bloom over a little blue ripple.
+    const water = `<ellipse cx="20" cy="33" rx="14" ry="3.5" fill="#9cc8e8"/><ellipse cx="13" cy="32" rx="6" ry="2.2" fill="#5f9a42"/>`;
+    const stalk = f.type === 'lily' || f.type === 'hyacinth' ? '' : `<path d="M20 32V16" stroke="#5f8f3e" stroke-width="2" stroke-linecap="round"/>`;
+    const cy = f.type === 'lily' ? 27 : f.type === 'hyacinth' ? 22 : 13;
+    const flower =
+      f.type === 'pickerel' || f.type === 'hyacinth'
+        ? Array.from({ length: 6 }, (_, i) => `<ellipse cx="${20 + (i % 2 ? 2.6 : -2.6)}" cy="${cy - 6 + i * 2.6}" rx="2.6" ry="2" fill="${c}"/>`).join('')
+        : f.type === 'lotus'
+          ? `${bloom(20, cy, c, 8, 7, '#e8d060', 6)}<rect x="17" y="${cy - 2}" width="6" height="3" rx="1" fill="#c8c050"/>`
+          : bloom(20, cy, c, f.type === 'arrowhead' ? 3 : f.type === 'flag' ? 6 : f.type === 'marigold' ? 5 : 9, 6, f.type === 'flag' ? '#f2c230' : '#f2c230', 6);
+    return `<svg viewBox="0 0 40 40" aria-hidden="true">${water}${stalk}${flower}</svg>`;
+  }
   if (f.kind === 'rose') {
     // A rose: a spiral of petals in a cup (a simple five-petalled one for the wild rose).
     const edge = sp.colors[0].split('|');
@@ -128,6 +147,7 @@ export class FlowerPicker {
     row.append(book);
     const entries: [string, string, FlowerSpecies | null, boolean][] = [
       [MIX_ID, 'Seasonal mix', null, true],
+      [WATER_MIX_ID, 'Water mix', null, true],
       ...species.map((s) => [s.id, s.name, s, inSeason(s)] as [string, string, FlowerSpecies, boolean]),
     ];
     for (const [id, label, sp, blooming] of entries) {
@@ -136,7 +156,7 @@ export class FlowerPicker {
       b.type = 'button';
       b.className = 'flower-chip' + (blooming ? ' blooming' : ' resting');
       b.setAttribute('aria-label', label);
-      b.innerHTML = `<span class="chip-face">${icon(sp)}</span><span class="chip-name">${label}</span>`;
+      b.innerHTML = `<span class="chip-face">${icon(sp, id === WATER_MIX_ID)}</span><span class="chip-name">${label}</span>`;
       b.addEventListener('pointerdown', (e) => e.stopPropagation());
       b.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -191,13 +211,14 @@ export class FlowerPicker {
   /** Choose a species (from a chip or the book), as if its chip were tapped. */
   pick(id: string) {
     const sp = this.species.find((s) => s.id === id);
-    const label = sp?.name ?? 'Seasonal mix';
+    const label = sp?.name ?? (id === WATER_MIX_ID ? 'Water mix' : 'Seasonal mix');
     this.select(id);
     this.chips.get(id)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
     this.showColours(sp);
     // Keep the colour chosen for this species last time.
     const colour = sp ? (this.colour.get(sp.id) ?? -1) : -1;
-    this.onPick(colour >= 0 ? `${id}:${colour}` : id, this.blooming.has(id) ? `${label}: blooming now` : `${label}: buds until its season`);
+    const where = id === WATER_MIX_ID || sp?.zone ? ' · paint across a pond' : '';
+    this.onPick(colour >= 0 ? `${id}:${colour}` : id, id === WATER_MIX_ID ? `Water mix${where}` : (this.blooming.has(id) ? `${label}: blooming now` : `${label}: buds until its season`) + where);
   }
 
   select(id: string) {

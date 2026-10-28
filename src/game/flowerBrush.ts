@@ -6,7 +6,7 @@ import type { Flowers } from '../world/flowers';
 import type { Wildflowers } from '../world/wildflowers';
 import type { Season } from '../world/season';
 import type { Stones } from '../world/stones';
-import { MIX_ID, SPECIES, type FlowerSpecies } from '../world/flowerSpecies';
+import { MIX_ID, SPECIES, WATER_MIX_ID, type FlowerSpecies } from '../world/flowerSpecies';
 
 const DAB_STEP = 0.3; // metres between brush dabs along a stroke
 const BED_RADIUS = 0.8; // painted soil (visible edge at ~80% of this), mostly hidden under foliage
@@ -53,6 +53,8 @@ export class FlowerBrush {
     private readonly blocked: (x: number, z: number) => boolean,
     private readonly distanceToPaths: (x: number, z: number) => number,
     private readonly stones: Stones,
+    /** Where water flowers can grow: a pond's deep middle, its shallows, or the damp bank. */
+    private readonly water: { zone(x: number, z: number): 'deep' | 'shallow' | 'bank' | null; level(x: number, z: number): number | null } = { zone: () => null, level: () => null },
   ) {}
 
   inSeason(sp: FlowerSpecies): boolean {
@@ -355,11 +357,69 @@ export class FlowerBrush {
     const { id } = this.choice();
     if (id !== MIX_ID) return SPECIES.find((s) => s.id === id) ?? SPECIES[0];
     const blooming = SPECIES.filter((s) => this.inSeason(s));
-    const pool = blooming.length ? blooming : SPECIES;
+    const land = SPECIES.filter((s) => !s.zone);
+    const pool = blooming.filter((s) => !s.zone).length ? blooming.filter((s) => !s.zone) : land;
     return pool[Math.floor(this.rng() * pool.length)];
   }
 
+  /** A water flower for this spot of the pond (the chosen one if it grows here, or the water mix). */
+  private pickWater(zone: 'deep' | 'shallow' | 'bank'): FlowerSpecies | null {
+    const { id } = this.choice();
+    if (id !== WATER_MIX_ID && id !== MIX_ID) {
+      const sp = SPECIES.find((s) => s.id === id);
+      return sp && sp.zone === zone ? sp : null;
+    }
+    const here = SPECIES.filter((s) => s.zone === zone);
+    const blooming = here.filter((s) => this.inSeason(s));
+    const pool = blooming.length ? blooming : here;
+    return pool.length ? pool[Math.floor(this.rng() * pool.length)] : null;
+  }
+
+  /** A colour for one plant: from the species' list (or the one chosen for it); "base|edge" is a bicolour. */
+  private plantColour(sp: FlowerSpecies): { color: THREE.Color; edge?: THREE.Color } {
+    const pick = Math.floor(this.rng() * sp.colors.length);
+    const { id: chosenId, colour: chosen } = this.choice();
+    const entry = sp.colors[sp.id === chosenId && chosen >= 0 && chosen < sp.colors.length ? chosen : pick];
+    const [baseHex, edgeHex] = entry.split('|');
+    const dh = (this.rng() - 0.5) * 0.03;
+    const ds = (this.rng() - 0.5) * 0.1;
+    const dl = (this.rng() - 0.5) * 0.06;
+    return { color: new THREE.Color(baseHex).offsetHSL(dh, ds, dl), edge: edgeHex ? new THREE.Color(edgeHex).offsetHSL(dh, ds, dl) : undefined };
+  }
+
+  /**
+   * Painting across a pond: no soil and no border, just water flowers, each kind in its own
+   * zone (floaters in the deep middle, marginals in the shallows, forget-me-nots on the damp
+   * bank), in soft drifts.
+   */
+  private waterDab(c: THREE.Vector2) {
+    const drift: Partial<Record<'deep' | 'shallow' | 'bank', FlowerSpecies | null>> = {};
+    for (let i = 0; i < 10; i++) {
+      const a = this.rng() * Math.PI * 2;
+      const r = Math.sqrt(this.rng()) * PLANT_RADIUS * 1.15;
+      const x = c.x + Math.cos(a) * r;
+      const z = c.y + Math.sin(a) * r;
+      const zone = this.water.zone(x, z);
+      if (!zone) continue;
+      if (drift[zone] === undefined || this.rng() < 0.3) drift[zone] = this.pickWater(zone);
+      const sp = drift[zone];
+      if (!sp || this.flowers.isCrowded(x, z, sp.spacing * FLOWER_SCALE * SPACING)) continue;
+      const { color, edge } = this.plantColour(sp);
+      const y = zone === 'bank' ? this.ground.heightAt(x, z) - 0.01 : (this.water.level(x, z) ?? this.ground.heightAt(x, z)) - 0.004;
+      const delay = this.strokeTime * 0.2 + 0.1 + (r / PLANT_RADIUS) * 0.9 + this.rng() * 0.25;
+      this.flowers.plant(sp, Math.floor(this.rng() * 5), x, y, z, this.rng() * Math.PI * 2, FLOWER_SCALE * lerp(0.85, 1.15, this.rng()), delay, this.inSeason(sp) ? lerp(0.9, 1, this.rng()) : lerp(0.3, 0.4, this.rng()), color, edge);
+    }
+  }
+
   private dab(c: THREE.Vector2) {
+    // Over a pond (or its damp bank): water flowers instead of a bed.
+    if (this.water.zone(c.x, c.y)) {
+      this.waterDab(c);
+      return;
+    }
+    // Water flowers only grow in and by the water.
+    const { id } = this.choice();
+    if (id === WATER_MIX_ID || SPECIES.find((s) => s.id === id)?.zone) return;
     if (this.blocked(c.x, c.y) || this.distanceToPaths(c.x, c.y) < 0.52) return;
     this.paint.bed(c.x, c.y, BED_RADIUS);
     const centre = c.clone();
@@ -395,16 +455,7 @@ export class FlowerBrush {
       if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.67) continue;
       // Room round each plant: a cottage-garden scatter, not a carpet.
       if (this.flowers.isCrowded(x, z, sp.spacing * FLOWER_SCALE * SPACING)) continue;
-      // A colour from the species' list (or the one chosen for it); "base|edge" is a bicolour.
-      const pick = Math.floor(this.rng() * sp.colors.length);
-      const { id: chosenId, colour: chosen } = this.choice();
-      const entry = sp.colors[sp.id === chosenId && chosen >= 0 && chosen < sp.colors.length ? chosen : pick];
-      const [baseHex, edgeHex] = entry.split('|');
-      const dh = (this.rng() - 0.5) * 0.03;
-      const ds = (this.rng() - 0.5) * 0.1;
-      const dl = (this.rng() - 0.5) * 0.06;
-      const color = new THREE.Color(baseHex).offsetHSL(dh, ds, dl);
-      const edge = edgeHex ? new THREE.Color(edgeHex).offsetHSL(dh, ds, dl) : undefined;
+      const { color, edge } = this.plantColour(sp);
       // The wave: plants further from the stroke sprout a little later.
       const delay = this.strokeTime * 0.2 + 0.1 + (r / PLANT_RADIUS) * 0.9 + this.rng() * 0.25;
       this.flowers.plant(
