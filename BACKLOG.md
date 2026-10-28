@@ -43,13 +43,14 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 4.1 A huge flower collection | ✅ Done | 57 species (was 14), every season covered: spring (daffodil with its trumpet, crocus, hyacinth, bluebell, snowdrop, primrose, forget-me-not, lily of the valley, iris, peony, grape hyacinth, ranunculus, hellebore, sweet pea), summer (sunflower, zinnia, marigold, petunia, snapdragon, delphinium, hollyhock, lupin, coneflower, shasta daisy, cornflower, geranium, hydrangea, allium, yarrow, phlox, verbena, lily, daylily, gladiolus, calendula, nasturtium, sweet William, blanket flower), autumn/winter (sneezeweed, goldenrod, cyclamen, heather, winter aconite) alongside the originals. New shape options: a corona trumpet on radial blooms; clusters can be flat, domed mopheads or a ball of stars on a bare stem. **Flower book**: a first chip opens a paper page of every species, "Blooming now" first, then by the season each next flowers, with art, name, season dots and colour swatches; tapping one picks it. The chip row now holds the book, the seasonal mix and what's blooming now (a species picked from the book keeps its chip). Flower meshes are built the first time a species is planted (57 × 5 pre-built variants would hold ~36 MB of empty buffers). Seasonal-mix beds now draw from the larger in-season list. |
 | 4.1b A rose garden | ✅ Done | Six rose habits as new species (a new `rose` form): hybrid tea (one high-centred bloom on a tall cane), floribunda (clusters), English rose (big, round, ~40 petals), climber (long arching canes, blooms along them), wild rose (open five petals, golden stamens), patio rose (compact, covered in small blooms). Blooms are petals on a golden-angle spiral, tight and cupped at the heart, opening and curling back outside; every bush mixes tight buds, half-open and open roses. Thorny canes, glossy five-leaflet leaves. 16 colours from classic red to white, lavender and mauve, plus bicolours written `base|edge` (yellow blushing pink, white edged red, peach to cream): petals now carry an edge factor and plants an edge colour, so any flower can shade heart → edge. Picking a rose shows colour swatches (with "mixed"); the choice is saved in the stroke (`species:colour`). Roses join the seasonal mix (wild roses spring–summer only). Petals now and then drop from open roses and tumble down on the breeze, lie a while, and fade. (Bare winter canes with hips not done: out of season they show as buds like other flowers.) Fixed along the way: the flower shader had hit WebGL's 16 vertex-input limit, so per-vertex and per-instance values are now packed. |
 | 4.1c Water flowers | 👀 Awaiting feedback | Painting with the Flowers tool across a pond plants water flowers instead of a bed (no soil, no border), each kind in its home zone by water depth: deep floaters (lotus with floating and raised round leaves, a tall stem and a cupped bloom round a golden seed pod; water lilies in white, pink, red, yellow, peach and a bicolour among notched pads; water hyacinth rosettes with pale lavender spikes), shallow marginals (water iris with sword leaves and a flag flower, marsh marigold's golden cups, pickerelweed's violet spikes, arrowhead's white three-petalled whorls over arrow leaves), and the damp bank (water forget-me-not). Planted in soft drifts, growing and blooming through the usual GPU growth with the bloom chime; bees and the other visitors find the open blooms. A "Water mix" chip plus a chip and book card for each; picking one says "paint across a pond", and a water flower never plants a bed on dry land. Each blooms in its real season (buds otherwise). Not done: bronze autumn leaves, nodding seed pods, pads bobbing on ripples, drifting petals on the water. Old flower strokes that crossed a pond now plant water flowers there. |
-| 4.2 – 6.x (+ follow-ups 3.8, 3.9, 4.1d, 4.1e, 6.6–6.8) | ⬜ Not started | See milestones below |
+| 4.2 – 6.x (+ follow-ups 3.8, 3.9, 4.1d, 4.1e, 6.6–6.8; requested 2.8 bed styles, 2.9 bed toppings) | ⬜ Not started | See milestones below |
 
 Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · ✅ Done
 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **New stories requested:** *Feedback:* "Add stories for a variety of garden beds, including raised beds, so the player decides the combination; also offer different materials like mulch and gravel." *Changes:* added Story 2.8 (bed styles, including raised beds) and Story 2.9 (bed toppings: mulches, gravels, living cover). Both are player choices saved per stroke, with old saves unchanged.
 - **4.1b → 4.1c:** *Feedback:* "Next story" (roses accepted). *Changes:* Story 4.1c built.
 - **4.1 → 4.1b:** *Feedback:* "Next story" (perf pass and flower collection accepted). *Changes:* Story 4.1b built.
 - **Performance request:** *Feedback:* "Drawing with the mouse sometimes lags; identify all performance issues and solve them one by one. Would a client/server architecture (hosted on a NAS) help?" *Answer:* no: the lag is per-frame work on the device (CPU and GPU), and a server only changes how fast the files download. *Changes:* Perf pass 2 (see the status table).
@@ -342,6 +343,49 @@ Demo script: draw a pond next to the path and wait for the first fish to jump.
 - The home stays simple (the garden is the focus), but you can **tap it to cycle variations**: roof color and material, wall color, shutters, door, and chimney.
 - Small **upgrades** you can add: a porch, a bay window, window flower boxes, climbing roses, a little extension or lean-to shed.
 - Each variation is seeded, so it saves and shares exactly.
+
+### Story 2.8 — Bed styles, including raised beds (M) — *requested by the player*
+**As a** player, **I want** to choose how each flower bed is built, including raised beds, **so that** my garden has variety and I decide the combinations myself.
+
+- **A "Bed" choice in the Flowers tool**, next to the species chips: a small button opens a row of bed styles. The choice is remembered until changed, and saved with each stroke.
+- **Bed styles**, each following the stroke's own curvy shape:
+  - **In-ground with a stone border:** today's bed, and the default.
+  - **No edge:** soil feathering softly into the lawn, like a meadow drift.
+  - **Raised timber bed:** weathered boards 25–40 cm high, with corner posts where the outline turns.
+  - **Raised stone bed:** a low dry-stone wall, borrowing the 2.3 wall stones.
+  - **Brick edge:** bricks set on end at an angle (the "sawtooth" edge), or laid flat.
+  - **Woven willow (wattle) edge:** low hurdles woven between stakes.
+- **Raised beds:**
+  - the soil and the plants sit up at the bed's height;
+  - the walls curve with the outline, and corners soften instead of turning sharp;
+  - where a raised bed meets a path, it finishes neatly.
+- **Mixing styles:** where beds of different styles touch, each keeps its own edge. Where beds of the same style meet, they join smoothly, as they do today.
+- **Hand-made feel:** boards vary in tone and width, the odd one sits a touch proud; bricks and stones are slightly irregular, with a missing or nudged one now and then.
+- **Saves:** old saves load as in-ground beds with a stone border (no change to existing gardens). Erasing and undo work as for beds today.
+- **Performance:** edges are instanced like fences and stones, with no new per-frame cost.
+
+### Story 2.9 — Bed toppings: mulches and gravels (M) — *requested by the player*
+**As a** player, **I want** to choose what covers the soil in each bed, **so that** the beds look different and set off the flowers the way I like.
+
+- **A "Topping" choice**, alongside the bed style, remembered and saved with each stroke. The player decides: no automatic colour matching, which was tried and set aside in 1.6.
+- **Mulches:**
+  - cedar bark (today's, the default);
+  - dark compost;
+  - golden straw;
+  - pine needles;
+  - cocoa shell.
+- **Gravels and stones:**
+  - warm pea gravel;
+  - white chippings;
+  - grey slate chips;
+  - river pebbles.
+- **Living cover:** creeping moss or low clover between the plants.
+- **Each topping has its own painted texture** in the lawn shader, with a soft hand-raked edge (and for gravels, a scatter of larger pebbles). It works on both in-ground and raised beds.
+- **Combinations are free:** any topping with any bed style. The flower book or the bed chips can show a tiny preview of the current combination.
+- **Saves:** old saves keep cedar bark. Erasing a bed lets its topping fade away like today's mulch.
+- **Performance:** one extra paint channel or a small topping index texture, so the lawn stays a single cheap shader pass.
+
+Demo script for 2.8 and 2.9: plant a raised timber bed of roses with white chippings, an in-ground bed of lavender with pea gravel, and a wattle-edged cottage bed with straw, side by side.
 
 ---
 
