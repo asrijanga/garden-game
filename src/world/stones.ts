@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addWet } from '../render/wet';
 import { touch } from '../render/touch';
 import { regrow } from '../core/regrow';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -165,6 +166,7 @@ export class Stones {
 
   constructor(private readonly onLand: (p: THREE.Vector3, size: number, kind: StoneKind) => void) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    addWet(mat);
     (Object.keys(SHAPES) as StoneKind[]).forEach((kind, ki) => {
       const list: THREE.InstancedMesh[] = [];
       for (let k = 0; k < SHAPES[kind]; k++) {

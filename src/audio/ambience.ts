@@ -138,9 +138,36 @@ export class Ambience {
     const leavesPan = ctx.createStereoPanner();
     loop(ctx, white2).connect(leavesHp).connect(leavesLp).connect(leaves).connect(leavesPan).connect(master);
 
+    // Rain: a soft, wide hiss of drops on leaves and grass, plus a lower patter on the ground.
+    const rain = ctx.createGain();
+    rain.gain.value = 0;
+    for (const [buf, pan, lo, hi] of [[white, -0.5, 700, 4200], [white2, 0.5, 300, 1400]] as const) {
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = lo;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = hi;
+      const p = ctx.createStereoPanner();
+      p.pan.value = pan;
+      loop(ctx, buf, 0.93).connect(hp).connect(lp).connect(p).connect(rain);
+    }
+    rain.connect(master);
+    this.rain = rain;
+    this.setRain(this.rainLevel);
+
     this.layers = { air, gust, gustFilter, trees, treesPan, leaves, leavesPan };
     this.birds = new Birds(ctx, master, this.season);
     this.applyMute(4); // slow, gentle fade-in
+  }
+
+  private rain: GainNode | null = null;
+  private rainLevel = 0;
+
+  /** How hard it's raining (0–1); the hiss follows gently. */
+  setRain(level: number) {
+    this.rainLevel = level;
+    if (this.rain && this.ctx) this.rain.gain.setTargetAtTime(level * 0.11, this.ctx.currentTime, 1.2);
   }
 
   setMuted(muted: boolean) {

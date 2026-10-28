@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addWet } from '../render/wet';
 import { touch } from '../render/touch';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
@@ -132,6 +133,7 @@ export class Boulders {
           diffuseColor.rgb = mix(diffuseColor.rgb, mossCol, moss * 0.85);`,
         );
     };
+    addWet(mat, 0.7);
     for (let k = 0; k < SHAPES; k++) {
       const geo = boulderGeometry(4100 + k * 37);
       geo.setAttribute('aMossStart', new THREE.InstancedBufferAttribute(new Float32Array(CAPACITY).fill(1e9), 1));

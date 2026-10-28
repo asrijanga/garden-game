@@ -19,6 +19,8 @@ import { Hummingbirds } from './world/hummingbirds';
 import { FallingPetals } from './world/petals';
 import { SeasonFx } from './world/seasonFx';
 import { NightMagic } from './world/nightMagic';
+import { Weather } from './world/weather';
+import { mountWeatherPicker } from './ui/weatherPicker';
 import { TimeOfDay } from './world/timeOfDay';
 import { mountTimeDial } from './ui/timeDial';
 import { GroundPaint } from './world/groundPaint';
@@ -651,8 +653,15 @@ scene.add(night.group);
 // --- Time of day ---------------------------------------------------------------------------
 // The light, haze, water and colour grade follow the sun dial (golden afternoon by default).
 const timeOfDay = new TimeOfDay(palette);
+// Rain, rolling mist, or sunbeams through broken cloud; it shades the day's light too.
+const weather = new Weather(!!palette.snowy);
+scene.add(weather.group);
+let dayTime = 0.55;
+const weatherWind = new THREE.Vector2();
 const applyTime = (p: number) => {
+  dayTime = p;
   const l = timeOfDay.light(p);
+  weather.shade(l);
   sun.color.copy(l.sun);
   sun.intensity = l.sunIntensity;
   sun.position.copy(l.sunDir).multiplyScalar(60);
@@ -674,7 +683,7 @@ const applyTime = (p: number) => {
   cottage.setNight(l.night);
   renderer.shadowMap.needsUpdate = true;
 };
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, paint, petals, seasonFx, night, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, paint, petals, seasonFx, night, weather, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -855,6 +864,7 @@ function resize() {
   (motes.material as THREE.ShaderMaterial).uniforms.uPixelRatio.value = pixelRatio();
   cottage.setPixelRatio(pixelRatio());
   night.setPixelRatio(pixelRatio());
+  weather.setPixelRatio(pixelRatio());
   dust.setPixelRatio(pixelRatio(), h);
   splash.setPixelRatio(pixelRatio(), h);
 }
@@ -862,6 +872,15 @@ window.addEventListener('resize', resize);
 resize();
 // (Once the post-processing and fog exist: the dial applies the saved time straight away.)
 mountTimeDial(applyTime);
+let firstWeather = true;
+mountWeatherPicker(
+  (w) => {
+    weather.set(w, firstWeather);
+    firstWeather = false;
+    applyTime(dayTime);
+  },
+  (w) => weather.allows(w),
+);
 started = true;
 
 // --- Adaptive quality: hold 60fps ------------------------------------------------------------
@@ -981,6 +1000,8 @@ function frame(time: number) {
     petals.update(dt);
     seasonFx.update(dt);
     night.update(dt);
+    if (weather.update(dt, camera, rig.target, weatherWind.set(wind.direction.x, wind.direction.y).multiplyScalar(0.3 + wind.sample(rig.target.x, rig.target.z) * 0.7))) applyTime(dayTime);
+    ambience.setRain(weather.raining);
     perchingBirds.update(dt);
     butterflies.update(dt);
     dragonflies.update(dt);

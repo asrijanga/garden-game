@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { wetUniforms } from '../render/wet';
 import { regrow } from '../core/regrow';
 import { createNoise2D } from '../core/noise';
 import { smoothstep } from '../core/random';
@@ -791,6 +792,7 @@ function waterMaterial(palette: SeasonPalette): THREE.ShaderMaterial {
       ...windUniforms,
       uTime: { value: 0 },
       uStars: { value: 0 },
+      uRainNow: wetUniforms.uRainNow,
       uShallow: { value: new THREE.Color('#8fcac0') },
       uDeep: { value: new THREE.Color('#2f7d93') },
       uSkyLow: { value: sky.clone().lerp(new THREE.Color('#ffffff'), 0.35) },
@@ -823,6 +825,7 @@ function waterMaterial(palette: SeasonPalette): THREE.ShaderMaterial {
       ${windSampleGLSL}
       uniform float uTime;
       uniform float uStars;
+      uniform float uRainNow;
       uniform vec3 uShallow, uDeep, uSkyLow, uSkyHigh, uTree, uFoam, uSunDir;
       uniform vec4 uRipples[${RIPPLES}];
       uniform vec4 uWakes[${WAKES}];
@@ -867,6 +870,22 @@ function waterMaterial(palette: SeasonPalette): THREE.ShaderMaterial {
           float env = exp(-x * x * 30.0) * r.w * exp(-age * 0.8) / (1.0 + dist * 1.5);
           g += dv / dist * cos(x * 38.0) * env * 0.9;
           ring += env * smoothstep(0.0, 0.05, -x + 0.05);
+        }
+        // Rain: a rash of little rings all over the water.
+        if (uRainNow > 0.01) {
+          for (int k = 0; k < 2; k++) {
+            vec2 q = p * 3.4 + float(k) * vec2(0.37, 0.61);
+            vec2 cell = floor(q);
+            float h = fract(sin(dot(cell, vec2(127.1, 311.7)) + float(k) * 13.0) * 43758.5453);
+            vec2 c = cell + 0.3 + 0.4 * vec2(fract(h * 7.1), fract(h * 13.3));
+            float a = fract(uTime * 0.9 + h);
+            vec2 dv = q - c;
+            float dist = length(dv) + 1e-4;
+            float x = dist - a * 0.3;
+            float env = exp(-x * x * 900.0) * (1.0 - a) * uRainNow;
+            g += dv / dist * cos(x * 90.0) * env * 0.05;
+            ring += env * 0.25;
+          }
         }
         // Wakes: two soft arms spreading back from each paddler, with fine ripples along them.
         for (int k = 0; k < ${WAKES}; k++) {

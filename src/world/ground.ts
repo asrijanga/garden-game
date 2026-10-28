@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createNoise2D } from '../core/noise';
 import { createRng, smoothstep } from '../core/random';
 import { uniforms as windUniforms, windSampleGLSL } from '../render/wind';
+import { rainRingsGLSL, wetUniforms } from '../render/wet';
 import { paintUvGLSL } from './groundPaint';
 import { pondUvGLSL, POND_WATERLINE_RANGE } from './pond';
 import type { SeasonPalette } from './season';
@@ -158,7 +159,7 @@ function lawnMaterial(paint: THREE.Texture, pond: THREE.Texture, basin: boolean)
   }
   mat.customProgramCacheKey = () => (basin ? 'lawn-basin' : 'lawn');
   mat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, windUniforms, { uGrain: { value: grain }, uPaint: { value: paint }, uPond: { value: pond } });
+    Object.assign(shader.uniforms, windUniforms, wetUniforms, { uGrain: { value: grain }, uPaint: { value: paint }, uPond: { value: pond } });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\nattribute float aMeadow;\nvarying float vMeadow;\nvarying vec3 vWorld;\nuniform sampler2D uPond;\n${pondUvGLSL}`)
       .replace(
@@ -169,7 +170,7 @@ function lawnMaterial(paint: THREE.Texture, pond: THREE.Texture, basin: boolean)
         vWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
       );
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nuniform sampler2D uGrain;\nuniform sampler2D uPaint;\nuniform sampler2D uPond;\nvarying float vMeadow;\nvarying vec3 vWorld;\n${windSampleGLSL}\n${paintUvGLSL}\n${pondUvGLSL}\n${lawnNoiseGLSL}\n${pebblesGLSL}`)
+      .replace('#include <common>', `#include <common>\nuniform sampler2D uGrain;\nuniform sampler2D uPaint;\nuniform sampler2D uPond;\nvarying float vMeadow;\nvarying vec3 vWorld;\n${windSampleGLSL}\n${paintUvGLSL}\n${pondUvGLSL}\n${lawnNoiseGLSL}\n${pebblesGLSL}\n${rainRingsGLSL}\nuniform float uWet, uRainNow, uCloud, uWetTime;\nuniform vec3 uWetSky;\nuniform vec2 uCloudDrift;`)
       .replace(
         '#include <color_fragment>',
         /* glsl */ `#include <color_fragment>
@@ -232,7 +233,32 @@ function lawnMaterial(paint: THREE.Texture, pond: THREE.Texture, basin: boolean)
         }
         // Gust sheen: the meadow brightens softly as wind passes, like grass bowing in waves.
         float gust = windAt(vWorld.xz, 0.0);
-        diffuseColor.rgb *= 1.0 + smoothstep(0.45, 1.1, gust) * 0.085 * vMeadow * (1.0 - earth) * (1.0 - bed) * (1.0 - mud);`,
+        diffuseColor.rgb *= 1.0 + smoothstep(0.45, 1.1, gust) * 0.085 * vMeadow * (1.0 - earth) * (1.0 - bed) * (1.0 - mud);
+        // Weather: rain soaks the soil dark (and the grass a little), pools in the dips of
+        // paths, and rings the puddles; drifting cloud shadows dim the lawn in slow patches.
+        float puddle = 0.0;
+        if (uWet > 0.001) {
+          diffuseColor.rgb *= 1.0 - uWet * (0.1 + 0.32 * max(earth, bed));
+          float dip = lawnNoise(vWorld.xz * 0.75 + 11.0) * 0.7 + lawnNoise(vWorld.xz * 2.3 - 4.0) * 0.3;
+          puddle = smoothstep(0.66, 0.7, dip + uWet * 0.12 - 0.12 + ragged * 0.2) * earth * uWet;
+          diffuseColor.rgb *= 1.0 - puddle * 0.6;
+        }
+        if (uCloud > 0.001) {
+          vec2 cp = vWorld.xz * 0.075 + uCloudDrift;
+          float cloud = lawnNoise(cp) * 0.65 + lawnNoise(cp * 2.3 + 3.0) * 0.35;
+          float shade = smoothstep(0.4, 0.6, cloud);
+          // Under a cloud the lawn dims; in the gaps between, the sun feels brighter still.
+          diffuseColor.rgb *= 1.0 + (0.1 - shade * 0.55) * uCloud;
+        }`,
+      )
+      .replace(
+        '#include <opaque_fragment>',
+        /* glsl */ `if (puddle > 0.001) {
+          // Puddles mirror the sky, and rings spread where raindrops land.
+          float rings = rainRings(vWorld.xz, uWetTime) * uRainNow;
+          outgoingLight = mix(outgoingLight, uWetSky * (0.5 + rings * 0.5), puddle * 0.55);
+        }
+        #include <opaque_fragment>`,
       );
   };
   return mat;
