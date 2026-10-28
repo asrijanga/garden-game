@@ -811,8 +811,6 @@ function refreshHistoryButtons() {
 
 // --- Post-processing ----------------------------------------------------------------------
 const post = new PostFX(renderer, scene, camera);
-// (After the post-processing exists: the dial applies the saved time straight away.)
-mountTimeDial(applyTime);
 if (debug) Object.assign(window, { post });
 
 let started = false;
@@ -840,6 +838,8 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 resize();
+// (Once the post-processing and fog exist: the dial applies the saved time straight away.)
+mountTimeDial(applyTime);
 started = true;
 
 // --- Adaptive quality: hold 60fps ------------------------------------------------------------
