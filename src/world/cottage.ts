@@ -102,6 +102,7 @@ export class Cottage {
   private readonly yaw: number;
   private readonly flowerTints: THREE.Color[];
   private bounce = 1;
+  private readonly snowy: boolean;
   private chimeSet: ChimeSet | null = null;
   /** A chime on the eaves rang (frequency, 0–1 loudness, where). */
   onChime: (freq: number, volume: number, at: THREE.Vector3) => void = () => {};
@@ -114,6 +115,7 @@ export class Cottage {
   ) {
     this.yaw = yaw;
     this.flowerTints = palette.wildflowers.map((c) => new THREE.Color(c));
+    this.snowy = !!palette.snowy;
     this.group.position.copy(position);
     this.group.rotation.y = yaw;
     this.group.scale.setScalar(COTTAGE_SCALE);
@@ -152,7 +154,9 @@ export class Cottage {
     const roof = lambert(roofOpt.a);
     const roofDark = lambert(roofOpt.b);
     const shutter = lambert(SHUTTERS[st.shutters].c);
-    const glass = new THREE.MeshLambertMaterial({ color: '#3a2a1a', emissive: '#ffbf6e', emissiveIntensity: 1.6 });
+    // Windows glow (warmer and brighter on a snowy day).
+    const glass = new THREE.MeshLambertMaterial({ color: '#3a2a1a', emissive: '#ffbf6e', emissiveIntensity: this.snowy ? 2.2 : 1.6 });
+    const snowMat = new THREE.MeshLambertMaterial({ color: '#f4f7fb', emissive: '#c8d4e4', emissiveIntensity: 0.12 });
     const trim = lambert('#efe6d6');
     const leafy = lambert('#5f8a3e');
 
@@ -244,6 +248,17 @@ export class Cottage {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         g.add(mesh);
+        // Winter: a soft blanket of snow on each course (thinner toward the eave, where it slides off).
+        if (this.snowy && k > 0) {
+          const snow = new THREE.Mesh(new RoundedBoxGeometry(W + 0.86 + (rng() - 0.5) * 0.05, 0.08, slopeLen / courses + 0.1, 2, 0.035), snowMat);
+          snow.position.copy(mesh.position);
+          snow.position.y += (thatch ? 0.14 : 0.08) * Math.cos(pitch);
+          snow.position.z += side * (thatch ? 0.14 : 0.08) * Math.sin(pitch);
+          snow.rotation.x = side * pitch;
+          snow.scale.y = lerp(0.6, 1.1, along);
+          snow.receiveShadow = true;
+          g.add(snow);
+        }
       }
     }
     if (thatch) {

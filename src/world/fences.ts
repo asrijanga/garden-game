@@ -214,7 +214,11 @@ export class Fences {
   private readonly s = new THREE.Vector3();
   private readonly p = new THREE.Vector3();
 
-  constructor(private readonly onArrive: (shape: PartShape, at: THREE.Vector3) => void) {
+  constructor(
+    private readonly onArrive: (shape: PartShape, at: THREE.Vector3) => void,
+    /** Winter: hoar frost on the hedges (0 none … 1 white-tipped). */
+    frost = 0,
+  ) {
     const wood = new THREE.MeshLambertMaterial({ vertexColors: true });
     const hedge = new THREE.MeshLambertMaterial({ vertexColors: true });
     // Leafy, clipped-box texture: small-leaf speckle and darker hollows, from world position, so
@@ -243,7 +247,9 @@ export class Fences {
           float clumps = hNoise(vLeaf * 7.0 + 3.0);
           diffuseColor.rgb *= 0.72 + leaves * 0.42;
           diffuseColor.rgb *= 0.85 + clumps * 0.25;
-          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.15, 1.2, 0.85), smoothstep(0.8, 0.95, leaves) * 0.6); // sunlit leaf tips`,
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.15, 1.2, 0.85), smoothstep(0.8, 0.95, leaves) * 0.6); // sunlit leaf tips
+          // Frost: pale, crystalline tips (more on the outermost leaves).
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.9, 0.95), ${frost.toFixed(2)} * (0.25 + 0.6 * smoothstep(0.55, 0.85, leaves)));`,
         );
     }, 0.12);
     (Object.keys(BUILD) as PartShape[]).forEach((shape, si) => {

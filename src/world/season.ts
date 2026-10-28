@@ -5,8 +5,40 @@ export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 // Time zones south of the equator (rough, but covers most players there).
 const SOUTHERN_TZ = /^(Australia|Antarctica|Pacific\/(Auckland|Chatham|Fiji|Tongatapu|Apia|Noumea)|America\/(Sao_Paulo|Argentina|Santiago|Montevideo|Asuncion|La_Paz|Lima)|Africa\/(Johannesburg|Maputo|Harare|Windhoek|Gaborone|Maseru|Mbabane|Lusaka|Blantyre)|Indian\/(Mauritius|Reunion|Antananarivo))/;
 
-/** The garden mirrors the player's real-world season. `?season=` overrides it for previews. */
+const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter'];
+const PEEK_KEY = 'peek-season';
+
+/** Peek at another season (just for this visit), or back to today's with null. Reloads. */
+export function peekSeason(season: Season | null) {
+  try {
+    if (season) sessionStorage.setItem(PEEK_KEY, season);
+    else sessionStorage.removeItem(PEEK_KEY);
+  } catch {
+    // no storage: nothing to remember
+  }
+  location.reload();
+}
+
+/** The season being peeked at (if any). */
+export function peekedSeason(): Season | null {
+  try {
+    const s = sessionStorage.getItem(PEEK_KEY);
+    return SEASONS.includes(s as Season) ? (s as Season) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The season before / after this one. */
+export const seasonShift = (s: Season, by: number): Season => SEASONS[(SEASONS.indexOf(s) + by + 4) % 4];
+
+/**
+ * The garden mirrors the player's real-world season. A peek (from the hidden season picker) or
+ * `?season=` (for debugging) overrides it.
+ */
 export function currentSeason(date = new Date()): Season {
+  const peek = peekedSeason();
+  if (peek) return peek;
   const override = new URLSearchParams(location.search).get('season');
   if (override === 'spring' || override === 'summer' || override === 'autumn' || override === 'winter') {
     return override;
@@ -35,6 +67,8 @@ export interface SeasonPalette {
   sun: string;
   sky: string;
   fog: string;
+  /** Snow lies on roofs and frost on hedges. */
+  snowy?: boolean;
 }
 
 export const PALETTES: Record<Season, SeasonPalette> = {
@@ -77,6 +111,7 @@ export const PALETTES: Record<Season, SeasonPalette> = {
     sun: '#ffe9d6',
     sky: '#cfdbe8',
     fog: '#d9e1ea',
+    snowy: true,
   },
 };
 

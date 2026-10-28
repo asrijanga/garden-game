@@ -671,3 +671,48 @@ body.picking.choosing-colour .tool-label {
 .colour-row {
   padding: 6px 16px 6px;
 }
+
+/* --- Season peek (long-press the camera button) ------------------------------------------- */
+.season-peek {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 74px);
+  right: 12px;
+  z-index: 25;
+  padding: 10px 12px 12px;
+  border-radius: 16px;
+  background: rgba(255, 250, 238, 0.95);
+  box-shadow: 0 6px 20px rgba(40, 28, 10, 0.25);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Rounded', 'Segoe UI', sans-serif;
+  color: #5a4228;
+  animation: peek-in 0.25s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+@keyframes peek-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.peek-title {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 0 2px 8px;
+}
+.peek-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.peek-option {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #f1e5cc;
+  color: inherit;
+  font: 600 13px/1 inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.peek-option.active {
+  background: #cfe0ac;
+}
+.peek-option:last-child {
+  grid-column: span 2;
+}

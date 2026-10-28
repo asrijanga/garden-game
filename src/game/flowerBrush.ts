@@ -7,6 +7,7 @@ import type { Wildflowers } from '../world/wildflowers';
 import type { Season } from '../world/season';
 import type { Stones } from '../world/stones';
 import { MIX_ID, SPECIES, WATER_MIX_ID, type FlowerSpecies } from '../world/flowerSpecies';
+import { seasonShift } from '../world/season';
 
 const DAB_STEP = 0.3; // metres between brush dabs along a stroke
 const BED_RADIUS = 0.8; // painted soil (visible edge at ~80% of this), mostly hidden under foliage
@@ -21,6 +22,8 @@ const FLOWER_SCALE = 1.2;
 const SPACING = 1.05;
 /** Minimum gap between leafy clumps. */
 const FOLIAGE_SPACING = 0.55;
+const SEED_BROWN = '#8a6a44'; // dry seed heads
+const KNOT_GREEN = '#5f8a3e'; // a resting plant's tight green knot
 const FOLIAGE_GREEN = ['#4f8a36', '#5e9a3f', '#6aa548', '#47803a', '#578f3c'];
 const FOLIAGE_AUTUMN = ['#4f8434', '#5e9440', '#6a9a42', '#7d9a40', '#567f35'];
 const FOLIAGE_WINTER = ['#557a50', '#5f8459', '#4d7048'];
@@ -59,6 +62,38 @@ export class FlowerBrush {
 
   inSeason(sp: FlowerSpecies): boolean {
     return sp.seasons.includes(this.season);
+  }
+
+  /**
+   * Where a flower is in its year: blooming; in bud (its season comes next); gone to seed (its
+   * season has just passed); or resting, just leaves, until its time comes round again.
+   */
+  private stage(sp: FlowerSpecies): 'bloom' | 'bud' | 'seed' | 'rest' {
+    if (sp.seasons.includes(this.season)) return 'bloom';
+    if (sp.seasons.includes(seasonShift(this.season, 1))) return 'bud';
+    if (sp.seasons.includes(seasonShift(this.season, -1))) return 'seed';
+    return 'rest';
+  }
+
+  /**
+   * How far a plant opens and what colour it shows for its stage (`r` is one random draw). Seed
+   * heads are dry and brown; resting plants keep only a tight green knot where the bloom will be.
+   */
+  private seasonal(sp: FlowerSpecies, r: number, color: THREE.Color, edge?: THREE.Color): { open: number; color: THREE.Color; edge?: THREE.Color } {
+    switch (this.stage(sp)) {
+      case 'bloom':
+        return { open: lerp(0.9, 1, r), color, edge };
+      case 'bud':
+        return { open: lerp(0.3, 0.4, r), color, edge };
+      case 'seed': {
+        const dry = new THREE.Color(SEED_BROWN).multiplyScalar(lerp(0.85, 1.1, r));
+        return { open: lerp(0.18, 0.26, r), color: color.clone().lerp(dry, 0.8), edge: edge?.clone().lerp(dry, 0.8) };
+      }
+      default: {
+        const knot = new THREE.Color(KNOT_GREEN).multiplyScalar(lerp(0.9, 1.1, r));
+        return { open: 0.12, color: knot, edge: knot };
+      }
+    }
   }
 
   /** Species blooming now first, then the rest. */
@@ -407,7 +442,11 @@ export class FlowerBrush {
       const { color, edge } = this.plantColour(sp);
       const y = zone === 'bank' ? this.ground.heightAt(x, z) - 0.01 : (this.water.level(x, z) ?? this.ground.heightAt(x, z)) - 0.004;
       const delay = this.strokeTime * 0.2 + 0.1 + (r / PLANT_RADIUS) * 0.9 + this.rng() * 0.25;
-      this.flowers.plant(sp, Math.floor(this.rng() * 5), x, y, z, this.rng() * Math.PI * 2, FLOWER_SCALE * lerp(0.85, 1.15, this.rng()), delay, this.inSeason(sp) ? lerp(0.9, 1, this.rng()) : lerp(0.3, 0.4, this.rng()), color, edge);
+      const variant = Math.floor(this.rng() * 5);
+      const yaw = this.rng() * Math.PI * 2;
+      const scale = FLOWER_SCALE * lerp(0.85, 1.15, this.rng());
+      const look = this.seasonal(sp, this.rng(), color, edge);
+      this.flowers.plant(sp, variant, x, y, z, yaw, scale, delay, look.open, look.color, look.edge);
     }
   }
 
@@ -458,20 +497,13 @@ export class FlowerBrush {
       const { color, edge } = this.plantColour(sp);
       // The wave: plants further from the stroke sprout a little later.
       const delay = this.strokeTime * 0.2 + 0.1 + (r / PLANT_RADIUS) * 0.9 + this.rng() * 0.25;
-      this.flowers.plant(
-        sp,
-        Math.floor(this.rng() * 5),
-        x,
-        this.ground.heightAt(x, z) - 0.01,
-        z,
-        this.rng() * Math.PI * 2,
-        FLOWER_SCALE * lerp(0.85, 1.15, this.rng()),
-        delay,
-        // Out of season: plump, half-open buds in their colour, so the bed clearly looks planted.
-        this.inSeason(sp) ? lerp(0.9, 1, this.rng()) : lerp(0.3, 0.4, this.rng()),
-        color,
-        edge,
-      );
+      // (Random draws in the same order as ever, so saved gardens grow back exactly.)
+      const variant = Math.floor(this.rng() * 5);
+      const yaw = this.rng() * Math.PI * 2;
+      const scale = FLOWER_SCALE * lerp(0.85, 1.15, this.rng());
+      // Blooming, in bud, gone to seed, or resting, by where it is in its year.
+      const look = this.seasonal(sp, this.rng(), color, edge);
+      this.flowers.plant(sp, variant, x, this.ground.heightAt(x, z) - 0.01, z, yaw, scale, delay, look.open, look.color, look.edge);
     }
   }
 }

@@ -17,6 +17,7 @@ import { Bunnies } from './world/bunnies';
 import { Ducks } from './world/ducks';
 import { Hummingbirds } from './world/hummingbirds';
 import { FallingPetals } from './world/petals';
+import { SeasonFx } from './world/seasonFx';
 import { GroundPaint } from './world/groundPaint';
 import { Stones } from './world/stones';
 import { EdgePlants } from './world/edgePlants';
@@ -44,7 +45,8 @@ import { RockBrush } from './game/rockBrush';
 import { BridgeBuilder } from './game/bridgeBuilder';
 import { createMotes } from './world/motes';
 import { FlyingBirds } from './world/flyingBirds';
-import { currentSeason, PALETTES } from './world/season';
+import { currentSeason, peekedSeason, PALETTES } from './world/season';
+import { showSeasonPeek } from './ui/seasonPeek';
 import { WindField, bindWind } from './render/wind';
 import { PostFX } from './render/post';
 import { Quality, TIERS, mountFpsMeter } from './render/quality';
@@ -238,7 +240,7 @@ const fences = new Fences((shape, at) => {
   } else if (shape === 'hedge') ambience.rustle();
   else if (shape === 'wallStone') ambience.stone(0.16);
   else ambience.wood(0.35);
-});
+}, palette.snowy ? 0.75 : 0);
 scene.add(fences.group);
 // Climbers: roses, clematis and honeysuckle on fences, ivy over walls, roses and wisteria on the cottage.
 const vines = new Vines(season);
@@ -617,7 +619,16 @@ scene.add(hummingbirds.group);
 const petals = new FallingPetals(openHeads, (x, z) => ground.heightAt(x, z), () => new THREE.Vector2(wind.direction.x, wind.direction.y).multiplyScalar(0.2 + wind.sample(0, 0) * 0.5));
 scene.add(petals.mesh);
 
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, paint, petals, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
+// The air of the season: blossom petals, floating seeds, falling leaves, or snow.
+const seasonFx = new SeasonFx(
+  season,
+  (x, z) => Math.max(ground.heightAt(x, z), ponds.levelAt(x, z) ?? -Infinity),
+  () => new THREE.Vector2(wind.direction.x, wind.direction.y).multiplyScalar(0.25 + wind.sample(rig.target.x, rig.target.z) * 0.6),
+  () => rig.target,
+);
+scene.add(seasonFx.group);
+
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, paint, petals, seasonFx, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -828,6 +839,11 @@ mountShotButton(
     return { url, info: `q${quality.tier}-${Math.round(recentFps)}fps` };
   },
   () => ambience.tap(1.6),
+  // Hidden extra: hold the camera button to peek at the garden in another season.
+  () => {
+    ambience.tap(1.2);
+    showSeasonPeek(season, peekedSeason() !== null);
+  },
 );
 if (debug) Object.assign(window, { quality, TIERS, store });
 
@@ -909,6 +925,7 @@ function frame(time: number) {
     ducks.update(dt);
     hummingbirds.update(dt);
     petals.update(dt);
+    seasonFx.update(dt);
     perchingBirds.update(dt);
     butterflies.update(dt);
     dragonflies.update(dt);

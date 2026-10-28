@@ -15,7 +15,7 @@ function dataUrlToBlob(url: string): Blob {
  * where sharing files isn't supported, the picture downloads instead. The file name carries a
  * little debug info (quality tier and frame rate).
  */
-export function mountShotButton(capture: () => { url: string; info: string }, onShutter: () => void) {
+export function mountShotButton(capture: () => { url: string; info: string }, onShutter: () => void, onLongPress: () => void = () => {}) {
   const button = document.createElement('button');
   button.className = 'sound-toggle shot-toggle';
   button.type = 'button';
@@ -23,9 +23,25 @@ export function mountShotButton(capture: () => { url: string; info: string }, on
   button.innerHTML = ICON;
   document.body.append(button);
 
-  button.addEventListener('pointerdown', (e) => e.stopPropagation());
+  // A long press (a hidden extra) does something else instead of taking a picture.
+  let held = 0;
+  let longPressed = false;
+  button.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    longPressed = false;
+    held = window.setTimeout(() => {
+      longPressed = true;
+      onLongPress();
+    }, 650);
+  });
+  const release = () => clearTimeout(held);
+  button.addEventListener('pointerup', release);
+  button.addEventListener('pointercancel', release);
+  button.addEventListener('pointerleave', release);
+  button.addEventListener('contextmenu', (e) => e.preventDefault());
   button.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (longPressed) return;
     onShutter();
     // Capture and share synchronously, inside the tap: iOS only shows the share sheet then.
     const { url, info } = capture();
