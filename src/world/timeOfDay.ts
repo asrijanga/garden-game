@@ -56,15 +56,15 @@ export class TimeOfDay {
     const k = (at: number, elevation: number, turn: number, sun: THREE.Color, sunIntensity: number, sky: THREE.Color, ground: THREE.Color, skyIntensity: number, haze: THREE.Color, mist: number, lift: string, gain: string, saturation: number, bloom: number, glow: number): Key => ({ at, elevation, turn, sun, sunIntensity, sky, ground, skyIntensity, haze, mist, lift: C(lift), gain: C(gain), saturation, bloom, glow });
     this.keys = [
       // Dawn: a low pink sun from the far side, lilac sky, mist lying close.
-      k(0.0, 7, -95, C('#ffc2a0'), 1.5, mix(palette.sky, '#e8c4dc', 0.55), C('#5a4a40'), 1.0, mix(palette.fog, '#f0d0d8', 0.55), 0.55, '#2a1a24', '#ffeef0', 0.98, 0.6, 0.85),
+      k(0.0, 9, -95, C('#ffcaa8'), 2.2, mix(palette.sky, '#f0d2e2', 0.5), C('#6a5a4c'), 1.25, mix(palette.fog, '#f6dce2', 0.45), 0.82, '#2a1c22', '#fff2f2', 1.0, 0.6, 0.9),
       // Morning: clear, fresh light.
       k(0.3, 30, -55, mix(palette.sun, '#ffffff', 0.5), 2.7, C(palette.sky), C('#6b5a3a'), 1.3, C(palette.fog), 1.0, '#221a14', '#fff8f0', 1.05, 0.5, 1),
       // Golden afternoon: the garden's usual look.
       k(0.55, 38.3, 0, C(palette.sun), 3.0, C(palette.sky), C('#6b5a3a'), 1.35, C(palette.fog), 1.0, '#2a1a10', '#fff4e6', 1.08, 0.55, 1),
       // Dusk: a deep orange sun going down, a warm glowing haze.
-      k(0.78, 6, 45, C('#ff9a5a'), 1.6, mix('#f2a87a', palette.sky, 0.35), C('#4a3a3a'), 0.85, mix(palette.fog, '#e8a888', 0.7), 0.8, '#2a1418', '#ffe2cc', 1.1, 0.75, 0.8),
+      k(0.78, 9, 45, C('#ffa868'), 2.4, mix('#f6b88a', palette.sky, 0.4), C('#5a4a40'), 1.15, mix(palette.fog, '#f0b898', 0.6), 0.95, '#2a1610', '#fff0dc', 1.12, 0.7, 0.85),
       // Night: cool moonlight, a deep blue sky; the cottage windows glow.
-      k(1.0, 50, 120, C('#9ab4ff'), 0.55, C('#2a3a66'), C('#1a1a22'), 0.42, C('#1c2440'), 0.9, '#0a0e1a', '#c8d4ff', 0.8, 0.95, 0.4),
+      k(1.0, 50, 120, C('#a8c0ff'), 1.0, C('#3a4c88'), C('#232634'), 0.8, C('#243058'), 0.95, '#121a30', '#dce6ff', 0.82, 0.9, 0.5),
     ];
   }
 
