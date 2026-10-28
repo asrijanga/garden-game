@@ -57,7 +57,7 @@ import { PostFX } from './render/post';
 import { Quality, TIERS, mountFpsMeter } from './render/quality';
 import { Ambience } from './audio/ambience';
 import { mountSoundControls } from './ui/soundButton';
-import { Toolbar } from './ui/toolbar';
+import { Toolbar, type Tool } from './ui/toolbar';
 import { GroundPicker } from './core/groundPicker';
 import { TouchMarker } from './world/touchMarker';
 import { ToolController } from './game/tools';
@@ -191,7 +191,9 @@ const fish = new Fish(ponds, splash, (size) => ambience.splash(size));
 scene.add(fish.group);
 const stones = new Stones((p, r, kind) => {
   if (kind === 'step') dust.puff(p, 4, r * 1.2);
-  ambience.stone(kind === 'step' ? 0.3 : kind === 'rock' ? 0.14 : kind === 'shore' ? Math.min(0.3, r * 0.9) : 0.18);
+  // A rock set down in the water plops in; everything else settles into the soil.
+  if (kind !== 'step' && ponds.waterDepth(p.x, p.z) > 0.08) ambience.plop(Math.min(1, r * 2.5));
+  else ambience.stone(kind === 'step' ? 0.3 : kind === 'rock' ? 0.14 : kind === 'shore' ? Math.min(0.3, r * 0.9) : 0.18);
 });
 scene.add(stones.group);
 const edgePlants = new EdgePlants(palette.wildflowers);
@@ -714,7 +716,25 @@ tools = new ToolController(
 );
 const controller = tools;
 // Bunnies notice fingers: a tap with the hand makes one sit up and look; building beside them shoos them a few hops.
+// Build sounds that follow your finger: gravel scrunching under a new path, a spade digging a
+// pond, plants patted into soil (or plopped into water), a pop as a decoration is picked up.
+const strokeSound = { x: 0, z: 0, travel: 0 };
+const STROKE_STEP: Partial<Record<Tool, number>> = { path: 0.32, pond: 0.5, flowers: 0.42 };
 controller.onTouch = (p, tool, down) => {
+  const step = STROKE_STEP[tool];
+  if (down) {
+    strokeSound.travel = step ?? 0;
+    if (tool === 'decor') ambience.pop();
+  } else strokeSound.travel += Math.hypot(p.x - strokeSound.x, p.z - strokeSound.z);
+  strokeSound.x = p.x;
+  strokeSound.z = p.z;
+  if (step && strokeSound.travel >= step) {
+    strokeSound.travel = 0;
+    if (tool === 'path') ambience.crunch();
+    else if (tool === 'pond') ambience.dig();
+    else if (ponds.waterDepth(p.x, p.z) > 0.05) ambience.plop(0.3);
+    else ambience.pat();
+  }
   if (tool === 'move') {
     if (down && !ducks.tap(p.x, p.z) && !hummingbirds.tap(p) && !butterflies.tap(p)) bunnies.tap(p.x, p.z, camera.position);
   } else {

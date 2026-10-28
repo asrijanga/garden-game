@@ -502,6 +502,118 @@ export class Ambience {
     osc.stop(t + 0.14);
   }
 
+  /** The audio context, if a one-shot sound may play now (sound on, not muted or hushed). */
+  private live(): AudioContext | null {
+    const ctx = this.ctx;
+    return ctx && this.master && !this.muted && !this.quiet && ctx.state === 'running' ? ctx : null;
+  }
+
+  /** A burst of soft noise through a filter (the body of most earthy sounds). */
+  private hiss(ctx: AudioContext, t: number, type: BiquadFilterType, f0: number, f1: number, q: number, vol: number, attack: number, dur: number, pan = 0) {
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise(ctx);
+    const f = ctx.createBiquadFilter();
+    f.type = type;
+    f.frequency.setValueAtTime(f0, t);
+    f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    f.Q.value = q;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(vol, t + attack);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const p = ctx.createStereoPanner();
+    p.pan.value = pan;
+    src.connect(f).connect(env).connect(p).connect(this.master!);
+    src.start(t, Math.random());
+    src.stop(t + dur + 0.02);
+  }
+
+  /** A short pitched blip (sine gliding f0 → f1). */
+  private blip(ctx: AudioContext, t: number, f0: number, f1: number, vol: number, dur: number, type: OscillatorType = 'sine') {
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(f0, t);
+    osc.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.8);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(vol, t + Math.min(0.006, dur * 0.2));
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(env).connect(this.master!);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+  }
+
+  private lastCrunch = 0;
+
+  /** Gravel crunching underfoot as a path is laid: a few tiny grains clicking in a soft scrunch. */
+  crunch() {
+    const ctx = this.live();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    if (t - this.lastCrunch < 0.12) return;
+    this.lastCrunch = t;
+    const pan = (Math.random() - 0.5) * 0.3;
+    this.hiss(ctx, t, 'bandpass', 2400 + Math.random() * 900, 1500, 1.1, 0.08, 0.012, 0.16, pan);
+    const grains = 3 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < grains; i++) {
+      const s = t + Math.random() * 0.12;
+      this.hiss(ctx, s, 'bandpass', 3500 + Math.random() * 2500, 3000, 4, 0.06 + Math.random() * 0.04, 0.001, 0.025, pan + (Math.random() - 0.5) * 0.3);
+    }
+  }
+
+  private lastDig = 0;
+
+  /** A spade going into soft earth: a dull thud and a scoop of soil. */
+  dig() {
+    const ctx = this.live();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    if (t - this.lastDig < 0.22) return;
+    this.lastDig = t;
+    const k = 0.85 + Math.random() * 0.3;
+    this.blip(ctx, t, 120 * k, 70 * k, 0.16, 0.12);
+    this.hiss(ctx, t + 0.02, 'lowpass', 900 * k, 300, 0.7, 0.09, 0.03, 0.28, (Math.random() - 0.5) * 0.3);
+  }
+
+  private lastPat = 0;
+
+  /** A plant firmed into the soil: a soft, muffled pat and a whisper of leaves. */
+  pat() {
+    const ctx = this.live();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    if (t - this.lastPat < 0.16) return;
+    this.lastPat = t;
+    const k = 0.85 + Math.random() * 0.3;
+    this.hiss(ctx, t, 'lowpass', 520 * k, 260, 0.8, 0.09, 0.004, 0.09);
+    this.blip(ctx, t, 160 * k, 110 * k, 0.05, 0.07);
+    if (Math.random() < 0.6) this.hiss(ctx, t + 0.05, 'bandpass', 3200 + Math.random() * 1500, 2600, 0.8, 0.012, 0.04, 0.2, (Math.random() - 0.5) * 0.4);
+  }
+
+  private lastPlop = 0;
+
+  /** Something dropped into water: a rounded "bloop" rising in pitch, and a little spray. */
+  plop(size = 0.5) {
+    const ctx = this.live();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    if (t - this.lastPlop < 0.1) return;
+    this.lastPlop = t;
+    const k = (0.85 + Math.random() * 0.3) / (0.6 + size * 0.8);
+    this.blip(ctx, t, 380 * k, 980 * k, 0.09 * (0.6 + size), 0.09);
+    this.hiss(ctx, t + 0.01, 'bandpass', 2400, 1600, 0.8, 0.025 * (0.5 + size), 0.01, 0.18);
+  }
+
+  /** Picking something up to place it: a soft, happy pop. */
+  pop() {
+    const ctx = this.live();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const k = 0.92 + Math.random() * 0.16;
+    this.blip(ctx, t, 520 * k, 900 * k, 0.1, 0.09);
+    this.blip(ctx, t + 0.05, 780 * k, 1150 * k, 0.04, 0.08);
+  }
+
   private lastRustle = 0;
 
   /** Leaves rustling as a hedge grows. */
