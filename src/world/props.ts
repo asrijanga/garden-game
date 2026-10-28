@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Perch } from './perchingBirds';
+import type { NightLight } from './nightMagic';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
@@ -300,6 +301,21 @@ export class Props {
       if (p.kind === 'gazebo' && (p.assemble ?? 0) < 6) continue;
       this.box.setFromObject(p.group);
       out.push({ pos: new THREE.Vector3(p.pos.x, this.box.max.y - 0.02, p.pos.z), yaw: p.yaw, alive: () => !p.gone && p.leaving === undefined });
+    }
+  }
+
+  /** After dark the lanterns burn brighter. */
+  setNight(n: number) {
+    this.glow.emissiveIntensity = 1.7 * (1 + n * 1.1);
+  }
+
+  /** The lanterns standing in the garden, for their pools of light after dark. */
+  nightLights(out: NightLight[]) {
+    for (const p of this.props) {
+      if (p.kind !== 'lantern' || p.gone || !p.landed || p.leaving !== undefined) continue;
+      this.box.setFromObject(p.group);
+      const top = this.box.max.y;
+      out.push({ pos: new THREE.Vector3(p.pos.x, top - 0.3, p.pos.z), pool: p.pos.clone(), radius: 2.2 });
     }
   }
 

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Perch } from './perchingBirds';
+import type { NightLight } from './nightMagic';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createRng, lerp } from '../core/random';
 import type { WindField } from '../render/wind';
@@ -104,6 +105,11 @@ export class Cottage {
   private bounce = 1;
   private readonly snowy: boolean;
   private chimeSet: ChimeSet | null = null;
+  private glassMat: THREE.MeshLambertMaterial | null = null;
+  private lampMat: THREE.MeshLambertMaterial | null = null;
+  /** The glowing windows and the door lamp (local position, and which way the light spills). */
+  private glowSpots: { at: THREE.Vector3; out: THREE.Vector3; size: number }[] = [];
+  private night = 0;
   /** A chime on the eaves rang (frequency, 0–1 loudness, where). */
   onChime: (freq: number, volume: number, at: THREE.Vector3) => void = () => {};
 
@@ -156,6 +162,8 @@ export class Cottage {
     const shutter = lambert(SHUTTERS[st.shutters].c);
     // Windows glow (warmer and brighter on a snowy day).
     const glass = new THREE.MeshLambertMaterial({ color: '#3a2a1a', emissive: '#ffbf6e', emissiveIntensity: this.snowy ? 2.2 : 1.6 });
+    this.glassMat = glass;
+    this.glowSpots = [];
     const snowMat = new THREE.MeshLambertMaterial({ color: '#f4f7fb', emissive: '#c8d4e4', emissiveIntensity: 0.12 });
     const trim = lambert('#efe6d6');
     const leafy = lambert('#5f8a3e');
@@ -301,6 +309,7 @@ export class Cottage {
       const w = new THREE.Group();
       w.position.set(x, y, z);
       w.rotation.y = rotY;
+      this.glowSpots.push({ at: new THREE.Vector3(x, y, z), out: new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY)), size: 1 });
       box(0.8, 0.85, 0.06, glass, 0, 0, 0, w);
       box(0.92, 0.08, 0.1, trim, 0, 0.46, 0.02, w);
       box(0.92, 0.08, 0.1, trim, 0, -0.46, 0.02, w);
@@ -318,6 +327,7 @@ export class Cottage {
       const bd = 0.55;
       box(bw, 0.55, bd, plaster, 0, 0.35, bd / 2, bay);
       box(bw - 0.12, 0.95, 0.05, glass, 0, 1.1, bd, bay);
+      this.glowSpots.push({ at: new THREE.Vector3(1.15, BASE_H + 1.1, front + bd), out: new THREE.Vector3(0, 0, 1), size: 1.3 });
       for (const sx of [-1, 1]) box(0.05, 0.95, bd - 0.1, glass, sx * (bw / 2 - 0.02), 1.1, bd / 2, bay);
       for (const sx of [-1, 0, 1]) box(0.06, 0.97, 0.07, trim, sx * (bw / 2 - 0.03), 1.1, bd + 0.01, bay);
       box(bw + 0.12, 0.08, bd + 0.14, trim, 0, 0.62, bd / 2, bay);
@@ -336,11 +346,11 @@ export class Cottage {
     windowAt(0.9, BASE_H + 1.3, -front, Math.PI, false);
 
     // Lantern by the door.
-    const lantern = new THREE.Mesh(
-      new THREE.BoxGeometry(0.16, 0.22, 0.16),
-      new THREE.MeshLambertMaterial({ color: '#2b2118', emissive: '#ffb45c', emissiveIntensity: 2.2 }),
-    );
+    this.lampMat = new THREE.MeshLambertMaterial({ color: '#2b2118', emissive: '#ffb45c', emissiveIntensity: 2.2 });
+    const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.16), this.lampMat);
     lantern.position.set(0.12, BASE_H + 1.55, front + 0.12);
+    this.glowSpots.push({ at: lantern.position.clone(), out: new THREE.Vector3(0, 0, 1), size: 0.8 });
+    this.setNight(this.night);
     g.add(lantern);
 
     if (st.porch) {
@@ -463,6 +473,23 @@ export class Cottage {
     for (let i = 0; i < 5; i++) {
       const pos = this.group.localToWorld(new THREE.Vector3(lerp(-W / 2 + 0.2, W / 2 - 0.2, i / 4), top, 0));
       out.push({ pos, yaw: this.yaw, alive: () => true });
+    }
+  }
+
+  /** After dark the windows and the door lamp burn brighter. */
+  setNight(n: number) {
+    this.night = n;
+    if (this.glassMat) this.glassMat.emissiveIntensity = (this.snowy ? 2.2 : 1.6) * (1 + n * 0.9);
+    if (this.lampMat) this.lampMat.emissiveIntensity = 2.2 * (1 + n * 0.8);
+  }
+
+  /** Where the cottage's light falls after dark: a pool on the grass outside each window. */
+  nightLights(out: NightLight[]) {
+    for (const s of this.glowSpots) {
+      const pos = this.group.localToWorld(s.at.clone().addScaledVector(s.out, 0.15));
+      const ground = s.at.clone().addScaledVector(s.out, 1.1);
+      ground.y = 0;
+      out.push({ pos, pool: this.group.localToWorld(ground), radius: 1.6 * s.size });
     }
   }
 

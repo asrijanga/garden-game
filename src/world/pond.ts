@@ -222,8 +222,9 @@ export class Ponds {
 
   /** Expanding rings on the water at (x, z). */
   /** Follow the time of day: the sun's direction (for glints), the sky and treeline reflected. */
-  setLight(sunDir: THREE.Vector3, sky: THREE.Color, haze: THREE.Color, glow = 1) {
+  setLight(sunDir: THREE.Vector3, sky: THREE.Color, haze: THREE.Color, glow = 1, stars = 0) {
     const u = this.waterMat.uniforms;
+    u.uStars.value = stars;
     (u.uSunDir.value as THREE.Vector3).copy(sunDir);
     (u.uSkyLow.value as THREE.Color).copy(sky).lerp(WHITE_SKY, 0.35).multiplyScalar(glow);
     (u.uSkyHigh.value as THREE.Color).copy(sky).lerp(BLUE_SKY, 0.45).multiplyScalar(glow);
@@ -789,6 +790,7 @@ function waterMaterial(palette: SeasonPalette): THREE.ShaderMaterial {
       ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
       ...windUniforms,
       uTime: { value: 0 },
+      uStars: { value: 0 },
       uShallow: { value: new THREE.Color('#8fcac0') },
       uDeep: { value: new THREE.Color('#2f7d93') },
       uSkyLow: { value: sky.clone().lerp(new THREE.Color('#ffffff'), 0.35) },
@@ -820,6 +822,7 @@ function waterMaterial(palette: SeasonPalette): THREE.ShaderMaterial {
       #include <fog_pars_fragment>
       ${windSampleGLSL}
       uniform float uTime;
+      uniform float uStars;
       uniform vec3 uShallow, uDeep, uSkyLow, uSkyHigh, uTree, uFoam, uSunDir;
       uniform vec4 uRipples[${RIPPLES}];
       uniform vec4 uWakes[${WAKES}];
@@ -897,6 +900,15 @@ function waterMaterial(palette: SeasonPalette): THREE.ShaderMaterial {
         float treeTop = crowns / max(t, 0.5);
         float tree = smoothstep(treeTop + 0.04, treeTop - 0.04, elev);
         refl = mix(refl, uTree * (0.85 + 0.25 * sin(ang * 47.0)), tree);
+        // After dark, the stars in the water (broken up by the ripples, hidden by the trees).
+        if (uStars > 0.01) {
+          vec2 sp = R.xz / max(R.y, 0.08) * 26.0;
+          vec2 cell = floor(sp);
+          float h = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
+          vec2 off = vec2(fract(h * 17.3), fract(h * 31.7)) * 0.6 + 0.2;
+          float star = step(0.93, h) * smoothstep(0.22, 0.0, length(sp - cell - off));
+          refl += vec3(0.85, 0.9, 1.0) * star * uStars * (1.0 - tree) * (0.6 + 0.4 * sin(uTime * 2.0 + h * 40.0));
+        }
         // Body colour: clear shallows, deeper teal; lit softly by the ripples.
         float deep = smoothstep(0.02, 0.5, depth);
         vec3 body = mix(uShallow, uDeep, deep) * (0.92 + 0.12 * dot(n, uSunDir));

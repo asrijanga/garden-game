@@ -18,6 +18,7 @@ import { Ducks } from './world/ducks';
 import { Hummingbirds } from './world/hummingbirds';
 import { FallingPetals } from './world/petals';
 import { SeasonFx } from './world/seasonFx';
+import { NightMagic } from './world/nightMagic';
 import { TimeOfDay } from './world/timeOfDay';
 import { mountTimeDial } from './ui/timeDial';
 import { GroundPaint } from './world/groundPaint';
@@ -631,6 +632,22 @@ const seasonFx = new SeasonFx(
 );
 scene.add(seasonFx.group);
 
+// After dark: pools of lamplight, fireflies over the flowers (not in winter), and stars.
+const night = new NightMagic(
+  (out) => {
+    props.nightLights(out);
+    cottage.nightLights(out);
+  },
+  (x, z) => ground.heightAt(x, z),
+  (rng) => {
+    const heads = openHeads();
+    if (heads.length && rng() < 0.6) return heads[Math.floor(rng() * heads.length)].pos;
+    return meadow.randomBloom(rng);
+  },
+  season !== 'winter',
+);
+scene.add(night.group);
+
 // --- Time of day ---------------------------------------------------------------------------
 // The light, haze, water and colour grade follow the sun dial (golden afternoon by default).
 const timeOfDay = new TimeOfDay(palette);
@@ -650,10 +667,14 @@ const applyTime = (p: number) => {
     scene.fog.far = fogFar * (0.6 + 0.4 * mist);
   }
   post.setGrade(l.lift, l.gain, l.saturation, l.bloom);
-  ponds.setLight(l.sunDir, l.sky, l.haze, l.glow);
+  ponds.setLight(l.sunDir, l.sky, l.haze, l.glow, l.night);
+  const dark = THREE.MathUtils.smoothstep(p, 0.68, 0.95);
+  night.setNight(l.night, dark);
+  props.setNight(l.night);
+  cottage.setNight(l.night);
   renderer.shadowMap.needsUpdate = true;
 };
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, paint, petals, seasonFx, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, paint, petals, seasonFx, night, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -833,6 +854,7 @@ function resize() {
   post.setSize(w, h, pixelRatio());
   (motes.material as THREE.ShaderMaterial).uniforms.uPixelRatio.value = pixelRatio();
   cottage.setPixelRatio(pixelRatio());
+  night.setPixelRatio(pixelRatio());
   dust.setPixelRatio(pixelRatio(), h);
   splash.setPixelRatio(pixelRatio(), h);
 }
@@ -958,6 +980,7 @@ function frame(time: number) {
     hummingbirds.update(dt);
     petals.update(dt);
     seasonFx.update(dt);
+    night.update(dt);
     perchingBirds.update(dt);
     butterflies.update(dt);
     dragonflies.update(dt);
