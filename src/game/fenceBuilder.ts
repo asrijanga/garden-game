@@ -13,7 +13,8 @@ const PATH_CLEAR = 0.78; // keep this far from a path's centre line
 /** Edgings may run close beside a path (its stones are ~0.3 m from the centre line). */
 const pathClear = (style: FenceStyle) => (EDGE_STYLES.has(style) ? 0.45 : PATH_CLEAR);
 const BRICK_TINTS = ['#e0866a', '#d27560', '#e8977a', '#c96a55', '#dc8b68', '#c27058'];
-const WILLOW_TINTS = ['#c9b49a', '#bba68b', '#d4c2a8', '#b09a80'];
+// Peeled willow is pale; these brighten the logs' weathered grey-brown towards straw and honey.
+const WILLOW_TINTS = [new THREE.Color(1.45, 1.3, 1.05), new THREE.Color(1.35, 1.2, 0.95), new THREE.Color(1.5, 1.38, 1.12), new THREE.Color(1.25, 1.1, 0.88)];
 const PICKET_TINTS = ['#ffffff', '#fbf8f2', '#f4f0e8', '#ece6da'];
 const LOG_TINTS = ['#ffffff', '#f2eee8', '#e6dfd5', '#d9d2c8'];
 // Weathered grey stone: some warmer, some cooler, the odd darker or rust-stained one.
@@ -296,11 +297,12 @@ export class FenceBuilder {
     const yaw = Math.atan2(-(seg.b.y - seg.a.y), seg.b.x - seg.a.x) + (this.rng() - 0.5) * 0.15;
     // Hand-set: each post leans a hair and stands a touch higher or lower than its neighbour.
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler((this.rng() - 0.5) * 0.05, yaw, (this.rng() - 0.5) * 0.05, 'YXZ'));
-    const tint = new THREE.Color(shape === 'picketPost' ? PICKET_TINTS[Math.floor(this.rng() * 4)] : style === 'willowEdge' ? WILLOW_TINTS[Math.floor(this.rng() * 4)] : LOG_TINTS[Math.floor(this.rng() * 4)]);
+    const k = Math.floor(this.rng() * 4);
+    const tint = shape === 'picketPost' ? new THREE.Color(PICKET_TINTS[k]) : style === 'willowEdge' ? WILLOW_TINTS[k].clone() : new THREE.Color(LOG_TINTS[k]);
     const y = this.heightAt(x, z) - lerp(0.05, 0.1, this.rng()) * (mini ? 0.5 : 1);
     this.wildflowers.clearNear(x, z, 0.3);
     // An edging's posts are little: a mini picket post, or a short willow stake.
-    const scale = style === 'picketEdge' ? new THREE.Vector3(0.62, 0.42 * tall, 0.62) : style === 'willowEdge' ? new THREE.Vector3(0.42, 0.3 * tall, 0.42) : new THREE.Vector3(1, tall, 1);
+    const scale = style === 'picketEdge' ? new THREE.Vector3(0.62, 0.42 * tall, 0.62) : style === 'willowEdge' ? new THREE.Vector3(0.36, 0.24 * tall, 0.36) : new THREE.Vector3(1, tall, 1);
     scale.y *= lerp(0.96, 1.04, this.rng());
     return this.fences.add(shape, new THREE.Vector3(x, y, z), q, scale, tint, 'drop', delay, seg.id);
   }
@@ -510,18 +512,18 @@ export class FenceBuilder {
         break;
       }
       case 'willowEdge': {
-        // Short stakes at each end and every 30 cm, with three withies woven along between.
+        // Short stakes at each end and every 30 cm, with five thin withies woven in and out between.
         this.post(seg, a.x, a.y, delay);
         this.post(seg, b.x, b.y, delay + 0.1);
         const stakes = Math.max(1, Math.round(len / 0.3));
         for (let i = 1; i < stakes; i++) {
           const p = at((i / stakes) * len);
           const q = quat(0.08);
-          this.fences.add('logPost', new THREE.Vector3(p.x, p.y - 0.03, p.z), q, new THREE.Vector3(0.32, 0.26, 0.32), new THREE.Color(WILLOW_TINTS[Math.floor(this.rng() * 4)]), 'drop', delay + 0.1 + i * 0.03, seg.id);
+          this.fences.add('logPost', new THREE.Vector3(p.x, p.y - 0.03, p.z), q, new THREE.Vector3(0.3, 0.22, 0.3), WILLOW_TINTS[Math.floor(this.rng() * 4)].clone(), 'drop', delay + 0.1 + i * 0.03, seg.id);
         }
-        for (let k = 0; k < 3; k++) {
-          const h = 0.07 + k * 0.065;
-          const side = (k % 2 ? 1 : -1) * 0.012;
+        for (let k = 0; k < 5; k++) {
+          const h = 0.05 + k * 0.035;
+          const side = (k % 2 ? 1 : -1) * 0.01;
           const pa = at(0, side);
           const pb = at(len, side);
           pa.y += h + (this.rng() - 0.5) * 0.015;
@@ -530,7 +532,7 @@ export class FenceBuilder {
           mid.y -= len * 0.01;
           const d = pb.clone().sub(pa);
           const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), d.clone().normalize());
-          this.fences.add('log', mid, q, new THREE.Vector3(d.length() + 0.06, 0.34, 0.34), new THREE.Color(WILLOW_TINTS[Math.floor(this.rng() * 4)]), 'pop', delay + 0.35 + k * 0.08, seg.id, d.length() / 2);
+          this.fences.add('log', mid, q, new THREE.Vector3(d.length() + 0.06, 0.24, 0.24), WILLOW_TINTS[Math.floor(this.rng() * 4)].clone().multiplyScalar(lerp(0.92, 1.05, this.rng())), 'pop', delay + 0.35 + k * 0.06, seg.id, d.length() / 2);
         }
         break;
       }
