@@ -421,6 +421,18 @@ export class Props {
       }
       if (p.gone) continue;
       if (p.anim && this.wind) p.anim.update(dt, this.wind.direction, this.wind.sample(p.pos.x, p.pos.z));
+      // Rebuilt at once (an undo replaying the garden): straight to standing, fully assembled.
+      if (regrow.instant && p.t !== null && (!p.landed || (p.assemble ?? 6) < 6)) {
+        p.delay = 0;
+        p.t = 1;
+        this.place(p, 0, 0);
+        p.landed = true;
+        if (p.kind === 'gazebo') {
+          p.assemble = 0;
+          this.assemble(p, 6);
+        }
+        continue;
+      }
       if (p.t === null) {
         // Carried: hovering just above the ground, bobbing softly.
         this.place(p, 0.3 + Math.sin(this.time * 5) * 0.03, 0);

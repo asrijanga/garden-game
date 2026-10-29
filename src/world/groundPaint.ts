@@ -218,6 +218,11 @@ export class GroundPaint {
   }
 
   /** Upload changes at most once per frame (and now and then, make sure the canvas is still ours). */
+  /** Worn earth still fading away somewhere. */
+  get busy(): boolean {
+    return this.clearing.length > 0;
+  }
+
   update(dt = 0) {
     for (let i = this.clearing.length - 1; i >= 0; i--) {
       const c = this.clearing[i];

@@ -74,6 +74,10 @@ export class Wildflowers {
     this.mesh.instanceMatrix.needsUpdate = true;
   }
 
+  get busy(): boolean {
+    return this.shrinking.size > 0;
+  }
+
   update(dt: number) {
     if (!this.shrinking.size) return;
     const m = new THREE.Matrix4();
