@@ -900,7 +900,7 @@ body.picking.choosing-colour .tool-label {
 body > * {
   transition: opacity 0.6s ease;
 }
-body.admiring > *:not(#world):not(#loader) {
+body.admiring > *:not(#world):not(#loader):not(#fps) {
   opacity: 0 !important;
   pointer-events: none !important;
 }

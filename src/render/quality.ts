@@ -98,6 +98,7 @@ export class Quality {
 /** A tiny frame-rate readout (add `?fps` to the URL). */
 export function mountFpsMeter(quality: Quality): (dt: number) => void {
   const el = document.createElement('div');
+  el.id = 'fps'; // stays on screen in admire mode
   el.style.cssText =
     'position:fixed;left:10px;top:calc(env(safe-area-inset-top) + 10px);z-index:50;font:600 12px/1.3 ui-monospace,monospace;color:#fff;background:rgba(0,0,0,.45);padding:4px 7px;border-radius:8px;pointer-events:none';
   document.body.appendChild(el);
