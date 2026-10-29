@@ -23,6 +23,7 @@ import { Weather } from './world/weather';
 import { mountWeatherPicker } from './ui/weatherPicker';
 import { clearAddress, linkFor, packGarden, sharedInAddress, unpackGarden } from './game/share';
 import { mountVisitBanner } from './ui/visitBanner';
+import { mountAdmire } from './ui/admire';
 import { TimeOfDay } from './world/timeOfDay';
 import { mountTimeDial } from './ui/timeDial';
 import { GroundPaint } from './world/groundPaint';
@@ -998,6 +999,15 @@ window.addEventListener('resize', resize);
 resize();
 // (Once the post-processing and fog exist: the dial applies the saved time straight away.)
 mountTimeDial(applyTime, shared?.time ?? 0.55, shared?.time != null);
+// Admire mode: no buttons, just a slow drift round the garden.
+let admireTime = 0;
+const admiring = mountAdmire(
+  () => {
+    admireTime = 0;
+    ambience.tap(1.05);
+  },
+  () => {},
+);
 let firstWeather = true;
 mountWeatherPicker(
   (w) => {
@@ -1205,6 +1215,18 @@ function frame(time: number) {
   }
   paint.update(dt);
   (motes.material as THREE.ShaderMaterial).uniforms.uTime.value = elapsed;
+  if (admiring.on) {
+    // Admire: a slow turn round the garden, drifting across the clearing and easing between a
+    // wide view and a closer, lower one. It eases in from wherever the view was.
+    admireTime += dt;
+    const ease = Math.min(1, admireTime / 2);
+    const k = Math.min(1, dt * 0.25) * ease;
+    rig.azimuth += dt * 0.06 * ease;
+    const breathe = 0.5 + 0.5 * Math.sin(admireTime * 0.07 - Math.PI / 2);
+    rig.distance += (THREE.MathUtils.lerp(rig.maxDistance * 0.5, rig.maxDistance * 0.88, breathe) - rig.distance) * k;
+    rig.target.x += (Math.sin(admireTime * 0.045) * 3 - rig.target.x) * k;
+    rig.target.z += (-1.2 + Math.sin(admireTime * 0.033) * 2.5 - rig.target.z) * k;
+  }
   rig.update(dt);
   ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));
   const buzz = bees.buzzNear(camera.position);
