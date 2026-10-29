@@ -7,7 +7,7 @@ import { createRng, lerp } from '../core/random';
 import type { WindField } from '../render/wind';
 import type { SeasonPalette } from './season';
 import { ChimeSet } from './chimes';
-import { DOORS, ROOFS, SHUTTERS, WALLS, DEFAULT_STYLE, type CottageStyle } from './cottageStyle';
+import { DOORS, ROOFS, SHUTTERS, WALLS, DEFAULT_STYLE, encodeStyle, type CottageStyle } from './cottageStyle';
 
 export * from './cottageStyle';
 
@@ -61,8 +61,10 @@ export class Cottage {
 
   /** Change the cottage's look; it rebuilds and gives a little bounce. */
   setStyle(style: CottageStyle, animate = true) {
+    // The same look again (an undo replaying the garden): nothing to rebuild.
+    const same = this.group.children.length > 0 && encodeStyle(style) === encodeStyle(this.style);
     this.style = { ...style };
-    this.build();
+    if (!same) this.build();
     this.onBuilt();
     if (animate) this.bounce = 0;
   }

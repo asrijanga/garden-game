@@ -95,6 +95,8 @@ export class Ponds {
   private readonly spare = new Map<number, Chunk>();
   private prebuildNext = 0;
   private readonly digging = new Set<number>();
+  /** Chunks changed during an instant rebuild, written out once it's done. */
+  private readonly unwritten = new Set<Chunk>();
   private readonly data: Uint8Array;
   private readonly noise = createNoise2D(913);
   private readonly waterMat: THREE.ShaderMaterial;
@@ -661,6 +663,12 @@ export class Ponds {
 
   /** Copy field state into a chunk's meshes, optionally only the vertices in [i0..i1] × [j0..j1]. */
   private writeChunk(ch: Chunk, i0 = 0, i1 = N, j0 = 0, j1 = N) {
+    // Rebuilding at once (an undo): only the end result is seen, so each chunk is written once,
+    // after (the fields are what everything else reads; the meshes only show them).
+    if (regrow.instant) {
+      this.unwritten.add(ch);
+      return;
+    }
     const bPos = ch.basin.geometry.attributes.position as THREE.BufferAttribute;
     const nrm = ch.basin.geometry.attributes.normal as THREE.BufferAttribute;
     const wPos = ch.water.geometry.attributes.position as THREE.BufferAttribute;
@@ -702,6 +710,10 @@ export class Ponds {
 
   update(dt: number) {
     this.time += dt;
+    if (!regrow.instant && this.unwritten.size) {
+      for (const ch of this.unwritten) if (this.chunks.get(ch.key) === ch || this.spare.get(ch.key) === ch) this.writeChunk(ch);
+      this.unwritten.clear();
+    }
     if (!this.stroking && this.time > 1.5) this.prebuild();
     this.waterMat.uniforms.uTime.value = this.time;
     // While digging, the (whole-field) flood fill runs a few times a second, not every frame.
@@ -714,7 +726,8 @@ export class Ponds {
     const refresh = new Set<number>();
     const strips: { ch: Chunk; i0: number; i1: number; j0: number; j1: number }[] = [];
     // The ground sinks softly into its new shape.
-    const k = 1 - Math.exp(-dt * 2.2);
+    // (Rebuilt at once, e.g. after an undo: straight to its final shape.)
+    const k = regrow.instant ? 1 : 1 - Math.exp(-dt * 2.2);
     for (const key of [...this.digging]) {
       const ci = key % CHUNKS;
       const cj = Math.floor(key / CHUNKS);
@@ -751,11 +764,12 @@ export class Ponds {
     // Water rises gently to its level.
     for (const body of this.bodies.values()) {
       if (!body.filled || body.fillT >= 1) continue;
+      if (regrow.instant) body.delay = 0;
       if (body.delay > 0) {
         body.delay -= dt;
         continue;
       }
-      body.fillT = Math.min(1, body.fillT + dt / FILL_TIME);
+      body.fillT = regrow.instant ? 1 : Math.min(1, body.fillT + dt / FILL_TIME);
       const t = body.fillT;
       const e = t * t * (3 - 2 * t);
       body.level = body.fillFrom + (body.target - body.fillFrom) * e;
@@ -766,6 +780,13 @@ export class Ponds {
       if (ch) this.writeChunk(ch);
     }
     for (const s of strips) if (!refresh.has(s.ch.key)) this.writeChunk(s.ch, s.i0, s.i1, s.j0, s.j1);
+  }
+
+  /** Still settling: ground sinking into a new basin, or water rising. */
+  get busy(): boolean {
+    if (this.digging.size) return true;
+    for (const body of this.bodies.values()) if (body.filled && body.fillT < 1) return true;
+    return false;
   }
 
   /** The water level (now) at (x, z), or null on dry land. */

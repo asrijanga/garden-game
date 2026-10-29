@@ -152,6 +152,10 @@ export class EdgePlants {
     touch(g.mesh.instanceMatrix, g.index);
   }
 
+  get busy(): boolean {
+    return this.wilting.length > 0 || this.growing.length > 0;
+  }
+
   update(dt: number) {
     for (let i = this.wilting.length - 1; i >= 0; i--) {
       const w = this.wilting[i];

@@ -805,6 +805,9 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     // Mown this visit (or kept mown): the wildflowers stay mown through an undo.
     if (mownWild) wildflowers.clearIf(() => true);
     flowers.update(10);
+    // Step everything on until it has all settled (at most 12 s of garden time).
+    const settling = () =>
+      stones.busy || fences.busy || boulders.busy || props.busy || edgePlants.busy || pondPlants.busy || ponds.busy || wildflowers.busy || paint.busy;
     for (let i = 0; i < 120; i++) {
       const d = 0.1;
       stones.update(d);
@@ -820,6 +823,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       paint.update(d);
       dust.update(d);
       splash.update(d);
+      if (!settling()) break;
     }
     regrow.instant = false;
     ambience.quiet = false;
