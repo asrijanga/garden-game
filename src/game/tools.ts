@@ -38,6 +38,9 @@ export interface Brush {
  * move the camera. Every stroke is also recorded (points rounded to the centimetre, exactly as
  * the brushes saw them) so the garden can be saved and rebuilt stroke for stroke.
  */
+/** How far (screen pixels) a path trails behind the finger, to steady it. */
+const ROPE_PX = 14;
+
 export class ToolController {
   private readonly pointers = new Set<number>();
   private stroke: { tool: BuildTool; points: number[]; species: string; style: BuildStyle; item: PropKind } | null = null;
@@ -186,6 +189,7 @@ export class ToolController {
     if (!hit) return;
     this.marker.move(hit);
     const pts = this.stroke.points;
+    if (this.stroke.tool === 'path' && !this.steady(hit, pts, ROPE_PX)) return;
     // Only real moves: keeps saves small, and replays see exactly the same points.
     if (hit.x === pts[pts.length - 2] && hit.z === pts[pts.length - 1]) return;
     pts.push(hit.x, hit.z);
@@ -193,9 +197,37 @@ export class ToolController {
     this.onTouch(hit, this.stroke.tool, false);
   };
 
+  /**
+   * A path's "lazy rope": the path follows a point trailing a short rope behind the finger, so
+   * finger wobble and jitter never reach it (the rope is a fixed size on screen, so it's just as
+   * steady zoomed out). Moves `hit` to that point; false while the finger is still within the rope.
+   * The steadied points are what's saved, so a rebuild follows exactly the same line.
+   */
+  private steady(hit: THREE.Vector3, pts: number[], ropePx: number): boolean {
+    const lx = pts[pts.length - 2];
+    const lz = pts[pts.length - 1];
+    const rope = ropePx * this.rig.metresPerPixel;
+    const d = Math.hypot(hit.x - lx, hit.z - lz);
+    if (d <= rope) return false;
+    const k = (d - rope) / d;
+    hit.x = roundCm(lx + (hit.x - lx) * k);
+    hit.z = roundCm(lz + (hit.z - lz) * k);
+    hit.y = this.heightAt(hit.x, hit.z);
+    return true;
+  }
+
   private onUp = (e: PointerEvent) => {
     // Don't lose the last little bit of the stroke.
     if (this.pending && this.pointers.size === 1) this.flushMove();
+    // A path ends exactly where the finger lifts (if it went anywhere at all).
+    if (this.stroke?.tool === 'path' && this.pointers.size === 1) {
+      const hit = this.pickAt(e.clientX, e.clientY);
+      const pts = this.stroke.points;
+      if (hit && pts.length > 2 && Math.hypot(hit.x - pts[pts.length - 2], hit.z - pts[pts.length - 1]) > 0.05) {
+        pts.push(hit.x, hit.z);
+        this.brushes.path.extend(hit);
+      }
+    }
     this.pointers.delete(e.pointerId);
     this.endStroke();
   };

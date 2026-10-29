@@ -108,6 +108,11 @@ export class CameraRig {
     this.distance = clamp(this.distance * Math.exp(logAmount), this.minDistance, this.maxDistance);
   }
 
+  /** Roughly how many metres of ground one screen pixel covers at this zoom. */
+  get metresPerPixel(): number {
+    return (2 * this.distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / Math.max(1, this.el.clientHeight);
+  }
+
   /** Drag the ground under the finger: screen pixels → metres on the ground plane. */
   private panByScreen(dx: number, dy: number) {
     const metresPerPixel = (2 * this.distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / this.el.clientHeight;

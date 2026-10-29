@@ -78,8 +78,8 @@ export class PathBuilder {
     this.lastCurb = [null, null];
     this.sinceStone = 0;
     this.started = false;
-    // Gravel appears under the finger straight away.
-    if (!this.blocked(p.x, p.z)) this.paint.wear(p.x, p.z, GRAVEL_RADIUS, 1, 1);
+    // Nothing is laid until the finger actually sets off: a tap or a long press leaves no trace
+    // (it used to leave a lone round patch of gravel, the "finger blob").
   }
 
   extend(p: THREE.Vector3) {
