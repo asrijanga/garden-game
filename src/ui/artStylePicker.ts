@@ -3,17 +3,20 @@ import type { ArtStyle } from '../render/post';
 const KEY = 'art-style';
 const CHOICES: [ArtStyle, string, string][] = [
   ['painted', '🖌️', 'Painted'],
-  ['sketch', '✏️', 'Sketch'],
+  ['pencil', '✏️', 'Pencil'],
+  ['hatched', '🖋️', 'Hatched'],
+  ['coloured', '🖍️', 'Coloured'],
 ];
 
 /**
- * The garden's art style, under the weather chips: the usual painted look or the pencil-sketch
- * prototype. Remembered between visits.
+ * The garden's art style, under the weather chips: the usual painted look or one of the
+ * hand-drawn prototypes (pencil, hatched, coloured pencil). Remembered between visits.
  */
 export function mountArtStylePicker(onChange: (s: ArtStyle) => void): ArtStyle {
   let current: ArtStyle = 'painted';
   try {
-    const saved = localStorage.getItem(KEY) as ArtStyle | null;
+    let saved = localStorage.getItem(KEY) as ArtStyle | 'sketch' | null;
+    if (saved === 'sketch') saved = 'hatched'; // the first prototype
     if (saved && CHOICES.some((c) => c[0] === saved)) current = saved;
   } catch {
     // no storage: painted
