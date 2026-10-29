@@ -1,4 +1,3 @@
-import { BED_ICONS } from './bedPicker';
 import { MIX_ID, WATER_MIX_ID, type FlowerSpecies } from '../world/flowerSpecies';
 
 /** A small illustrated flower icon for a species chip (inline SVG, 40×40). */
@@ -184,10 +183,7 @@ export class FlowerPicker {
   onBook: () => void = () => {};
   /** The amount chip was tapped: move on to the next amount (drift → clump → one). */
   onAmount: () => void = () => {};
-  /** The bed chip was tapped: open or close the bed panel (edges and toppings). */
-  onBed: () => void = () => {};
   private readonly amountChip: HTMLButtonElement;
-  private readonly bedChip: HTMLButtonElement;
 
   constructor(
     private readonly species: FlowerSpecies[],
@@ -220,16 +216,7 @@ export class FlowerPicker {
       this.onAmount();
     });
     this.setAmount('drift');
-    this.bedChip = document.createElement('button');
-    this.bedChip.type = 'button';
-    this.bedChip.className = 'flower-chip bed-chip amount-chip';
-    this.bedChip.addEventListener('pointerdown', (e) => e.stopPropagation());
-    this.bedChip.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.onBed();
-    });
-    this.setBed(BED_ICONS.stone[0]);
-    row.append(this.amountChip, this.bedChip, book);
+    row.append(this.amountChip, book);
     const entries: [string, string, FlowerSpecies | null, boolean][] = [
       [MIX_ID, 'Seasonal mix', null, true],
       [WATER_MIX_ID, 'Water mix', null, true],
@@ -294,12 +281,6 @@ export class FlowerPicker {
   }
 
   /** Choose a species (from a chip or the book), as if its chip were tapped. */
-  /** Show the current bed style's drawing on the Bed chip. */
-  setBed(svg: string) {
-    this.bedChip.setAttribute('aria-label', 'Bed edge and topping');
-    this.bedChip.innerHTML = `<span class="chip-face">${svg}</span><span class="chip-name">Bed</span>`;
-  }
-
   /** Show which amount is chosen on its chip. */
   setAmount(amount: 'drift' | 'clump' | 'one') {
     const [svg, label] = AMOUNT_ICONS[amount];

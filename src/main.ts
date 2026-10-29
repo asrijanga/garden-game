@@ -23,7 +23,6 @@ import { Weather } from './world/weather';
 import { mountWeatherPicker } from './ui/weatherPicker';
 import { clearAddress, linkFor, packGarden, sharedInAddress, unpackGarden } from './game/share';
 import { mountVisitBanner } from './ui/visitBanner';
-import { BedPicker, BED_ICONS } from './ui/bedPicker';
 import { TimeOfDay } from './world/timeOfDay';
 import { mountTimeDial } from './ui/timeDial';
 import { GroundPaint } from './world/groundPaint';
@@ -32,7 +31,6 @@ import { EdgePlants } from './world/edgePlants';
 import { Dust } from './world/dust';
 import { PathBuilder } from './game/pathBuilder';
 import { FlowerBrush, type PlantAmount } from './game/flowerBrush';
-import { RaisedSoil } from './world/raisedSoil';
 import { Flowers } from './world/flowers';
 import { SPECIES } from './world/flowerSpecies';
 import { FlowerBook } from './ui/flowerBook';
@@ -197,8 +195,7 @@ const stones = new Stones((p, r, kind) => {
   if (kind === 'step') dust.puff(p, 4, r * 1.2);
   // A rock set down in the water plops in; everything else settles into the soil.
   if (kind !== 'step' && ponds.waterDepth(p.x, p.z) > 0.08) ambience.plop(Math.min(1, r * 2.5));
-  else if (kind === 'plank') ambience.wood(0.4);
-  else ambience.stone(kind === 'step' ? 0.3 : kind === 'rock' ? 0.14 : kind === 'shore' ? Math.min(0.3, r * 0.9) : kind === 'brick' ? 0.12 : 0.18);
+  else ambience.stone(kind === 'step' ? 0.3 : Math.min(0.3, r * 0.9));
 });
 scene.add(stones.group);
 const edgePlants = new EdgePlants(palette.wildflowers);
@@ -227,13 +224,11 @@ scene.add(bees.group);
 scene.add(flowers.group);
 const flowerBrush = new FlowerBrush(
   ground,
-  paint,
   flowers,
   wildflowers,
   season,
   (x, z) => cottage.contains(x, z, 0.3) || ground.forestness(x, z) > 0.4 || ponds.contains(x, z, 0.9),
   (x, z) => paths.distanceToPaths(x, z),
-  stones,
   {
     // Deep middle, shallows, or the damp bank just outside the water.
     zone: (x, z) => {
@@ -245,10 +240,6 @@ const flowerBrush = new FlowerBrush(
     level: (x, z) => ponds.levelAt(x, z),
   },
 );
-// Raised beds' soil sits up on top of their frames (drawn with the lawn's own shader).
-const raisedSoil = new RaisedSoil(ground.basinMaterial);
-scene.add(raisedSoil.mesh);
-flowerBrush.raised = raisedSoil;
 // Fences and hedges: posts knocked in with a wooden "tock", hedges rustling up.
 const fences = new Fences((shape, at) => {
   if (shape === 'picketPost' || shape === 'logPost') {
@@ -434,26 +425,6 @@ picker.onAmount = () => {
   toolbar.showLabel(AMOUNT_HINT[flowerBrush.amount], 2200);
 };
 flowerBrush.onPlace = (_x, _z, water) => (water ? ambience.plop(0.3) : ambience.pat());
-// How new beds are edged (or raised) and what covers their soil.
-const bedPicker = new BedPicker(
-  (style, label) => {
-    flowerBrush.bedStyle = style;
-    picker.setBed(BED_ICONS[style][0]);
-    ambience.tap(1.15);
-    toolbar.showLabel(label, 1600);
-  },
-  (topping, label) => {
-    flowerBrush.topping = topping;
-    ambience.tap(1.25);
-    toolbar.showLabel(label, 1600);
-  },
-);
-picker.onBed = () => {
-  ambience.tap(1.1);
-  bedPicker.setVisible(!bedPicker.open);
-};
-// Putting a finger on the garden puts the bed panel away.
-canvas.addEventListener('pointerdown', () => bedPicker.setVisible(false));
 // The flower book: every species to browse, blooming-now first.
 const flowerBook = new FlowerBook(SPECIES, season, (id) => picker.pick(id));
 picker.onBook = () => {
@@ -765,7 +736,6 @@ tools = new ToolController(
   (tool) => {
     cottagePanelRef?.setVisible(false);
     picker.setVisible(tool === 'flowers');
-    if (tool !== 'flowers') bedPicker.setVisible(false);
     stylePicker.setVisible(tool === 'fence');
     decorPicker.setVisible(tool === 'decor');
     document.body.classList.toggle('picking', tool === 'flowers' || tool === 'fence' || tool === 'decor');
@@ -1114,7 +1084,6 @@ function frame(time: number) {
     props.update(dt);
     edgePlants.update(dt);
     flowers.update(dt);
-    raisedSoil.update(dt);
     bees.update(dt);
     ponds.update(dt);
     fish.update(dt);

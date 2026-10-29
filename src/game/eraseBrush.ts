@@ -67,8 +67,6 @@ export class EraseBrush {
     if (!this.last) return;
     this.last = null;
     if (this.touchedPond) this.world.ponds.settle();
-    // Beds that were cut get a stone border along their new edge.
-    this.world.beds.reborder(this.trail, this.radius);
   }
 
   private dab(x: number, z: number) {

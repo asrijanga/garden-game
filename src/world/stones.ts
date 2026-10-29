@@ -2,12 +2,11 @@ import * as THREE from 'three';
 import { addWet } from '../render/wet';
 import { touch } from '../render/touch';
 import { regrow } from '../core/regrow';
-import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 
-export type StoneKind = 'step' | 'rock' | 'shore' | 'brick' | 'plank';
-const SHAPES: Record<StoneKind, number> = { step: 8, rock: 7, shore: 7, brick: 4, plank: 4 };
+export type StoneKind = 'step' | 'shore';
+const SHAPES: Record<StoneKind, number> = { step: 8, shore: 7 };
 const CAPACITY = 2000; // per shape
 const CELL = 0.5; // spatial hash cell, metres
 
@@ -106,35 +105,6 @@ function shoreGeometry(seed: number): THREE.BufferGeometry {
   return g;
 }
 
-/** A clay brick (long along z), its arrises softly worn. */
-function brickGeometry(seed: number): THREE.BufferGeometry {
-  const rng = createRng(seed);
-  const g = new RoundedBoxGeometry(lerp(0.092, 0.1, rng()), 0.055, lerp(0.19, 0.205, rng()), 1, 0.012);
-  g.translate(0, 0.0275, 0);
-  g.deleteAttribute('uv');
-  colorByHeight(g, -0.01, 0.06);
-  return g;
-}
-
-/** A weathered board (long along z, 1 m), with a faint grain of lighter and darker streaks. */
-function plankGeometry(seed: number): THREE.BufferGeometry {
-  const rng = createRng(seed);
-  const g = new RoundedBoxGeometry(lerp(0.12, 0.14, rng()), 0.035, 1.0, 1, 0.01);
-  g.translate(0, 0.0175, 0);
-  g.deleteAttribute('uv');
-  const pos = g.attributes.position;
-  const col = new Float32Array(pos.count * 3);
-  const ph = rng() * 10;
-  for (let i = 0; i < pos.count; i++) {
-    const top = Math.min(1, Math.max(0, pos.getY(i) / 0.035));
-    const grain = 0.94 + 0.06 * Math.sin(pos.getX(i) * 140 + Math.sin(pos.getZ(i) * 3 + ph) * 2);
-    const v = lerp(0.72, 1.02, top) * grain;
-    col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v;
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  return g;
-}
-
 /** Lighter, sun-bleached top faces; darker sides. */
 function colorByHeight(g: THREE.BufferGeometry, lo: number, hi: number) {
   const pos = g.attributes.position;
@@ -153,9 +123,6 @@ interface Placed {
   pos: THREE.Vector3;
   scale: THREE.Vector3;
   yaw: number;
-  /** Optional tilt: pitch about the piece's own x, and roll about its own z (applied before yaw). */
-  pitch: number;
-  roll: number;
   r: number;
   owner: number;
   removed?: boolean;
@@ -170,8 +137,7 @@ interface Falling {
 }
 
 /**
- * Stones (stepping stones, edging, bed borders, pond rocks, and the bricks and boards of bed
- * edges) that drop into place with a soft squash and bounce.
+ * Stones (stepping stones and pond rocks) that drop into place with a soft squash and bounce.
  * All stones of a shape share one InstancedMesh; only those still settling update each frame.
  */
 export class Stones {
@@ -193,12 +159,7 @@ export class Stones {
     (Object.keys(SHAPES) as StoneKind[]).forEach((kind) => {
       const list: THREE.InstancedMesh[] = [];
       for (let k = 0; k < SHAPES[kind]; k++) {
-        const geo =
-          kind === 'rock' ? rockGeometry(700 + k * 17)
-          : kind === 'shore' ? shoreGeometry(900 + k * 23)
-          : kind === 'brick' ? brickGeometry(1300 + k * 31)
-          : kind === 'plank' ? plankGeometry(1700 + k * 41)
-          : stepGeometry(550 + k * 13); // (the seeds stepping stones have always had)
+        const geo = kind === 'shore' ? shoreGeometry(900 + k * 23) : stepGeometry(550 + k * 13); // (the seeds they've always had)
         const mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
         mesh.count = 0;
         mesh.visible = false; // drawn only once something of this shape is laid
@@ -285,7 +246,7 @@ export class Stones {
     return gone;
   }
 
-  add(kind: StoneKind, x: number, y: number, z: number, scale: THREE.Vector3, yaw: number, r: number, tone: THREE.Color, delay: number, owner = 0, pitch = 0, roll = 0) {
+  add(kind: StoneKind, x: number, y: number, z: number, scale: THREE.Vector3, yaw: number, r: number, tone: THREE.Color, delay: number, owner = 0) {
     const list = this.meshes.get(kind)!;
     const mesh = list[Math.floor(this.rng() * list.length)];
     if (mesh.count >= CAPACITY) return;
@@ -293,7 +254,7 @@ export class Stones {
     mesh.visible = true;
     mesh.setColorAt(index, tone);
     if (mesh.instanceColor) touch(mesh.instanceColor, index);
-    const stone: Placed = { kind, mesh, index, pos: new THREE.Vector3(x, y, z), scale: scale.clone(), yaw, pitch, roll, r, owner };
+    const stone: Placed = { kind, mesh, index, pos: new THREE.Vector3(x, y, z), scale: scale.clone(), yaw, r, owner };
     const k = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
     if (!this.grid.has(k)) this.grid.set(k, []);
     this.grid.get(k)!.push(stone);
@@ -303,7 +264,7 @@ export class Stones {
 
   private write(st: Placed, lift: number, k: number, squash = 0, force = false) {
     if (st.removed && !force) return;
-    this.e.set(st.pitch, st.yaw, st.roll, 'YXZ');
+    this.e.set(0, st.yaw, 0);
     this.q.setFromEuler(this.e);
     this.s.set(st.scale.x * k * (1 + squash * 0.4), st.scale.y * k * (1 - squash), st.scale.z * k * (1 + squash * 0.4));
     this.m.compose(this.p.set(st.pos.x, st.pos.y + lift, st.pos.z), this.q, this.s);
