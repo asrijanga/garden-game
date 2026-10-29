@@ -201,6 +201,8 @@ export class ChipPicker<T extends string> {
   }
 }
 
+const BACKUP_ICON = `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M11 13.5a3 3 0 0 1 3-3h8.5l5.5 5.5v13a3 3 0 0 1-3 3H14a3 3 0 0 1-3-3z" fill="#f6efe0" stroke="#8a6a4a" stroke-width="1.6" stroke-linejoin="round"/><path d="M22.5 10.5V16h5.5" fill="none" stroke="#8a6a4a" stroke-width="1.6" stroke-linejoin="round"/><path d="M20 19c-2.6 0-4 2-3.6 4.4 1.8 0 3-.8 3.6-2.2.6 1.4 1.8 2.2 3.6 2.2.4-2.4-1-4.4-3.6-4.4z" fill="#7aa54a"/><path d="M20 21v6" stroke="#5e8a3a" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+const RESTORE_ICON = `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M11 13.5a3 3 0 0 1 3-3h8.5l5.5 5.5v13a3 3 0 0 1-3 3H14a3 3 0 0 1-3-3z" fill="#f6efe0" stroke="#8a6a4a" stroke-width="1.6" stroke-linejoin="round"/><path d="M22.5 10.5V16h5.5" fill="none" stroke="#8a6a4a" stroke-width="1.6" stroke-linejoin="round"/><path d="M15.5 23.5a4.6 4.6 0 1 0 1.4-3.4" fill="none" stroke="#5e8a3a" stroke-width="1.7" stroke-linecap="round"/><path d="M15.2 17.6v3h3" fill="none" stroke="#5e8a3a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const MOW_ICON = `<svg viewBox="0 0 40 40" aria-hidden="true">
   <rect x="4" y="9" width="32" height="24" rx="5" fill="#6fa848"/>
   ${[0, 1, 2, 3].map((i) => `<rect x="${4 + i * 8}" y="9" width="8" height="24" fill="${i % 2 ? '#86bd5c' : '#6fa848'}"/>`).join('')}
@@ -222,7 +224,7 @@ export class TidyPicker {
   private readonly el: HTMLDivElement;
   private readonly keep: HTMLButtonElement;
 
-  constructor(onMow: () => void, onKeep: (on: boolean) => void, keepMown: boolean) {
+  constructor(onMow: () => void, onKeep: (on: boolean) => void, keepMown: boolean, onBackup?: () => void, onRestore?: () => void) {
     this.el = document.createElement('div');
     this.el.className = 'flower-picker';
     const row = document.createElement('div');
@@ -242,13 +244,16 @@ export class TidyPicker {
       row.append(b);
       return b;
     };
-    chip('Mow wild growth', MOW_ICON, onMow);
-    this.keep = chip('Keep it mown', KEEP_ICON, () => {
+    chip('Mow', MOW_ICON, onMow);
+    this.keep = chip('Keep mown', KEEP_ICON, () => {
       const on = !this.keep.classList.contains('active');
       this.keep.classList.toggle('active', on);
       onKeep(on);
     });
     this.keep.classList.toggle('active', keepMown);
+    // Keeping the garden safe: a small file to save, and restoring from one.
+    if (onBackup) chip('Back up', BACKUP_ICON, onBackup);
+    if (onRestore) chip('Restore', RESTORE_ICON, onRestore);
     document.body.append(this.el);
   }
 

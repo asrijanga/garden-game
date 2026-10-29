@@ -17,6 +17,7 @@ import { Ambience } from './audio/ambience';
 import { mountSoundControls } from './ui/soundButton';
 import { Toolbar, type Tool } from './ui/toolbar';
 import { GardenStore, type Action } from './game/garden';
+import { keepStorage, makeBackup, readBackup } from './game/backup';
 import { confirmCard } from './ui/confirm';
 import { mountShotButton } from './ui/shotButton';
 import { mountUndoButtons } from './ui/undoButtons';
@@ -258,7 +259,62 @@ const tidyPicker = new TidyPicker(
     tuckAway('erase');
   },
   keepMown,
+  () => {
+    ambience.tap(1.15);
+    tuckAway('erase');
+    saveBackup();
+  },
+  () => {
+    ambience.tap(1.1);
+    pickBackup.click();
+  },
 );
+// --- Keeping the garden safe -------------------------------------------------------------------
+// Ask the browser not to clear the save when space runs low (iOS otherwise may, after a while).
+keepStorage();
+/** A small file with the whole garden: to the share sheet (Save to Files) or a download. */
+function saveBackup() {
+  const file = makeBackup(store.actions, Number(stored(MEADOW_KEY)) || 0, keepMown);
+  const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+  if (nav.share && nav.canShare?.({ files: [file] })) {
+    nav.share({ files: [file] }).catch(() => {});
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file);
+  a.download = file.name;
+  document.body.append(a);
+  a.click();
+  toolbar.showLabel('Garden backed up', 2000);
+  setTimeout(() => {
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  }, 1000);
+}
+const pickBackup = document.createElement('input');
+pickBackup.type = 'file';
+pickBackup.accept = '.json,application/json';
+pickBackup.style.display = 'none';
+document.body.append(pickBackup);
+pickBackup.addEventListener('change', async () => {
+  const file = pickBackup.files?.[0];
+  pickBackup.value = '';
+  if (!file) return;
+  let backup: Awaited<ReturnType<typeof readBackup>>;
+  try {
+    backup = await readBackup(file);
+  } catch {
+    toolbar.showLabel('That file isn’t a garden backup', 2600);
+    return;
+  }
+  const go = await confirmCard('Restore this backup?', `It will replace the garden you have now (${backup.actions.length} things made). This can’t be undone.`, 'Not now', 'Restore');
+  if (!go) return;
+  store.replace(backup.actions);
+  if (backup.meadow !== undefined) remember(MEADOW_KEY, String(backup.meadow));
+  if (backup.keepMown !== undefined) remember(MOWN_KEY, backup.keepMown ? '1' : '0');
+  clearAddress();
+  location.reload();
+});
 
 // The world says which tool is in hand: show its chips.
 handlers.toolChanged = ((tool: Tool) => {
