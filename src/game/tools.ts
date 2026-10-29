@@ -1,7 +1,8 @@
 import * as THREE from 'three';
+import { nextFrame } from '../engine/env';
 import type { CameraRig } from '../core/cameraRig';
 import type { GroundPicker } from '../core/groundPicker';
-import type { Toolbar, Tool } from '../ui/toolbar';
+import type { Tool } from '../ui/toolbar';
 import type { TouchMarker } from '../world/touchMarker';
 import type { FlowerBrush } from './flowerBrush';
 import type { PondBrush } from './pondBrush';
@@ -58,7 +59,7 @@ export class ToolController {
 
   constructor(
     el: HTMLElement,
-    private readonly toolbar: Toolbar,
+    private readonly toolbar: { readonly tool: Tool },
     private readonly rig: CameraRig,
     private readonly picker: GroundPicker,
     private readonly marker: TouchMarker,
@@ -178,7 +179,7 @@ export class ToolController {
     this.pendingX = e.clientX;
     this.pendingY = e.clientY;
     this.pending = true;
-    if (!this.raf) this.raf = requestAnimationFrame(this.flushMove);
+    if (!this.raf) this.raf = nextFrame(this.flushMove);
   };
 
   private flushMove = () => {

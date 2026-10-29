@@ -904,3 +904,19 @@ body.admiring > *:not(#world):not(#loader):not(#fps) {
   opacity: 0 !important;
   pointer-events: none !important;
 }
+
+/* When the picture took too long for the share sheet: one more tap to share it. */
+.shot-offer {
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 72px);
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 252, 244, 0.94);
+  color: #3d3427;
+  font: 600 15px/1 system-ui, sans-serif;
+  box-shadow: 0 6px 20px rgba(40, 30, 10, 0.25);
+}

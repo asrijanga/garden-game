@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeCanvas } from '../engine/env';
 
 /** World half-size covered by the paint layer (the clearing plus a margin). */
 export const PAINT_HALF = 25;
@@ -36,8 +37,7 @@ export class GroundPaint {
   private checkIn = 2;
 
   constructor() {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = SIZE;
+    const canvas = makeCanvas(SIZE, SIZE);
     // CPU-backed: on iOS a GPU canvas must be read back before every upload to WebGL, which stalls.
     this.ctx = canvas.getContext('2d', { willReadFrequently: true })!;
     this.texture = new THREE.DataTexture(this.data, SIZE, SIZE, THREE.RGBAFormat);

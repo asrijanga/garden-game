@@ -462,7 +462,7 @@ function boxGeometry(seed: number): THREE.BufferGeometry {
   const rng = createRng(seed);
   const m = new FlowerMesh();
   const base = new THREE.Vector3();
-  const ico = new THREE.IcosahedronGeometry(0.17, farDetail ? 1 : 3).toNonIndexed();
+  const ico = new THREE.IcosahedronGeometry(0.17, farDetail ? 1 : 3); // (already non-indexed)
   const pos = ico.attributes.position;
   // Soft lumps where the shears missed a bit, and a fine leafy roughness (the same at shared
   // corners, so the surface stays whole).

@@ -1,4 +1,4 @@
-import { CHIMNEYS, DOORS, ROOFS, SHUTTERS, WALLS, type CottageStyle } from '../world/cottage';
+import { CHIMNEYS, DOORS, ROOFS, SHUTTERS, WALLS, type CottageStyle } from '../world/cottageStyle';
 
 type Cycle = 'roof' | 'walls' | 'shutters' | 'door' | 'chimney';
 type Toggle = 'porch' | 'bay' | 'boxes' | 'roses' | 'wisteria' | 'shed' | 'chimes';

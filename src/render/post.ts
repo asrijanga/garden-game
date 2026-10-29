@@ -186,7 +186,8 @@ export class PostFX {
     u.uBloom.value = bloom;
   }
 
-  setSize(width: number, height: number, pixelRatio: number) {
+  /** `screenRatio`: the screen's own pixel ratio (how much the picture will be stretched). */
+  setSize(width: number, height: number, pixelRatio: number, screenRatio: number) {
     const w = Math.round(width * pixelRatio);
     const h = Math.round(height * pixelRatio);
     this.sceneRT.setSize(w, h);
@@ -198,7 +199,7 @@ export class PostFX {
     this.final.uniforms.uAspect.value = width / height;
     this.final.uniforms.uTexel.value.set(1 / w, 1 / h);
     // Sharpen more the more the screen will stretch the picture.
-    const stretch = Math.max(1, (window.devicePixelRatio || 1) / pixelRatio);
+    const stretch = Math.max(1, (screenRatio || 1) / pixelRatio);
     this.final.uniforms.uSharpen.value = Math.min(1.0, 0.45 + (stretch - 1) * 0.6);
   }
 

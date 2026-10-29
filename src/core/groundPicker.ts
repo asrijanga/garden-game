@@ -4,21 +4,16 @@ import * as THREE from 'three';
 export class GroundPicker {
   private readonly ray = new THREE.Raycaster();
   private readonly ndc = new THREE.Vector2();
-  private rect: DOMRect | null = null;
 
   constructor(
     private readonly camera: THREE.Camera,
-    private readonly el: HTMLElement,
+    /** The drawing surface (its size; touches arrive relative to its corner). */
+    private readonly el: { getBoundingClientRect(): { left: number; top: number; width: number; height: number } },
     private readonly heightAt: (x: number, z: number) => number,
-  ) {
-    // Reading the canvas's on-screen rect can force a layout; it only changes on resize.
-    const forget = () => (this.rect = null);
-    window.addEventListener('resize', forget);
-    window.visualViewport?.addEventListener('resize', forget);
-  }
+  ) {}
 
   pick(clientX: number, clientY: number, out = new THREE.Vector3()): THREE.Vector3 | null {
-    const r = (this.rect ??= this.el.getBoundingClientRect());
+    const r = this.el.getBoundingClientRect();
     this.ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
     this.ray.setFromCamera(this.ndc, this.camera);
     const { origin, direction } = this.ray.ray;

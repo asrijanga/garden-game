@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeCanvas } from '../engine/env';
 import { createRng, lerp } from '../core/random';
 import type { Season } from './season';
 
@@ -373,9 +374,7 @@ const FAVOURITES = new Set(['lavender', 'salvia', 'sedum', 'cosmos', 'aster']);
 
 /** One canvas holding every kind's wing (upper side left, underside right), a row each. */
 function atlas(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = CELL * 2;
-  canvas.height = CELL * KINDS.length;
+  const canvas = makeCanvas(CELL * 2, CELL * KINDS.length);
   const c = canvas.getContext('2d')!;
   KINDS.forEach((k, i) => {
     const path = wingPath(k.shape);

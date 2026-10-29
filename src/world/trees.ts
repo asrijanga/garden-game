@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeCanvas } from '../engine/env';
 import { cullers, InstanceCuller } from '../render/cull';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createNoise2D } from '../core/noise';
@@ -37,8 +38,7 @@ interface Archetype {
 /** A clump of little leaves, greyscale so each tree can tint it with its own colour. */
 function leafClusterTexture(rng: Rng): THREE.CanvasTexture {
   const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
+  const canvas = makeCanvas(size, size);
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, size, size);
   const c = size / 2;
@@ -74,8 +74,7 @@ function leafClusterTexture(rng: Rng): THREE.CanvasTexture {
 /** A tuft of needles radiating from a twig. */
 function needleTexture(rng: Rng): THREE.CanvasTexture {
   const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
+  const canvas = makeCanvas(size, size);
   const ctx = canvas.getContext('2d')!;
   ctx.lineCap = 'round';
   for (let twig = 0; twig < 5; twig++) {

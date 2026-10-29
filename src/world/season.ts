@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
@@ -115,4 +114,3 @@ export const PALETTES: Record<Season, SeasonPalette> = {
   },
 };
 
-export const colors = (hexes: string[]) => hexes.map((h) => new THREE.Color(h));
