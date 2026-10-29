@@ -533,6 +533,7 @@ body.picking .sound-hint {
 }
 .book-body {
   overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
   padding: 4px 14px 18px;

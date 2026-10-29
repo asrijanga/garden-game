@@ -78,8 +78,9 @@ for (const type of ['gesturestart', 'gesturechange', 'gestureend', 'dblclick', '
 document.addEventListener(
   'touchmove',
   (e) => {
-    // The flower picker (and the rose colours above it) scroll sideways; everything else stays still.
-    if (!(e.target instanceof Element && e.target.closest('.flower-picker, .colour-bar'))) e.preventDefault();
+    // The flower picker (and the rose colours above it) scroll sideways and the books' pages
+    // scroll up and down; everything else stays perfectly still.
+    if (!(e.target instanceof Element && e.target.closest('.flower-picker, .colour-bar, .book-body'))) e.preventDefault();
   },
   { passive: false },
 );
