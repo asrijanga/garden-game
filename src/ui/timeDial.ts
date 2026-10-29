@@ -44,18 +44,49 @@ export function mountTimeDial(onChange: (p: number) => void, initial = 0.55): nu
     panel.classList.toggle('show');
   });
   panel.addEventListener('pointerdown', (e) => e.stopPropagation());
-  slider.addEventListener('input', () => {
-    p = Number(slider.value) / 1000;
-    show();
-    onChange(p);
-  });
-  slider.addEventListener('change', () => {
+  const save = () => {
     try {
       localStorage.setItem(KEY, String(p));
     } catch {
       // nothing to do
     }
+  };
+  const set = (v: number) => {
+    p = Math.min(1, Math.max(0, v));
+    show();
+    onChange(p);
+  };
+  slider.addEventListener('input', () => set(Number(slider.value) / 1000));
+  slider.addEventListener('change', save);
+  // The dial follows the finger itself: tap anywhere on it to jump there, or slide along it.
+  // (iOS Safari won't drag a native slider here: the page blocks touch scrolling, and a tap on
+  // the track doesn't move the thumb.)
+  const THUMB = 30;
+  let dragging: number | null = null;
+  const seek = (e: PointerEvent) => {
+    const r = slider.getBoundingClientRect();
+    set((e.clientX - r.left - THUMB / 2) / Math.max(1, r.width - THUMB));
+  };
+  slider.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    dragging = e.pointerId;
+    try {
+      slider.setPointerCapture(e.pointerId);
+    } catch {
+      // synthetic pointers can't be captured; moves still arrive while over the dial
+    }
+    seek(e);
   });
+  slider.addEventListener('pointermove', (e) => {
+    if (dragging === e.pointerId) seek(e);
+  });
+  const release = (e: PointerEvent) => {
+    if (dragging !== e.pointerId) return;
+    dragging = null;
+    save();
+  };
+  slider.addEventListener('pointerup', release);
+  slider.addEventListener('pointercancel', release);
   // Tap elsewhere to put the dial away.
   document.addEventListener('pointerdown', (e) => {
     if (!panel.contains(e.target as Node) && e.target !== button) panel.classList.remove('show');

@@ -201,7 +201,7 @@ body {
   overflow-y: hidden;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-x;
+  touch-action: none;
   opacity: 0;
   transform: translateY(12px);
   pointer-events: none;
@@ -235,7 +235,7 @@ body {
   gap: 4px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  touch-action: pan-x;
+  touch-action: none;
 }
 .chip-face {
   position: relative;
@@ -628,7 +628,7 @@ body.picking .sound-hint {
   background: #fffaf0;
   box-shadow: 0 2px 0 #cdb38b, 0 3px 6px rgba(60, 40, 18, 0.25);
   cursor: pointer;
-  touch-action: pan-x;
+  touch-action: none;
   -webkit-tap-highlight-color: transparent;
   transition: transform 0.25s cubic-bezier(0.3, 1.7, 0.5, 1);
 }
@@ -655,7 +655,7 @@ body.picking.choosing-colour .tool-label {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  touch-action: pan-x;
+  touch-action: none;
   z-index: 9;
   opacity: 0;
   pointer-events: none;
@@ -759,7 +759,7 @@ body.picking.choosing-colour .tool-label {
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
-  touch-action: pan-x;
+  touch-action: none;
 }
 .time-slider::-webkit-slider-runnable-track {
   height: 12px;
