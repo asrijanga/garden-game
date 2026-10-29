@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Perch } from './perchingBirds';
 import type { NightLight } from './nightMagic';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import type { WindField } from '../render/wind';
 import type { SeasonPalette } from './season';
@@ -417,6 +418,7 @@ export class Cottage {
       this.chimeSet = set;
     }
 
+    this.merge();
     g.traverse((o) => {
       if (o instanceof THREE.Mesh) {
         o.castShadow = true;
@@ -425,6 +427,76 @@ export class Cottage {
     });
     g.updateMatrixWorld(true);
     this.smoke.moveTo(g.localToWorld(new THREE.Vector3(chimX, smokeY, -0.55)));
+  }
+
+  /**
+   * The cottage is built from a couple of hundred little pieces, but nothing in it moves (bar the
+   * chimes): pieces that look the same are merged into one mesh, so it costs a handful of draw
+   * calls rather than 150.
+   */
+  private merge() {
+    const g = this.group;
+    g.updateMatrixWorld(true);
+    const toLocal = new THREE.Matrix4().copy(g.matrixWorld).invert();
+    const keep = this.chimeSet?.group;
+    const pieces: THREE.Mesh[] = [];
+    g.traverse((o) => {
+      if (!(o instanceof THREE.Mesh) || Array.isArray(o.material)) return;
+      for (let p: THREE.Object3D | null = o; p; p = p.parent) if (p === keep) return;
+      pieces.push(o);
+    });
+    const buckets = new Map<string, { mat: THREE.MeshLambertMaterial; geos: THREE.BufferGeometry[] }>();
+    const used = new Set<THREE.Material>();
+    const m = new THREE.Matrix4();
+    for (const piece of pieces) {
+      const mat = piece.material as THREE.MeshLambertMaterial;
+      // The window glass and lamp keep their own materials (they brighten at night).
+      const key =
+        mat === this.glassMat || mat === this.lampMat
+          ? mat.uuid
+          : [mat.type, mat.color.getHex(), mat.emissive.getHex(), mat.emissiveIntensity, mat.side, mat.transparent, mat.opacity, mat.vertexColors, mat.flatShading, mat.map?.uuid].join('|');
+      if (!buckets.has(key)) buckets.set(key, { mat, geos: [] });
+      used.add(buckets.get(key)!.mat);
+      const geo = piece.geometry.index ? piece.geometry.toNonIndexed() : piece.geometry.clone();
+      for (const name of Object.keys(geo.attributes)) {
+        if (name !== 'position' && name !== 'normal' && !(name === 'color' && mat.vertexColors) && !(name === 'uv' && mat.map)) geo.deleteAttribute(name);
+      }
+      if (!geo.attributes.normal) geo.computeVertexNormals();
+      m.multiplyMatrices(toLocal, piece.matrixWorld);
+      geo.applyMatrix4(m);
+      // A mirrored piece turns inside out once baked: wind its triangles the other way.
+      if (m.determinant() < 0) {
+        for (const a of Object.values(geo.attributes)) {
+          const k = a.itemSize;
+          const arr = a.array;
+          for (let t = 0; t < a.count; t += 3) {
+            for (let c = 0; c < k; c++) {
+              const i1 = (t + 1) * k + c;
+              const i2 = (t + 2) * k + c;
+              const tmp = arr[i1];
+              arr[i1] = arr[i2];
+              arr[i2] = tmp;
+            }
+          }
+        }
+      }
+      buckets.get(key)!.geos.push(geo);
+      piece.geometry.dispose();
+      piece.removeFromParent();
+    }
+    for (const piece of pieces) {
+      const mat = piece.material as THREE.Material;
+      if (!used.has(mat)) mat.dispose();
+    }
+    for (const { mat, geos } of buckets.values()) {
+      const merged = mergeGeometries(geos);
+      if (!merged) {
+        for (const geo of geos) g.add(new THREE.Mesh(geo, mat)); // (can't happen; just in case)
+        continue;
+      }
+      for (const geo of geos) geo.dispose();
+      g.add(new THREE.Mesh(merged, mat));
+    }
   }
 
   /** Ground point just in front of the doorstep, where garden paths should arrive. */

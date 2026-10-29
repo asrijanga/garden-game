@@ -24,6 +24,7 @@ import { mountWeatherPicker } from './ui/weatherPicker';
 import { clearAddress, linkFor, packGarden, sharedInAddress, unpackGarden } from './game/share';
 import { mountVisitBanner } from './ui/visitBanner';
 import { mountAdmire } from './ui/admire';
+import { cullers, GardenBounds, View } from './render/cull';
 import { TimeOfDay } from './world/timeOfDay';
 import { mountTimeDial } from './ui/timeDial';
 import { GroundPaint } from './world/groundPaint';
@@ -763,6 +764,8 @@ const weather = new Weather(!!palette.snowy);
 scene.add(weather.group);
 let dayTime = 0.55;
 const weatherWind = new THREE.Vector2();
+const lastSun = new THREE.Vector3(Infinity, 0, 0);
+let sunMoved = false;
 const applyTime = (p: number) => {
   dayTime = p;
   const l = timeOfDay.light(p);
@@ -770,6 +773,12 @@ const applyTime = (p: number) => {
   sun.color.copy(l.sun);
   sun.intensity = l.sunIntensity;
   sun.position.copy(l.sunDir).multiplyScalar(60);
+  // The shadow map only holds depth: it needs redrawing when the sun moves, not when the light
+  // merely changes colour (weather sweeping in, dusk tints).
+  if (sun.position.distanceToSquared(lastSun) > 1e-4) {
+    lastSun.copy(sun.position);
+    sunMoved = true;
+  }
   hemi.color.copy(l.sky);
   hemi.groundColor.copy(l.ground);
   hemi.intensity = l.skyIntensity;
@@ -786,9 +795,8 @@ const applyTime = (p: number) => {
   night.setNight(l.night, dark);
   props.setNight(l.night);
   cottage.setNight(l.night);
-  renderer.shadowMap.needsUpdate = true;
 };
-if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, paint, petals, seasonFx, night, weather, renderer, scene, fences, fenceBuilder, boulders, props, edgePlants });
+if (debug) Object.assign(window, { ambience, wind, flyingBirds, paths, toolbar, flowerBrush, flowers, bees, rig, stones, ponds, pondBrush, fish, pondPlants, splash, eraser, wildflowers, meadow, perchingBirds, butterflies, dragonflies, vines, cottage, bunnies, ducks, hummingbirds, paint, petals, seasonFx, night, weather, renderer, scene, camera, THREE, cullers, fences, fenceBuilder, boulders, props, edgePlants });
 tools = new ToolController(
   canvas,
   toolbar,
@@ -1149,6 +1157,8 @@ void rebuild();
 
 // --- Loop -----------------------------------------------------------------------------------
 const timer = new THREE.Timer();
+const view = new View();
+const gardenBounds = new GardenBounds([flowers.group, stones.group, edgePlants.group, fences.group, vines.group, boulders.group, props.group, pondPlants.group]);
 let shadowAge = 0;
 let wasSettling = false;
 let elapsed = 0;
@@ -1238,11 +1248,22 @@ function frame(time: number) {
   // redrawn a few times a second rather than every frame, then once more when all is still.
   const settling = stones.busy || pondPlants.busy || fences.busy || boulders.busy || props.busy;
   shadowAge += dt;
-  if ((settling && shadowAge > 0.12) || (wasSettling && !settling)) {
+  if (((settling || sunMoved) && shadowAge > 0.12) || (wasSettling && !settling)) {
     renderer.shadowMap.needsUpdate = true;
+    sunMoved = false;
     shadowAge = 0;
   }
   wasSettling = settling;
+  // Only what's in view is drawn (trees, ferns, the meadow), except that a shadow redraw needs
+  // every tree: those just off screen still cast shadows onto it.
+  view.update(camera, rig.distance);
+  gardenBounds.update();
+  flowers.updateDetail(camera.position);
+  const shadows = renderer.shadowMap.needsUpdate;
+  for (const c of cullers) {
+    if (shadows && c.casts) c.showAll();
+    else c.update(view);
+  }
   post.render(dt);
 }
 

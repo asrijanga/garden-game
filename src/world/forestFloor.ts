@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { cullers, InstanceCuller } from '../render/cull';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
@@ -133,5 +134,7 @@ export function createForestFloor(ground: Ground, season: Season, seed: number, 
     const mesh = shrooms[Math.floor(rng() * shrooms.length)];
     if (mesh.count < 24) mesh.setMatrixAt(mesh.count++, m);
   }
+  // Only those in view are drawn.
+  for (const mesh of [...ferns, ...shrooms]) if (mesh.count) cullers.push(new InstanceCuller([mesh], mesh.count, mesh.count));
   return group;
 }

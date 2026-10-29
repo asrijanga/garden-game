@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { touch } from '../render/touch';
+import { cullers, InstanceCuller } from '../render/cull';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createNoise2D } from '../core/noise';
 import { createRng, lerp } from '../core/random';
@@ -60,7 +60,7 @@ function clumpGeometry(rng: Rng, kind: 'disc' | 'cup' | 'bell' | 'spray'): THREE
       }
     } else {
       for (let b = 0; b < 4; b++) {
-        const dot = new THREE.IcosahedronGeometry(0.012, 0).translate(top.x + (rng() - 0.5) * 0.04, top.y + (rng() - 0.5) * 0.02, top.z + (rng() - 0.5) * 0.04);
+        const dot = new THREE.OctahedronGeometry(0.012, 0).translate(top.x + (rng() - 0.5) * 0.04, top.y + (rng() - 0.5) * 0.02, top.z + (rng() - 0.5) * 0.04);
         parts.push(colored(dot, white));
       }
     }
@@ -100,6 +100,7 @@ export class Meadow {
   readonly group = new THREE.Group();
   private readonly sites: Site[] = [];
   private readonly changing = new Set<number>();
+  private readonly cullers = new Map<THREE.InstancedMesh, InstanceCuller>();
   private cursor = 0;
   /** How many sites (in growth order) are allowed to bloom so far. */
   grown = 0;
@@ -159,7 +160,13 @@ export class Meadow {
       this.sites.push({ x: r.x, z: r.z, mesh, index, m, scale: 0, want: 0 });
       mesh.setMatrixAt(index, this.m.makeScale(0, 0, 0));
     }
-    for (const mesh of meshes) if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    for (const mesh of meshes) {
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      // Only the clumps that have come up, and are in view, are drawn.
+      const c = new InstanceCuller([mesh], SITES, mesh.count, [mesh]);
+      this.cullers.set(mesh, c);
+      cullers.push(c);
+    }
   }
 
   /** Pick up where the meadow was (its growth is remembered across visits, not in the save). */
@@ -180,10 +187,9 @@ export class Meadow {
   }
 
   private write(s: Site) {
-    const k = Math.max(0.0001, s.scale);
+    const k = s.scale;
     this.m.copy(s.m).multiply(this.sc.makeScale(k, k, k));
-    s.mesh.setMatrixAt(s.index, this.m);
-    touch(s.mesh.instanceMatrix, s.index);
+    this.cullers.get(s.mesh)!.setMatrix(s.index, this.m);
   }
 
   /** Mow it all down: every clump shrinks back into the lawn (and it starts over from nothing). */

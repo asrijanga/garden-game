@@ -7,6 +7,8 @@ import type { FlowerSpecies } from './flowerSpecies';
 const VARIANTS = 5; // geometry variants per species (plus per-plant scale, yaw, colour)
 const CAPACITY = 1500; // plants per variant
 const FOLIAGE_VARIANTS = 3;
+/** Beyond this distance (metres) plants are drawn with their simpler, far-off geometry. */
+const FAR_DETAIL = 45;
 const FOLIAGE_CAPACITY = 4000;
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -112,12 +114,32 @@ class FlowerMesh {
   }
 }
 
+/**
+ * While set, plants are built with less detail (fewer petal rows, thinner stems) for when
+ * they're seen from far off. The shapes come out the same: the same seed makes the same plant.
+ */
+let farDetail = false;
+
+/** Builds a plant's geometry twice: in full, and simplified for when it's far away. */
+function withFar(build: () => THREE.BufferGeometry): [THREE.BufferGeometry, THREE.BufferGeometry] {
+  const near = build();
+  farDetail = true;
+  try {
+    const far = build();
+    far.userData = { ...near.userData };
+    return [near, far];
+  } finally {
+    farDetail = false;
+  }
+}
+
 const STEM = new THREE.Color('#4f8a3a');
 const LEAF = new THREE.Color('#5f9a42');
 const WHITE = new THREE.Color('#ffffff');
 
 function stem(m: FlowerMesh, height: number, lean: THREE.Vector3, rng: () => number, withLeaves = true) {
-  const segs = 4;
+  const segs = farDetail ? 2 : 4;
+  const sides = farDetail ? 3 : 4;
   const r0 = 0.0055;
   const pts: THREE.Vector3[] = [];
   for (let i = 0; i <= segs; i++) {
@@ -129,9 +151,9 @@ function stem(m: FlowerMesh, height: number, lean: THREE.Vector3, rng: () => num
     const b = pts[i + 1];
     const ra = r0 * (1 - (i / segs) * 0.4);
     const rb = r0 * (1 - ((i + 1) / segs) * 0.4);
-    for (let k = 0; k < 4; k++) {
-      const a0 = (k / 4) * Math.PI * 2;
-      const a1 = ((k + 1) / 4) * Math.PI * 2;
+    for (let k = 0; k < sides; k++) {
+      const a0 = (k / sides) * Math.PI * 2;
+      const a1 = ((k + 1) / sides) * Math.PI * 2;
       const o = (ang: number, r: number) => new THREE.Vector3(Math.cos(ang) * r, 0, Math.sin(ang) * r);
       const n = o((a0 + a1) / 2, 1);
       m.tri(a.clone().add(o(a0, ra)), b.clone().add(o(a1, rb)), b.clone().add(o(a0, rb)), { n, color: STEM });
@@ -226,6 +248,24 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
     const face = blotch > 0 ? lerp(1 - blotch, 1, Math.min(1, Math.max(0, (t - 0.12) / 0.38))) : 1;
     return lerp(0.74, 0.98, Math.pow(t, 0.7)) * (1 - edge * 0.06) * face;
   };
+  if (farDetail) {
+    // Seen from afar: the same outline in four rows and no crease (6 triangles, not 24), a
+    // touch wider so the bloom covers the same area.
+    const few = [rows[0], rows[2], rows[4], rows[6]];
+    for (let i = 0; i < few.length - 1; i++) {
+      const t0 = few[i][0];
+      const t1 = few[i + 1][0];
+      const w0 = few[i][1] * 1.08;
+      const w1 = few[i + 1][1] * 1.08;
+      const l0 = at(t0, -w0);
+      const r0 = at(t0, w0);
+      const l1 = at(t1, -w1);
+      const r1 = at(t1, w1);
+      m.tri(l0, l1, r1, opts([shadeAt(t0, 0.5), shadeAt(t1, 0.5), shadeAt(t1, 0.5)], [t0, t1, t1]));
+      m.tri(l0, r1, r0, opts([shadeAt(t0, 0.5), shadeAt(t1, 0.5), shadeAt(t0, 0.5)], [t0, t1, t0]));
+    }
+    return;
+  }
   for (let i = 0; i < rows.length - 1; i++) {
     const [t0, w0] = rows[i];
     const [t1, w1] = rows[i + 1];
@@ -422,7 +462,7 @@ function boxGeometry(seed: number): THREE.BufferGeometry {
   const rng = createRng(seed);
   const m = new FlowerMesh();
   const base = new THREE.Vector3();
-  const ico = new THREE.IcosahedronGeometry(0.17, 3).toNonIndexed();
+  const ico = new THREE.IcosahedronGeometry(0.17, farDetail ? 1 : 3).toNonIndexed();
   const pos = ico.attributes.position;
   // Soft lumps where the shears missed a bit, and a fine leafy roughness (the same at shared
   // corners, so the surface stays whole).
@@ -1226,6 +1266,25 @@ export class Flowers {
   private readonly q = new THREE.Quaternion();
 
   private readonly material: THREE.MeshLambertMaterial;
+  private readonly lodMeshes: THREE.InstancedMesh[] = [];
+
+  /**
+   * Plants far from the camera are drawn with their simpler geometry: at that distance a petal
+   * is a few pixels long, and its fine shape can't be seen. Decided per mesh, by its nearest
+   * plant (so a mesh with any plant up close stays detailed).
+   */
+  updateDetail(camera: THREE.Vector3) {
+    for (const mesh of this.lodMeshes) {
+      if (mesh.count === 0) continue;
+      if (!mesh.boundingSphere) mesh.computeBoundingSphere();
+      const b = mesh.boundingSphere!;
+      const d = camera.distanceTo(b.center) - b.radius;
+      const { near, far } = mesh.userData.lod as { near: THREE.BufferGeometry; far: THREE.BufferGeometry };
+      // A little give either way, so a mesh at the threshold doesn't flicker between the two.
+      if (mesh.geometry === near && d > FAR_DETAIL + 2) mesh.geometry = far;
+      else if (mesh.geometry === far && d < FAR_DETAIL - 2) mesh.geometry = near;
+    }
+  }
 
   constructor(
     private readonly species: FlowerSpecies[],
@@ -1296,7 +1355,7 @@ export class Flowers {
     );
 
     for (let v = 0; v < FOLIAGE_VARIANTS; v++) {
-      this.foliage.push(this.makeMesh(foliageGeometry(500 + v * 31), material, FOLIAGE_CAPACITY));
+      this.foliage.push(this.makeMesh(withFar(() => foliageGeometry(500 + v * 31)), material, FOLIAGE_CAPACITY));
     }
 
     this.material = material;
@@ -1311,20 +1370,24 @@ export class Flowers {
     if (!list) {
       const si = this.species.indexOf(sp);
       list = [];
-      for (let v = 0; v < VARIANTS; v++) list.push(this.makeMesh(flowerGeometry(sp, 1000 + si * 97 + v * 13), this.material, CAPACITY));
+      for (let v = 0; v < VARIANTS; v++) list.push(this.makeMesh(withFar(() => flowerGeometry(sp, 1000 + si * 97 + v * 13)), this.material, CAPACITY));
       this.meshes.set(sp.id, list);
     }
     return list;
   }
 
-  private makeMesh(geo: THREE.BufferGeometry, material: THREE.Material, capacity: number): THREE.InstancedMesh {
+  private makeMesh([geo, far]: [THREE.BufferGeometry, THREE.BufferGeometry], material: THREE.Material, capacity: number): THREE.InstancedMesh {
     // Birth time and how far it blooms, together (x, y).
     const life = new Float32Array(capacity * 2);
     for (let i = 0; i < capacity; i++) life[i * 2] = 1e6;
     geo.setAttribute('aLife', new THREE.InstancedBufferAttribute(life, 2));
     geo.setAttribute('aPetalColor', new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
     geo.setAttribute('aEdgeColor', new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
+    // The far version shares the plants themselves (when they were planted, their colours).
+    for (const name of ['aLife', 'aPetalColor', 'aEdgeColor']) far.setAttribute(name, geo.getAttribute(name));
     const mesh = new THREE.InstancedMesh(geo, material, capacity);
+    mesh.userData.lod = { near: geo, far };
+    this.lodMeshes.push(mesh);
     mesh.count = 0;
     mesh.visible = false;
     mesh.frustumCulled = false;
@@ -1341,7 +1404,7 @@ export class Flowers {
     if (kind === 'clump') return this.plantFoliage(x, y, z, yaw, scale, delay, color);
     let list = this.leaves.get(kind);
     if (!list) {
-      list = [0, 1, 2].map((v) => this.makeMesh(leafGeometry(kind, 2000 + LEAF_KINDS.indexOf(kind) * 101 + v * 17), this.material, 1500));
+      list = [0, 1, 2].map((v) => this.makeMesh(withFar(() => leafGeometry(kind, 2000 + LEAF_KINDS.indexOf(kind) * 101 + v * 17)), this.material, 1500));
       this.leaves.set(kind, list);
     }
     const mesh = list[Math.floor(this.rng() * list.length)];

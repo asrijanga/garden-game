@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { cullers, InstanceCuller } from '../render/cull';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createNoise2D } from '../core/noise';
 import { createRng, lerp, smoothstep } from '../core/random';
@@ -491,17 +492,26 @@ export function createForest(ground: Ground, palette: SeasonPalette, season: Sea
     sp.archetypes.forEach((arch, a) => {
       const inst = perArchetype[a];
       if (!inst.matrices.length) return;
+      const meshes: THREE.InstancedMesh[] = [];
+      const leafy: THREE.InstancedMesh[] = [];
       for (const part of arch.parts) {
         const mesh = new THREE.InstancedMesh(part.geometry, mats[part.kind], inst.matrices.length);
         inst.matrices.forEach((mat, i) => {
           mesh.setMatrixAt(i, mat);
           mesh.setColorAt(i, part.kind === 'wood' ? sp.bark : inst.foliage[i]);
         });
+        // The leafy parts all take the same colours, so they share one colour buffer.
+        if (part.kind !== 'wood') {
+          if (leafy.length) mesh.instanceColor = leafy[0].instanceColor;
+          leafy.push(mesh);
+        }
         mesh.castShadow = isNear;
         mesh.receiveShadow = true;
-        mesh.frustumCulled = false;
+        meshes.push(mesh);
         group.add(mesh);
       }
+      // Only the trees in view are drawn.
+      cullers.push(new InstanceCuller(meshes, inst.matrices.length, inst.matrices.length, leafy.slice(0, 1)));
     });
   }
   return group;
