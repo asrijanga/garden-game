@@ -96,6 +96,9 @@ export class Dragonflies {
   private readonly flies: Dragonfly[] = [];
   private readonly rng = createRng(31337);
   private spawnIn = 3;
+  /** How active they are right now (0 at night or in heavy rain … 1), set from the time and weather. */
+  activity = 1;
+
   private time = 0;
   private readonly enabled: boolean;
 
@@ -107,7 +110,7 @@ export class Dragonflies {
   }
 
   private aim(f: Dragonfly) {
-    const p = this.ponds.pointOn(f.body, this.rng);
+    const p = this.activity > 0.4 ? this.ponds.pointOn(f.body, this.rng) : null;
     if (!p) {
       f.leaving = true;
       f.to.copy(f.pos).add(new THREE.Vector3((this.rng() - 0.5) * 16, 5, (this.rng() - 0.5) * 16));
@@ -128,7 +131,7 @@ export class Dragonflies {
     this.time += dt;
     const bodies = this.enabled ? this.ponds.bodies() : [];
     // One per pond (two on a second visit), up to four.
-    const want = Math.min(4, bodies.length * (this.time > 60 ? 2 : 1));
+    const want = this.activity > 0.4 ? Math.min(4, bodies.length * (this.time > 60 ? 2 : 1)) : 0;
     this.spawnIn -= dt;
     if (this.flies.filter((f) => !f.leaving).length < want && this.spawnIn <= 0) {
       this.spawnIn = lerp(4, 10, this.rng());

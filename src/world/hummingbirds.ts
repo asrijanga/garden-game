@@ -106,6 +106,9 @@ export class Hummingbirds {
   private readonly birds: Hummer[] = [];
   private readonly rng = createRng(4747);
   private spawnIn = 8;
+  /** How active they are right now (0 at night or in heavy rain … 1), set from the time and weather. */
+  activity = 1;
+
   private time = 0;
   private readonly cap: number;
   private readonly v = new THREE.Vector3();
@@ -198,7 +201,7 @@ export class Hummingbirds {
   update(dt: number) {
     this.time += dt;
     const beds = this.world.beds().length;
-    const want = beds >= 6 ? Math.min(this.cap, 1 + Math.floor(beds / 90)) : 0;
+    const want = beds >= 6 && this.activity > 0.4 ? Math.min(this.cap, 1 + Math.floor(beds / 90)) : 0;
     this.spawnIn -= dt;
     if (this.birds.length < want && this.spawnIn <= 0) {
       this.spawnIn = lerp(10, 30, this.rng());
@@ -277,6 +280,8 @@ export class Hummingbirds {
       return;
     }
     h.visits--;
+    // Dusk, nightfall or rain: off home after this flower.
+    if (this.activity < 0.4) h.visits = 0;
     const r = this.rng();
     const other = this.birds.find((o) => o !== h && o.state !== 'leaving' && !o.rival && o.pos.distanceTo(h.pos) < 5);
     if (h.visits <= 0) {

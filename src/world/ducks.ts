@@ -311,6 +311,9 @@ export class Ducks {
     return true;
   }
 
+  /** How lively they are: dozing at night, perky in the rain (set from the time and weather). */
+  activity = 1;
+
   update(dt: number) {
     this.time += dt;
     // Now and then, a family finds a big enough pond that hasn't got one.
@@ -318,15 +321,16 @@ export class Ducks {
     if (this.check <= 0) {
       this.check = lerp(20, 45, this.rng());
       const free = this.world.ponds().filter((p) => p.cells >= MIN_POND_CELLS && !this.families.some((f) => f.body === p.id));
-      if (free.length && this.rng() < 0.6) this.arrive(free[Math.floor(this.rng() * free.length)].id);
+      if (free.length && this.activity > 0.5 && this.rng() < 0.6) this.arrive(free[Math.floor(this.rng() * free.length)].id);
     }
     // The odd soft quack when you're close by.
     this.ambient -= dt;
     if (this.ambient <= 0) {
-      this.ambient = lerp(18, 40, this.rng());
+      // Chattier in the rain (ducks love it); quiet while they sleep at night.
+      this.ambient = lerp(18, 40, this.rng()) / Math.max(0.3, this.activity);
       const cam = this.world.camera();
       const near = this.all.filter((d) => d.mode === 'swim' && d.root.position.distanceTo(cam) < 14);
-      if (near.length) this.world.quack(near[0].root.position.clone(), near[0].chick);
+      if (near.length && this.activity >= 0.4) this.world.quack(near[0].root.position.clone(), near[0].chick);
     }
     for (let i = this.families.length - 1; i >= 0; i--) {
       const f = this.families[i];
@@ -420,7 +424,8 @@ export class Ducks {
     }
     // --- Swimming ---
     let goal: THREE.Vector2;
-    let speed = d.chick ? 0.4 : 0.28;
+    // Asleep at night: barely drifting.
+    let speed = (d.chick ? 0.4 : 0.28) * Math.min(1, Math.max(0.2, this.activity));
     if (d.chick && d.ahead) {
       // Keep station a little behind the one ahead (huddled close when mother dozes).
       const a = d.ahead;

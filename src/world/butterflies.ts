@@ -487,6 +487,9 @@ export class Butterflies {
   private readonly flies: Fly[] = [];
   private readonly rng = createRng(777);
   private spawnIn = 3;
+  /** How active they are right now (0 at night or in heavy rain … 1), set from the time and weather. */
+  activity = 1;
+
   private time = 0;
   private readonly kinds: number[];
   private readonly wings: THREE.InstancedMesh;
@@ -685,7 +688,7 @@ export class Butterflies {
   update(dt: number) {
     this.time += dt;
     this.uniforms.uFlyTime.value = this.time;
-    const want = this.wanted();
+    const want = Math.floor(this.wanted() * this.activity + 0.3);
     this.spawnIn -= dt;
     if (this.flies.length < want && this.spawnIn <= 0) {
       this.spawnIn = lerp(2, 7, this.rng());

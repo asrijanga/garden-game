@@ -32,9 +32,9 @@ import { Dust } from './world/dust';
 import { PathBuilder } from './game/pathBuilder';
 import { FlowerBrush, type PlantAmount } from './game/flowerBrush';
 import { Flowers } from './world/flowers';
-import { SPECIES } from './world/flowerSpecies';
+import { MIX_ID, SPECIES, WATER_MIX_ID } from './world/flowerSpecies';
 import { FlowerBook } from './ui/flowerBook';
-import { FlowerPicker } from './ui/flowerPicker';
+import { FlowerPicker, icon } from './ui/flowerPicker';
 import { Bees } from './world/bees';
 import { Ponds, createPondTexture } from './world/pond';
 import { PondPlants } from './world/pondPlants';
@@ -445,7 +445,15 @@ picker.onAmount = () => {
 };
 flowerBrush.onPlace = (_x, _z, water) => (water ? ambience.plop(0.3) : ambience.pat());
 // The flower book: every species to browse, blooming-now first.
-const flowerBook = new FlowerBook(SPECIES, season, (id) => picker.pick(id));
+const flowerBook = new FlowerBook('Flower book', SPECIES.filter((s) => s.form.kind !== 'foliage'), season, (id) => picker.pick(id), [
+  { id: MIX_ID, name: 'Seasonal mix', art: icon(null), note: 'what’s blooming' },
+  { id: WATER_MIX_ID, name: 'Water mix', art: icon(null, true), note: 'for ponds' },
+]);
+const foliageBook = new FlowerBook('Foliage book', SPECIES.filter((s) => s.form.kind === 'foliage'), season, (id) => picker.pick(id));
+picker.onFoliage = () => {
+  ambience.tap(1.1);
+  foliageBook.setVisible(true);
+};
 picker.onBook = () => {
   ambience.tap(1.1);
   flowerBook.setVisible(true);
@@ -1172,6 +1180,23 @@ function frame(time: number) {
     if (weather.update(dt, camera, rig.target, weatherWind.set(wind.direction.x, wind.direction.y).multiplyScalar(0.3 + wind.sample(rig.target.x, rig.target.z) * 0.7))) applyTime(dayTime);
     ambience.setRain(weather.raining);
     ambience.setMood({ time: dayTime, night: Math.min(1, Math.max(0, (dayTime - 0.78) / 0.22)), rain: weather.raining, wet: weather.wetness, ponds: ponds.bodies.size > 0 });
+    // Creatures keep the hours (and the weather) real ones would.
+    {
+      const sm = THREE.MathUtils.smoothstep;
+      const rain = weather.raining;
+      const dark = sm(dayTime, 0.8, 0.92);
+      const dawn = 1 - sm(dayTime, 0.05, 0.3);
+      // Insects need warmth and light: out from mid-morning to early evening, never in rain.
+      const insects = sm(dayTime, 0.06, 0.25) * (1 - sm(dayTime, 0.7, 0.84)) * (1 - rain);
+      bees.activity = butterflies.activity = hummingbirds.activity = dragonflies.activity = insects;
+      // Birds: busiest at dawn, quieter in rain, roosting at night.
+      perchingBirds.activity = flyingBirds.activity = (1 - dark) * (1 + 0.6 * dawn) * (1 - 0.8 * rain);
+      // Bunnies: out most at dawn and dusk, a few by day, hardly at night, never in rain.
+      const twilight = Math.max(dawn, sm(dayTime, 0.6, 0.74) * (1 - sm(dayTime, 0.86, 0.95)));
+      bunnies.activity = (0.55 + 0.45 * twilight) * (1 - 0.8 * dark) * (1 - rain);
+      // Ducks doze at night and perk up in the rain.
+      ducks.activity = (1 - 0.8 * dark) * (1 + 0.4 * rain);
+    }
     perchingBirds.update(dt);
     butterflies.update(dt);
     dragonflies.update(dt);

@@ -135,6 +135,8 @@ export class PerchingBirds {
   private readonly birds: Bird[] = [];
   private readonly rng = createRng(4242);
   private spawnIn = 4;
+  /** How lively the birds are (a dawn chorus brings more; dusk fewer; none at night or in heavy rain). */
+  activity = 1;
   private time = 0;
   private readonly v = new THREE.Vector3();
 
@@ -169,7 +171,7 @@ export class PerchingBirds {
     const list = this.perches();
     const built = list.filter((p) => !p.ground).length;
     // A bird or two on an empty lawn; more as there's more to sit on.
-    const want = Math.min(6, 1 + Math.floor(built / 5));
+    const want = Math.floor(Math.min(8, (1 + Math.floor(built / 5)) * this.activity) + 0.3);
     this.spawnIn -= dt;
     if (this.spawnIn <= 0) {
       this.spawnIn = lerp(4, 12, this.rng());
@@ -238,7 +240,8 @@ export class PerchingBirds {
 
   private perched(b: Bird, dt: number, list: Perch[]) {
     const perch = b.perch!;
-    b.stay -= dt;
+    // Night falling or rain setting in: they don't linger.
+    b.stay -= dt * (this.activity < 0.3 ? 6 : 1);
     if (!perch.alive()) {
       this.leave(b); // startled: its perch is gone
       return;

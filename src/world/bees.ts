@@ -88,6 +88,9 @@ export class Bees {
   private readonly rng = createRng(909);
   private time = 0;
   private spawnIn = 2;
+  /** How active they are right now (0 at night or in heavy rain … 1), set from the time and weather. */
+  activity = 1;
+
 
   constructor(
     private readonly openBlooms: () => THREE.Vector3[],
@@ -142,7 +145,7 @@ export class Bees {
     this.time += dt;
     const blooms = this.openBlooms();
     // About one bee per 25 open blooms, up to eight.
-    const want = blooms.length ? Math.min(MAX_BEES, 1 + Math.floor(blooms.length / 25)) : 0;
+    const want = blooms.length ? Math.floor(Math.min(MAX_BEES, 1 + Math.floor(blooms.length / 25)) * this.activity + 0.3) : 0;
     this.spawnIn -= dt;
     if (this.bees.length < want && this.spawnIn <= 0) {
       this.spawn(blooms);

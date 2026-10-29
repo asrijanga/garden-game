@@ -170,17 +170,29 @@ const AMOUNT_ICONS: Record<'drift' | 'clump' | 'one', [string, string]> = {
   one: [`<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 33V19" stroke="#5f8a3e" stroke-width="2.2" stroke-linecap="round"/><path d="M20 27c-4-1-6-4-6-6 3 0 5 2 6 6z" fill="#6aa548"/>${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="20" cy="11" rx="3.2" ry="5" fill="#e88aa8" transform="rotate(${a} 20 16)"/>`).join('')}<circle cx="20" cy="16" r="2.8" fill="#f6d36a"/></svg>`, 'One'],
 };
 
+const LEAF_BOOK_ICON = `<svg viewBox="0 0 40 40" aria-hidden="true">
+  <path d="M6 10c5-2 10-2 14 1v21c-4-3-9-3-14-1z" fill="#c9d9a8" stroke="#5f7f43" stroke-width="1.2"/>
+  <path d="M34 10c-5-2-10-2-14 1v21c4-3 9-3 14-1z" fill="#d8e4bc" stroke="#5f7f43" stroke-width="1.2"/>
+  <path d="M13 26c-3-5-1-10 3-12 1 5-1 9-3 12zM27 27c-1-6 2-10 5-11 0 5-2 9-5 11z" fill="#5f9a3e"/><path d="M24 28c1-5 0-8-2-10" stroke="#6f9a48" stroke-width="1.2" fill="none"/>
+</svg>`;
+
+/**
+ * The Flowers tool's three chips: how much each touch plants (drift, clump or one), the flower
+ * book (every flower and the mixes), and the foliage book (grasses, ferns, hostas and friends).
+ * The book chips show what's chosen; roses get a row of colour swatches above.
+ */
 export class FlowerPicker {
   private readonly el: HTMLDivElement;
-  private readonly chips = new Map<string, HTMLButtonElement>();
   private readonly blooming = new Set<string>();
-  private readonly kept = new Set<string>();
+  private readonly flowerChip: HTMLButtonElement;
+  private readonly leafChip: HTMLButtonElement;
   private readonly colours: HTMLDivElement;
   private readonly coloursBar: HTMLDivElement;
   /** The colour chosen for each species with a colour choice (-1: mixed). */
   private readonly colour = new Map<string, number>();
-  /** Opens the flower book (set by whoever owns it). */
+  /** Opens the flower book, or the foliage book (set by whoever owns them). */
   onBook: () => void = () => {};
+  onFoliage: () => void = () => {};
   /** The amount chip was tapped: move on to the next amount (drift → clump → one). */
   onAmount: () => void = () => {};
   private readonly amountChip: HTMLButtonElement;
@@ -196,47 +208,25 @@ export class FlowerPicker {
     const row = document.createElement('div');
     row.className = 'flower-picker-row';
     this.el.append(row);
-    const book = document.createElement('button');
-    book.type = 'button';
-    book.className = 'flower-chip book-chip';
-    book.setAttribute('aria-label', 'Flower book');
-    book.innerHTML = `<span class="chip-face">${BOOK_ICON}</span><span class="chip-name">Flower book</span>`;
-    book.addEventListener('pointerdown', (e) => e.stopPropagation());
-    book.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.onBook();
-    });
-    // How much each touch plants, first in the row: a drift, a clump, or one flower.
-    this.amountChip = document.createElement('button');
-    this.amountChip.type = 'button';
-    this.amountChip.className = 'flower-chip amount-chip';
-    this.amountChip.addEventListener('pointerdown', (e) => e.stopPropagation());
-    this.amountChip.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.onAmount();
-    });
-    this.setAmount('drift');
-    row.append(this.amountChip, book);
-    const entries: [string, string, FlowerSpecies | null, boolean][] = [
-      [MIX_ID, 'Seasonal mix', null, true],
-      [WATER_MIX_ID, 'Water mix', null, true],
-      ...species.map((s) => [s.id, s.name, s, inSeason(s)] as [string, string, FlowerSpecies, boolean]),
-    ];
-    for (const [id, label, sp, blooming] of entries) {
-      if (blooming) this.blooming.add(id);
+    const chip = (cls: string, label: string, act: () => void) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'flower-chip' + (blooming ? ' blooming' : ' resting');
+      b.className = `flower-chip ${cls}`;
       b.setAttribute('aria-label', label);
-      b.innerHTML = `<span class="chip-face">${icon(sp, id === WATER_MIX_ID)}</span><span class="chip-name">${label}</span>`;
       b.addEventListener('pointerdown', (e) => e.stopPropagation());
       b.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.pick(id);
+        act();
       });
-      this.chips.set(id, b);
       row.append(b);
-    }
+      return b;
+    };
+    // How much each touch plants: a drift, a clump, or one flower.
+    this.amountChip = chip('amount-chip', 'Planting', () => this.onAmount());
+    this.setAmount('drift');
+    this.flowerChip = chip('book-chip', 'Flower book', () => this.onBook());
+    this.leafChip = chip('book-chip leaf-chip', 'Foliage book', () => this.onFoliage());
+    for (const sp of species) if (inSeason(sp)) this.blooming.add(sp.id);
     // A row of colour swatches above the chips, for flowers that offer a colour choice (roses).
     // (Its own strip, floating just above the chips: inside the scrolling row it would be clipped.)
     this.coloursBar = document.createElement('div');
@@ -248,6 +238,18 @@ export class FlowerPicker {
     document.body.append(this.coloursBar);
     document.body.append(this.el);
     this.select(MIX_ID);
+  }
+
+  /** The book chips: the chosen plant's picture and name on its book, the other book plain. */
+  private select(id: string) {
+    const sp = this.species.find((s) => s.id === id);
+    const leafy = sp?.form.kind === 'foliage';
+    const name = sp?.name ?? (id === WATER_MIX_ID ? 'Water mix' : 'Seasonal mix');
+    const face = (svg: string, label: string) => `<span class="chip-face">${svg}</span><span class="chip-name">${label}</span>`;
+    this.flowerChip.innerHTML = leafy ? face(BOOK_ICON, 'Flower book') : face(icon(sp ?? null, id === WATER_MIX_ID), name);
+    this.leafChip.innerHTML = leafy ? face(icon(sp!), name) : face(LEAF_BOOK_ICON, 'Foliage book');
+    this.flowerChip.classList.toggle('active', !leafy);
+    this.leafChip.classList.toggle('active', leafy);
   }
 
   /** Show the colour swatches for a species with a colour choice (or hide them). */
@@ -292,23 +294,14 @@ export class FlowerPicker {
     const sp = this.species.find((s) => s.id === id);
     const label = sp?.name ?? (id === WATER_MIX_ID ? 'Water mix' : 'Seasonal mix');
     this.select(id);
-    this.chips.get(id)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
     this.showColours(sp);
     // Keep the colour chosen for this species last time.
     const colour = sp ? (this.colour.get(sp.id) ?? -1) : -1;
     const where = id === WATER_MIX_ID || sp?.zone ? ' · paint across a pond' : '';
     // Settled, unless it has colours to choose from first (roses): then the swatch settles it.
     const settled = !this.colours.classList.contains('show');
-    this.onPick(colour >= 0 ? `${id}:${colour}` : id, id === WATER_MIX_ID ? `Water mix${where}` : (this.blooming.has(id) ? `${label}: blooming now` : `${label}: buds until its season`) + where, settled);
-  }
-
-  select(id: string) {
-    // Out-of-season species get a chip only once chosen from the book (and keep it after).
-    if (!this.blooming.has(id)) this.kept.add(id);
-    for (const [cid, b] of this.chips) {
-      b.classList.toggle('active', cid === id);
-      b.classList.toggle('resting', !this.blooming.has(cid) && !this.kept.has(cid));
-    }
+    const status = sp?.form.kind === 'foliage' ? label : this.blooming.has(id) || !sp ? `${label}: blooming now` : `${label}: buds until its season`;
+    this.onPick(colour >= 0 ? `${id}:${colour}` : id, id === WATER_MIX_ID ? `Water mix${where}` : status + where, settled);
   }
 
   setVisible(v: boolean) {

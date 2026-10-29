@@ -204,12 +204,15 @@ export class FlyingBirds {
     this.launch();
   }
 
+  /** How many fly over (busier at dawn, few in the rain, none at night). */
+  activity = 1;
+
   update(dt: number) {
     this.time += dt;
     this.uniforms.uTime.value = this.time;
-    this.nextIn -= dt;
+    this.nextIn -= dt * Math.max(0.05, this.activity);
     if (this.nextIn <= 0) {
-      this.launch();
+      if (this.activity > 0.2) this.launch();
       this.nextIn = lerp(30, 75, this.rng());
     }
 

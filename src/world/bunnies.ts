@@ -219,16 +219,21 @@ export class Bunnies {
     return true;
   }
 
+  /** How likely they are to be out (most at dawn and dusk; few at night; none in rain). */
+  activity = 1;
+
   update(dt: number) {
     this.time += dt;
-    this.nextFamily -= dt;
+    // Out more at dawn and dusk: the next family comes sooner.
+    this.nextFamily -= dt * Math.max(0.2, this.activity);
     if (this.nextFamily <= 0) {
-      if (this.families.length < 2) this.spawn();
+      if (this.families.length < 2 && this.activity > 0.35) this.spawn();
       this.nextFamily = lerp(120, 260, this.rng());
     }
     for (let f = this.families.length - 1; f >= 0; f--) {
       const fam = this.families[f];
-      fam.stay -= dt;
+      // Rain or night coming on: home to the woods soon.
+      fam.stay -= dt * (this.activity < 0.3 ? 8 : 1);
       if (!fam.leaving && fam.stay <= 0) {
         fam.leaving = true;
         fam.target = this.world.edge(Math.atan2(fam.leader.pos.y, fam.leader.pos.x) + (this.rng() - 0.5));
