@@ -14,9 +14,9 @@ const MOMENTS: [number, string][] = [
  * golden afternoon to dusk and moonlit night, with a name for the moment. Easy to sweep with a
  * thumb; the garden follows live, and remembers the time you left it at.
  */
-export function mountTimeDial(onChange: (p: number) => void, initial = 0.55): number {
+export function mountTimeDial(onChange: (p: number) => void, initial = 0.55, fromLink = false): number {
   let p = initial;
-  try {
+  if (!fromLink) try {
     const saved = Number(localStorage.getItem(KEY));
     if (localStorage.getItem(KEY) !== null && isFinite(saved)) p = Math.min(1, Math.max(0, saved));
   } catch {

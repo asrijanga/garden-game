@@ -21,6 +21,8 @@ import { SeasonFx } from './world/seasonFx';
 import { NightMagic } from './world/nightMagic';
 import { Weather } from './world/weather';
 import { mountWeatherPicker } from './ui/weatherPicker';
+import { clearAddress, linkFor, packGarden, sharedInAddress, unpackGarden } from './game/share';
+import { mountVisitBanner } from './ui/visitBanner';
 import { TimeOfDay } from './world/timeOfDay';
 import { mountTimeDial } from './ui/timeDial';
 import { GroundPaint } from './world/groundPaint';
@@ -334,13 +336,25 @@ toolbar.onHold = (tool) => {
   void confirmCard('Start a new garden?', 'Everything you’ve made here will be cleared away. This can’t be undone.', 'Keep my garden', 'Start fresh').then((go) => {
     if (!go) return;
     store.clear();
+    // Visiting someone's garden: "start fresh" goes back to your own.
+    if (store.visiting) clearAddress();
     location.reload();
   });
 };
 
 // Your garden, remembered stroke by stroke.
 const store = new GardenStore();
-const saved = store.load();
+let saved = store.load();
+// Opened from a share link? Then it's someone else's garden to visit (yours stays safe).
+const shared = sharedInAddress();
+// A garden link opened while the game is already showing (only the #fragment changes, so the
+// page wouldn't load again by itself): load it properly.
+addEventListener('hashchange', () => {
+  if (sharedInAddress()) {
+    store.save();
+    location.reload();
+  }
+});
 addEventListener('pagehide', () => store.save());
 // Coming back to the app: iOS may have thrown away the ground-paint canvas (paths' gravel, bed
 // soil) or the WebGL context while we were in the background; put the paint back.
@@ -891,7 +905,7 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 // (Once the post-processing and fog exist: the dial applies the saved time straight away.)
-mountTimeDial(applyTime);
+mountTimeDial(applyTime, shared?.time ?? 0.55, shared?.time != null);
 let firstWeather = true;
 mountWeatherPicker(
   (w) => {
@@ -900,6 +914,7 @@ mountWeatherPicker(
     applyTime(dayTime);
   },
   (w) => weather.allows(w),
+  shared?.weather ?? null,
 );
 started = true;
 
@@ -937,6 +952,8 @@ mountShotButton(
     ambience.tap(1.2);
     showSeasonPeek(season, peekedSeason() !== null);
   },
+  () => shareLink(),
+  () => toolbar.showLabel('Picture saved · garden link copied', 2600),
 );
 if (debug) Object.assign(window, { quality, TIERS, store });
 
@@ -944,12 +961,61 @@ if (debug) Object.assign(window, { quality, TIERS, store });
 // doesn't hitch while its material compiles.
 const warmed = renderer.compileAsync(scene, camera).catch(() => {});
 
+// --- Sharing: the garden as a link -----------------------------------------------------------
+// Kept ready in the background (packing is async, but the share sheet must open inside the tap).
+let shareData: string | null = null;
+let sharedAt = -1;
+const refreshShare = () => {
+  if (store.changes === sharedAt) return;
+  const at = store.changes;
+  if (!store.actions.length) {
+    shareData = null;
+    sharedAt = at;
+    return;
+  }
+  void packGarden(store.actions)
+    .then((d) => {
+      shareData = d;
+      sharedAt = at;
+    })
+    .catch(() => {});
+};
+setInterval(refreshShare, 1500);
+if (debug) Object.assign(window, { shareLink: () => shareLink(), refreshShare });
+const shareLink = () => (shareData ? linkFor(shareData, dayTime, weather.kind) : null);
+/** Make a visited garden your own (after asking: it replaces yours). */
+const keepVisit = async () => {
+  ambience.tap(1.1);
+  const go = await confirmCard('Keep this garden?', 'It will replace your own garden. This can’t be undone.', 'Not now', 'Keep it');
+  if (!go) return false;
+  store.visiting = false;
+  store.save();
+  clearAddress();
+  toolbar.showLabel('It’s your garden now', 2200);
+  return true;
+};
+const leaveVisit = () => {
+  ambience.tap(0.9);
+  clearAddress();
+  location.reload();
+};
+
 // --- Loading: a seed sprouts while shaders compile and the saved garden is rebuilt ------------
 // The garden's own clock stands still meanwhile, so it regrows in front of you once the loader
 // fades: stroke after stroke, a little apart.
 let loading = true;
 const loadStart = performance.now();
 async function rebuild() {
+  if (shared) {
+    try {
+      store.visit(await unpackGarden(shared.data));
+      saved = store.actions;
+      mountVisitBanner(keepVisit, leaveVisit);
+    } catch {
+      clearAddress();
+      setTimeout(() => toolbar.showLabel('That garden link didn’t work: here’s yours', 3000), 2600);
+    }
+  }
   await Promise.race([warmed, new Promise((r) => setTimeout(r, 4000))]);
   const gap = Math.min(0.18, 3 / Math.max(1, saved.length));
   let next = 0;

@@ -12,10 +12,11 @@ const CHOICES: [WeatherKind, string, string][] = [
  * A row of weather chips under the sun dial: clear, sunbeams through broken cloud, soft rain, or
  * rolling mist. The garden blends into the new weather, and remembers it.
  */
-export function mountWeatherPicker(onChange: (w: WeatherKind) => void, allowed: (w: WeatherKind) => boolean): WeatherKind {
+export function mountWeatherPicker(onChange: (w: WeatherKind) => void, allowed: (w: WeatherKind) => boolean, fromLink: string | null = null): WeatherKind {
   let current: WeatherKind = 'clear';
   try {
-    const saved = localStorage.getItem(KEY) as WeatherKind | null;
+    // A shared garden opens in the weather it was shared in (without changing the player's own).
+    const saved = (fromLink ?? localStorage.getItem(KEY)) as WeatherKind | null;
     if (saved && CHOICES.some((c) => c[0] === saved) && allowed(saved)) current = saved;
   } catch {
     // no storage: clear skies

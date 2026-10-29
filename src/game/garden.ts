@@ -110,6 +110,18 @@ export function decode(json: string): Action[] {
 export class GardenStore {
   readonly actions: Action[] = [];
   private timer = 0;
+  /** Showing someone else's garden (from a link): nothing is written over the player's own. */
+  visiting = false;
+  /** Goes up whenever the garden changes (so a share link knows when to be remade). */
+  changes = 0;
+
+  /** Show a shared garden instead of the saved one (until it's kept, nothing is saved). */
+  visit(actions: Action[]) {
+    clearTimeout(this.timer);
+    this.visiting = true;
+    this.actions.length = 0;
+    this.actions.push(...actions);
+  }
 
   load(): Action[] {
     try {
@@ -123,12 +135,15 @@ export class GardenStore {
 
   add(action: Action) {
     this.actions.push(action);
+    this.changes++;
     clearTimeout(this.timer);
     this.timer = window.setTimeout(() => this.save(), 400);
   }
 
   save() {
     clearTimeout(this.timer);
+    this.changes++;
+    if (this.visiting) return;
     try {
       localStorage.setItem(KEY, encode(this.actions));
     } catch {
@@ -139,6 +154,7 @@ export class GardenStore {
   clear() {
     clearTimeout(this.timer);
     this.actions.length = 0;
+    if (this.visiting) return; // someone else's garden: the player's own stays saved
     try {
       localStorage.removeItem(KEY);
     } catch {

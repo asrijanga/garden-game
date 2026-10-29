@@ -11,11 +11,20 @@ function dataUrlToBlob(url: string): Blob {
 
 /**
  * A camera button beside the sound toggle. It captures the garden (just the world, no buttons)
- * at high resolution and opens the share sheet, so it can be saved to Photos or sent on;
+ * at high resolution and opens the share sheet with a link to the garden itself, so the picture
+ * can be saved to Photos, or sent on and the garden visited;
  * where sharing files isn't supported, the picture downloads instead. The file name carries a
  * little debug info (quality tier and frame rate).
  */
-export function mountShotButton(capture: () => { url: string; info: string }, onShutter: () => void, onLongPress: () => void = () => {}) {
+export function mountShotButton(
+  capture: () => { url: string; info: string },
+  onShutter: () => void,
+  onLongPress: () => void = () => {},
+  /** A link to the garden itself, sent along with the picture (null if there's nothing yet). */
+  link: () => string | null = () => null,
+  /** Where there's no share sheet: the picture downloaded and the link went to the clipboard. */
+  onCopied: () => void = () => {},
+) {
   const button = document.createElement('button');
   button.className = 'sound-toggle shot-toggle';
   button.type = 'button';
@@ -56,8 +65,10 @@ export function mountShotButton(capture: () => { url: string; info: string }, on
     setTimeout(() => flash.remove(), 700);
 
     const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+    const gardenUrl = link();
+    const text = gardenUrl ? `Come and see my garden 🌷 ${gardenUrl}` : undefined;
     if (nav.share && nav.canShare?.({ files: [file] })) {
-      nav.share({ files: [file] }).catch(() => {
+      nav.share(text ? { files: [file], text } : { files: [file] }).catch(() => {
         /* the player closed the share sheet */
       });
       return;
@@ -67,6 +78,7 @@ export function mountShotButton(capture: () => { url: string; info: string }, on
     a.download = name;
     document.body.append(a);
     a.click();
+    if (gardenUrl) void navigator.clipboard?.writeText(gardenUrl).then(onCopied, () => {});
     setTimeout(() => {
       URL.revokeObjectURL(a.href);
       a.remove();
