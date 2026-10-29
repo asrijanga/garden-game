@@ -399,16 +399,34 @@ const decorPicker = new ChipPicker(DECOR_CHIPS, (kind, label) => {
   propBrush.kind = kind;
   ambience.tap(1.15);
   toolbar.showLabel(label, 1400);
+  tuckAway('decor');
 });
 const stylePicker = new ChipPicker(BUILD_CHIPS, (style, label) => {
   if (tools) tools.buildStyle = style;
   ambience.tap(1.1);
   toolbar.showLabel(label, 1600);
+  tuckAway('fence');
 });
-const picker = new FlowerPicker(flowerBrush.ordered(), (sp) => flowerBrush.inSeason(sp), (id, label) => {
+/**
+ * Once something's chosen, the chip row tucks away so the whole garden is free to draw on;
+ * tapping the tool's button again brings it back (a reminder the first few times).
+ */
+let tuckHints = 0;
+function tuckAway(tool: Tool) {
+  window.setTimeout(() => {
+    if (toolbar.tool !== tool) return;
+    picker.setVisible(false);
+    stylePicker.setVisible(false);
+    decorPicker.setVisible(false);
+    document.body.classList.remove('picking');
+    if (tuckHints++ < 3) window.setTimeout(() => toolbar.showLabel('Tap the tool again to choose another', 2000), 1400);
+  }, 350);
+}
+const picker = new FlowerPicker(flowerBrush.ordered(), (sp) => flowerBrush.inSeason(sp), (id, label, settled) => {
   flowerBrush.selected = id;
   ambience.tap(1.3);
   toolbar.showLabel(label, 1800);
+  if (settled) tuckAway('flowers');
 });
 // How much each touch plants: a drift (a bed), a clump, or exactly one flower.
 const AMOUNTS: PlantAmount[] = ['drift', 'clump', 'one'];

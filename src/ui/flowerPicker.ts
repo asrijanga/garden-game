@@ -188,7 +188,7 @@ export class FlowerPicker {
   constructor(
     private readonly species: FlowerSpecies[],
     inSeason: (sp: FlowerSpecies) => boolean,
-    private readonly onPick: (id: string, label: string) => void,
+    private readonly onPick: (id: string, label: string, settled: boolean) => void,
   ) {
     this.el = document.createElement('div');
     this.el.className = 'flower-picker';
@@ -269,7 +269,7 @@ export class FlowerPicker {
         this.colour.set(sp.id, i);
         for (const el of this.colours.children) el.classList.toggle('active', el === b);
         const id = i < 0 ? sp.id : `${sp.id}:${i}`;
-        this.onPick(id, i < 0 ? `${sp.name}: mixed colours` : `${sp.name}: ${label.toLowerCase()}`);
+        this.onPick(id, i < 0 ? `${sp.name}: mixed colours` : `${sp.name}: ${label.toLowerCase()}`, true);
       });
       this.colours.append(b);
     };
@@ -297,7 +297,9 @@ export class FlowerPicker {
     // Keep the colour chosen for this species last time.
     const colour = sp ? (this.colour.get(sp.id) ?? -1) : -1;
     const where = id === WATER_MIX_ID || sp?.zone ? ' · paint across a pond' : '';
-    this.onPick(colour >= 0 ? `${id}:${colour}` : id, id === WATER_MIX_ID ? `Water mix${where}` : (this.blooming.has(id) ? `${label}: blooming now` : `${label}: buds until its season`) + where);
+    // Settled, unless it has colours to choose from first (roses): then the swatch settles it.
+    const settled = !this.colours.classList.contains('show');
+    this.onPick(colour >= 0 ? `${id}:${colour}` : id, id === WATER_MIX_ID ? `Water mix${where}` : (this.blooming.has(id) ? `${label}: blooming now` : `${label}: buds until its season`) + where, settled);
   }
 
   select(id: string) {
