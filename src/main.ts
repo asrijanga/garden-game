@@ -23,6 +23,7 @@ import { Weather } from './world/weather';
 import { mountWeatherPicker } from './ui/weatherPicker';
 import { clearAddress, linkFor, packGarden, sharedInAddress, unpackGarden } from './game/share';
 import { mountVisitBanner } from './ui/visitBanner';
+import { BedPicker, BED_ICONS } from './ui/bedPicker';
 import { TimeOfDay } from './world/timeOfDay';
 import { mountTimeDial } from './ui/timeDial';
 import { GroundPaint } from './world/groundPaint';
@@ -31,6 +32,7 @@ import { EdgePlants } from './world/edgePlants';
 import { Dust } from './world/dust';
 import { PathBuilder, type PathStyle } from './game/pathBuilder';
 import { FlowerBrush, type PlantAmount } from './game/flowerBrush';
+import { RaisedSoil } from './world/raisedSoil';
 import { Flowers } from './world/flowers';
 import { SPECIES } from './world/flowerSpecies';
 import { FlowerBook } from './ui/flowerBook';
@@ -78,8 +80,8 @@ for (const type of ['gesturestart', 'gesturechange', 'gestureend', 'dblclick', '
 document.addEventListener(
   'touchmove',
   (e) => {
-    // The flower picker scrolls sideways; everything else stays perfectly still.
-    if (!(e.target instanceof Element && e.target.closest('.flower-picker'))) e.preventDefault();
+    // The flower picker (and the rose colours above it) scroll sideways; everything else stays still.
+    if (!(e.target instanceof Element && e.target.closest('.flower-picker, .colour-bar'))) e.preventDefault();
   },
   { passive: false },
 );
@@ -243,6 +245,10 @@ const flowerBrush = new FlowerBrush(
     level: (x, z) => ponds.levelAt(x, z),
   },
 );
+// Raised beds' soil sits up on top of their frames (drawn with the lawn's own shader).
+const raisedSoil = new RaisedSoil(ground.basinMaterial);
+scene.add(raisedSoil.mesh);
+flowerBrush.raised = raisedSoil;
 // Fences and hedges: posts knocked in with a wooden "tock", hedges rustling up.
 const fences = new Fences((shape, at) => {
   if (shape === 'picketPost' || shape === 'logPost') {
@@ -434,6 +440,26 @@ picker.onAmount = () => {
   toolbar.showLabel(AMOUNT_HINT[flowerBrush.amount], 2200);
 };
 flowerBrush.onPlace = (_x, _z, water) => (water ? ambience.plop(0.3) : ambience.pat());
+// How new beds are edged (or raised) and what covers their soil.
+const bedPicker = new BedPicker(
+  (style, label) => {
+    flowerBrush.bedStyle = style;
+    picker.setBed(BED_ICONS[style][0]);
+    ambience.tap(1.15);
+    toolbar.showLabel(label, 1600);
+  },
+  (topping, label) => {
+    flowerBrush.topping = topping;
+    ambience.tap(1.25);
+    toolbar.showLabel(label, 1600);
+  },
+);
+picker.onBed = () => {
+  ambience.tap(1.1);
+  bedPicker.setVisible(!bedPicker.open);
+};
+// Putting a finger on the garden puts the bed panel away.
+canvas.addEventListener('pointerdown', () => bedPicker.setVisible(false));
 // The flower book: every species to browse, blooming-now first.
 const flowerBook = new FlowerBook(SPECIES, season, (id) => picker.pick(id));
 picker.onBook = () => {
@@ -745,6 +771,7 @@ tools = new ToolController(
   (tool) => {
     cottagePanelRef?.setVisible(false);
     picker.setVisible(tool === 'flowers');
+    if (tool !== 'flowers') bedPicker.setVisible(false);
     stylePicker.setVisible(tool === 'fence');
     pathPicker.setVisible(tool === 'path');
     decorPicker.setVisible(tool === 'decor');
@@ -1094,6 +1121,7 @@ function frame(time: number) {
     props.update(dt);
     edgePlants.update(dt);
     flowers.update(dt);
+    raisedSoil.update(dt);
     bees.update(dt);
     ponds.update(dt);
     fish.update(dt);

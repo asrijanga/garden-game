@@ -3,7 +3,7 @@ import { createNoise2D } from '../core/noise';
 import { createRng, smoothstep } from '../core/random';
 import { uniforms as windUniforms, windSampleGLSL } from '../render/wind';
 import { rainRingsGLSL, wetUniforms } from '../render/wet';
-import { paintUvGLSL } from './groundPaint';
+import { paintUvGLSL, TOPPING_STEPS } from './groundPaint';
 import { pondUvGLSL, POND_WATERLINE_RANGE } from './pond';
 import type { SeasonPalette } from './season';
 
@@ -167,7 +167,11 @@ function lawnMaterial(paint: THREE.Texture, pond: THREE.Texture, basin: boolean)
         `#include <begin_vertex>
         ${basin ? '' : 'transformed.y -= step(0.004, texture2D(uPond, pondUv(transformed.xz)).g) * 2.5;'}
         vMeadow = aMeadow;
-        vWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
+        #ifdef USE_INSTANCING
+          vWorld = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+        #else
+          vWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        #endif`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\nuniform sampler2D uGrain;\nuniform sampler2D uPaint;\nuniform sampler2D uPond;\nvarying float vMeadow;\nvarying vec3 vWorld;\n${windSampleGLSL}\n${paintUvGLSL}\n${pondUvGLSL}\n${lawnNoiseGLSL}\n${pebblesGLSL}\n${rainRingsGLSL}\nuniform float uWet, uRainNow, uCloud, uWetTime;\nuniform vec3 uWetSky;\nuniform vec2 uCloudDrift;`)
@@ -203,6 +207,8 @@ function lawnMaterial(paint: THREE.Texture, pond: THREE.Texture, basin: boolean)
         vec3 bedSoil = vec3(0.0);
         if (bed > 0.0) {
           vec2 mp = vWorld.xz;
+          // Which topping covers this bed (green rides as a fraction of blue).
+          float topping = floor(paintTex.g / max(paintTex.b, 0.02) * ${TOPPING_STEPS.toFixed(1)} + 0.5);
           // Cedar bark mulch: warm red-brown shreds, lighter chips, fine dark crumbs between.
           // Red-brown sits opposite the greens, so leaves and blooms glow against it.
           vec2 mr = vec2(mp.x * 0.8 - mp.y * 0.6, mp.x * 0.6 + mp.y * 0.8); // rotated, so chips don't line up
@@ -212,6 +218,47 @@ function lawnMaterial(paint: THREE.Texture, pond: THREE.Texture, basin: boolean)
           bedSoil = mix(vec3(0.115, 0.042, 0.02), vec3(0.2, 0.08, 0.036), shreds);
           bedSoil = mix(bedSoil, vec3(0.32, 0.15, 0.07), smoothstep(0.66, 0.74, chips)); // lighter bark chips
           bedSoil *= 0.8 + crumb * 0.35;
+          if (topping > 0.5) {
+            float fine = lawnNoise(mp * 55.0 + 1.7);
+            if (topping < 1.5) {
+              // Dark garden compost: fine crumbs and the odd lighter fleck.
+              bedSoil = mix(vec3(0.06, 0.045, 0.03), vec3(0.15, 0.105, 0.07), chips) * (0.75 + crumb * 0.45);
+            } else if (topping < 2.5) {
+              // Golden straw: long pale strands crossing every which way.
+              float s1 = lawnNoise(vec2(mr.x * 7.0, mr.y * 60.0));
+              float s2 = lawnNoise(vec2(mr.y * 7.0 + 3.0, mr.x * 60.0));
+              bedSoil = mix(vec3(0.34, 0.26, 0.12), vec3(0.72, 0.6, 0.32), max(smoothstep(0.55, 0.8, s1), smoothstep(0.6, 0.85, s2)));
+            } else if (topping < 3.5) {
+              // Pine needles: thin rusty needles in a tangled mat.
+              float s1 = lawnNoise(vec2(mr.x * 6.0, mr.y * 90.0));
+              float s2 = lawnNoise(vec2((mr.x + mr.y) * 64.0, (mr.x - mr.y) * 5.0));
+              bedSoil = mix(vec3(0.16, 0.08, 0.04), vec3(0.48, 0.26, 0.11), max(smoothstep(0.6, 0.82, s1), smoothstep(0.62, 0.85, s2) * 0.85));
+            } else if (topping < 4.5) {
+              // Cocoa shell: chocolate-brown flakes with a soft sheen.
+              bedSoil = mix(vec3(0.13, 0.065, 0.035), vec3(0.3, 0.16, 0.09), smoothstep(0.45, 0.75, chips)) * (0.85 + fine * 0.3);
+            } else if (topping < 5.5) {
+              // Warm pea gravel: small rounded stones in honey and buff.
+              bedSoil = pebbles(mp * 1.8) * vec3(1.12, 1.0, 0.78) * 1.15;
+            } else if (topping < 6.5) {
+              // White chippings: pale angular stone, sparkling where it's broken.
+              bedSoil = mix(vec3(0.6, 0.6, 0.57), vec3(0.86, 0.85, 0.82), smoothstep(0.3, 0.7, lawnNoise(mp * 30.0))) * (0.9 + fine * 0.18);
+              bedSoil *= 1.0 - smoothstep(0.82, 0.95, crumb) * 0.35;
+            } else if (topping < 7.5) {
+              // Slate chips: flat blue-grey flakes overlapping.
+              bedSoil = mix(vec3(0.17, 0.19, 0.22), vec3(0.32, 0.35, 0.39), smoothstep(0.35, 0.75, shreds)) * (0.85 + chips * 0.3);
+            } else if (topping < 8.5) {
+              // River pebbles: bigger rounded stones in greys and browns.
+              bedSoil = pebbles(mp * 0.9) * 1.25;
+            } else if (topping < 9.5) {
+              // Moss: a soft green velvet, brighter in cushions.
+              bedSoil = mix(vec3(0.12, 0.2, 0.06), vec3(0.3, 0.42, 0.12), smoothstep(0.3, 0.75, lawnNoise(mp * 6.0) * 0.6 + chips * 0.4)) * (0.88 + fine * 0.22);
+            } else {
+              // Clover: a low green carpet of little leaves with the odd white flower.
+              float leafy = lawnNoise(mp * 26.0);
+              bedSoil = mix(vec3(0.15, 0.28, 0.08), vec3(0.3, 0.5, 0.16), leafy);
+              bedSoil = mix(bedSoil, vec3(0.88, 0.86, 0.8), smoothstep(0.93, 0.97, lawnNoise(mp * 12.0 + 4.0)));
+            }
+          }
           bedSoil *= 1.0 - (1.0 - smoothstep(0.46, 0.62, bedField)) * 0.2; // tucked-in edge
         }
         diffuseColor.rgb = mix(diffuseColor.rgb, soil, earth);

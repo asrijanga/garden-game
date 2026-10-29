@@ -49,6 +49,16 @@ export type FlowerForm =
       /** Bloom radius (metres, before storybook scaling). */
       size: number;
     }
+  /** Arching stems hung with flowers: hearts (bleeding heart) or bells (Solomon's seal, fuchsia). */
+  | { kind: 'arch'; florets: number; floretSize: number; shape: 'heart' | 'bell' }
+  /** An airy cloud of tiny florets on fine branching stems (baby's breath, lady's mantle). */
+  | { kind: 'cloud'; florets: number; spread: number; floretSize: number }
+  /** A pincushion head with a frill (scabious), or a spiky steel ball (globe thistle). */
+  | { kind: 'pincushion'; size: number; spiky: boolean }
+  /** A dense torch of drooping tubes, shading from the base colour up to the edge colour (red hot poker). */
+  | { kind: 'torch'; length: number; radius: number }
+  /** A foliage plant (grass, fern, hosta, heuchera, lamb's ear, box), tinted by its colour. */
+  | { kind: 'foliage'; leaf: 'grass' | 'fern' | 'hosta' | 'silver' | 'box' }
   | {
       kind: 'cluster';
       florets: number;
@@ -747,6 +757,134 @@ export const SPECIES: FlowerSpecies[] = [
     form: { kind: 'cluster', florets: 30, radius: 0.06, floretSize: 0.008, shape: 'dome' },
     spacing: 0.14,
     zone: 'bank',
+  },
+  // --- New silhouettes (2.14) ---
+  {
+    id: 'bleeding-heart',
+    name: 'Bleeding heart',
+    seasons: ['spring'],
+    height: [0.45, 0.65],
+    colors: ['#e8608a|#fbe9ef', '#f2f0ea|#f9d9e4'],
+    form: { kind: 'arch', florets: 7, floretSize: 0.016, shape: 'heart' },
+    spacing: 0.4,
+  },
+  {
+    id: 'solomons-seal',
+    name: "Solomon's seal",
+    seasons: ['spring', 'summer'],
+    height: [0.55, 0.8],
+    colors: ['#f4f6e8|#cfe0a8'],
+    form: { kind: 'arch', florets: 8, floretSize: 0.012, shape: 'bell' },
+    spacing: 0.4,
+  },
+  {
+    id: 'fuchsia',
+    name: 'Fuchsia',
+    seasons: ['summer', 'autumn'],
+    height: [0.45, 0.65],
+    colors: ['#d81b60|#6a2c91', '#e91e63|#f8f0f8', '#c2185b|#c2185b'],
+    form: { kind: 'arch', florets: 6, floretSize: 0.017, shape: 'bell' },
+    spacing: 0.4,
+  },
+  {
+    id: 'babys-breath',
+    name: "Baby's breath",
+    seasons: ['summer'],
+    height: [0.5, 0.7],
+    colors: ['#fbfaf5', '#f6dfe8'],
+    form: { kind: 'cloud', florets: 70, spread: 0.2, floretSize: 0.006 },
+    spacing: 0.42,
+  },
+  {
+    id: 'ladys-mantle',
+    name: "Lady's mantle",
+    seasons: ['summer'],
+    height: [0.3, 0.42],
+    colors: ['#d6e05a', '#c8d84e'],
+    form: { kind: 'cloud', florets: 50, spread: 0.16, floretSize: 0.007 },
+    spacing: 0.36,
+  },
+  {
+    id: 'scabious',
+    name: 'Scabious',
+    seasons: ['summer', 'autumn'],
+    height: [0.5, 0.7],
+    colors: ['#a7a4e0', '#d7a6d9', '#5a2a5e', '#f3f0fa'],
+    form: { kind: 'pincushion', size: 0.026, spiky: false },
+    spacing: 0.32,
+  },
+  {
+    id: 'globe-thistle',
+    name: 'Globe thistle',
+    seasons: ['summer'],
+    height: [0.8, 1.1],
+    colors: ['#6f8fd0', '#8aa2dc'],
+    form: { kind: 'pincushion', size: 0.032, spiky: true },
+    spacing: 0.45,
+  },
+  {
+    id: 'red-hot-poker',
+    name: 'Red hot poker',
+    seasons: ['summer', 'autumn'],
+    height: [0.8, 1.1],
+    colors: ['#f4d03f|#e8452a', '#f6e27a|#f39c12'],
+    form: { kind: 'torch', length: 0.13, radius: 0.026 },
+    spacing: 0.42,
+  },
+  // Foliage to pick and plant like flowers.
+  {
+    id: 'grass',
+    name: 'Ornamental grass',
+    seasons: ['spring', 'summer', 'autumn', 'winter'],
+    height: [0.5, 0.7],
+    colors: ['#8a9a52', '#6f8f74', '#a07a4a'],
+    form: { kind: 'foliage', leaf: 'grass' },
+    spacing: 0.5,
+  },
+  {
+    id: 'fern',
+    name: 'Fern',
+    seasons: ['spring', 'summer', 'autumn'],
+    height: [0.35, 0.45],
+    colors: ['#5f9a3e', '#6aa548'],
+    form: { kind: 'foliage', leaf: 'fern' },
+    spacing: 0.45,
+  },
+  {
+    id: 'hosta',
+    name: 'Hosta',
+    seasons: ['spring', 'summer', 'autumn'],
+    height: [0.25, 0.32],
+    colors: ['#5a8a5a', '#4f7f6e', '#8fb45e'],
+    form: { kind: 'foliage', leaf: 'hosta' },
+    spacing: 0.5,
+  },
+  {
+    id: 'heuchera',
+    name: 'Heuchera',
+    seasons: ['spring', 'summer', 'autumn', 'winter'],
+    height: [0.2, 0.28],
+    colors: ['#6a2a4a', '#b5652e', '#8a3a5a', '#c9a23a'],
+    form: { kind: 'foliage', leaf: 'hosta' },
+    spacing: 0.4,
+  },
+  {
+    id: 'lambs-ear',
+    name: "Lamb's ear",
+    seasons: ['spring', 'summer', 'autumn', 'winter'],
+    height: [0.1, 0.15],
+    colors: ['#b9c2b3', '#c4cabe'],
+    form: { kind: 'foliage', leaf: 'silver' },
+    spacing: 0.35,
+  },
+  {
+    id: 'box-ball',
+    name: 'Box ball',
+    seasons: ['spring', 'summer', 'autumn', 'winter'],
+    height: [0.3, 0.38],
+    colors: ['#3f6a32', '#4a7638'],
+    form: { kind: 'foliage', leaf: 'box' },
+    spacing: 0.45,
   },
 ];
 

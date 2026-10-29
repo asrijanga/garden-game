@@ -1,5 +1,10 @@
 import * as THREE from 'three';
 
+/** Bed toppings, by the number painted into a bed (green = blue × topping / TOPPING_STEPS). */
+export const TOPPINGS = ['cedar', 'compost', 'straw', 'pine', 'cocoa', 'pea', 'chippings', 'slate', 'pebbles', 'moss', 'clover'] as const;
+export type Topping = (typeof TOPPINGS)[number];
+export const TOPPING_STEPS = 11;
+
 /** World half-size covered by the paint layer (the clearing plus a margin). */
 export const PAINT_HALF = 25;
 const SIZE = 512; // ~10 cm per texel
@@ -204,9 +209,13 @@ export class GroundPaint {
     this.dab(x, z, radius, strength, strength * sand, 0);
   }
 
-  /** Dig a dab of rich, dark bed soil (blue channel) at (x, z). */
-  bed(x: number, z: number, radius: number, strength = 1) {
-    this.dab(x, z, radius, 0, 0, strength);
+  /**
+   * Dig a dab of bed (blue channel) at (x, z), covered with topping `topping` (0 cedar bark … see
+   * TOPPINGS). The topping rides in the green channel as a fraction of the blue, which nothing
+   * else uses inside a bed and which survives soft edges, overlaps, erasing and restoring.
+   */
+  bed(x: number, z: number, radius: number, strength = 1, topping = 0) {
+    this.dab(x, z, radius, 0, (strength * topping) / TOPPING_STEPS, strength);
   }
 
   /** Let the lawn grow back over (x, z): paint fades away there over a moment, softly at the rim. */

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { createRng, lerp } from '../core/random';
 import type { Ground } from '../world/ground';
-import type { GroundPaint } from '../world/groundPaint';
-import type { Flowers } from '../world/flowers';
+import { TOPPING_STEPS, type GroundPaint } from '../world/groundPaint';
+import type { RaisedSoil } from '../world/raisedSoil';
+import type { Flowers, LeafKind } from '../world/flowers';
 import type { Wildflowers } from '../world/wildflowers';
 import type { Season } from '../world/season';
 import type { Stones } from '../world/stones';
@@ -32,6 +33,57 @@ const FOLIAGE_WINTER = ['#557a50', '#5f8459', '#4d7048'];
  * Paints flower beds. Each dab digs soft soil and scatters plants around it; their birth times
  * are offset by distance from the stroke, so the bed blooms outward in a wave.
  */
+/** A bed's colour scheme: cool blues and whites, hot reds and golds, soft pastels, or a cottage jumble. */
+type Theme = 'cool' | 'hot' | 'pastel' | 'jumble';
+const THEMES: Theme[] = ['cool', 'hot', 'pastel', 'jumble'];
+
+/** Does a colour belong in a theme? */
+function fits(hex: string, theme: Theme): boolean {
+  if (theme === 'jumble') return true;
+  const hsl = { h: 0, s: 0, l: 0 };
+  new THREE.Color(hex.split('|')[0]).getHSL(hsl);
+  if (theme === 'cool') return (hsl.h > 0.48 && hsl.h < 0.86) || hsl.l > 0.86;
+  if (theme === 'hot') return (hsl.h < 0.17 || hsl.h > 0.94) && hsl.s > 0.45 && hsl.l < 0.8;
+  return hsl.l > 0.66;
+}
+
+/**
+ * How a bed is planted, chosen when it's started: its colour theme, a tall plant for the middle,
+ * mid-height plants round it and low edgers at the rim (each in drifts that repeat along the
+ * bed), and two foliage plants woven between. Every bed gets its own.
+ */
+interface BedPlan {
+  theme: Theme;
+  tiers: { tall: FlowerSpecies[]; mid: FlowerSpecies[]; low: FlowerSpecies[] };
+  /** The species each tier is in the middle of a drift of. */
+  drift: { tall: FlowerSpecies | null; mid: FlowerSpecies | null; low: FlowerSpecies | null };
+  /** A taller foliage plant for the middle, and a low one for the edges. */
+  leaves: [LeafKind, LeafKind];
+}
+
+/** Foliage tints by kind (autumn and winter turn grasses to straw). */
+const LEAF_TINTS: Record<LeafKind, string[]> = {
+  clump: ['#4f8a36', '#5e9a3f', '#6aa548', '#47803a'],
+  grass: ['#7f9f4c', '#94a75a', '#6f8f74', '#8a9a52'],
+  fern: ['#5f9a3e', '#6aa548', '#579238'],
+  hosta: ['#5a8a5a', '#7aa860', '#4f7f6e', '#8fb45e'],
+  silver: ['#b9c2b3', '#aab4a6', '#c4cabe'],
+  box: ['#3f6a32', '#4a7638', '#456f36'],
+};
+
+/**
+ * How a bed is edged: a natural stone border (the original), no edge at all, bricks set on end,
+ * a woven willow (wattle) edge, or raised: in a timber frame or a low dry-stone wall.
+ */
+export type BedStyle = 'stone' | 'none' | 'brick' | 'wattle' | 'timber' | 'raised';
+export const BED_STYLES: BedStyle[] = ['stone', 'none', 'brick', 'wattle', 'timber', 'raised'];
+const BED_CODE: Record<BedStyle, string> = { stone: 's', none: 'n', brick: 'b', wattle: 'w', timber: 't', raised: 'r' };
+/** How high a raised bed's soil sits. */
+const LIFT: Record<BedStyle, number> = { stone: 0, none: 0, brick: 0, wattle: 0, timber: 0.28, raised: 0.22 };
+const WILLOW = ['#8a7258', '#7d6650', '#958067', '#6f5a46'];
+const BOARD = ['#8f6f50', '#9c7b5a', '#836548', '#a6865f'];
+const BRICKS = ['#b5583d', '#a94f37', '#c0654a', '#9c4a35', '#b86a4c', '#8f4632'];
+
 /** How much each touch plants: a drift (a bed along the stroke), a little clump, or one flower. */
 export type PlantAmount = 'drift' | 'clump' | 'one';
 const AMOUNT_CODE: Record<PlantAmount, string> = { drift: '', clump: 'c', one: '1' };
@@ -42,14 +94,25 @@ export class FlowerBrush {
   selected = MIX_ID;
   /** Drift (today's bed stroke), a clump, or a single flower placed exactly where the finger lifts. */
   amount: PlantAmount = 'drift';
+  /** How new beds are edged (or raised), and what covers their soil (an index into TOPPINGS). */
+  bedStyle: BedStyle = 'stone';
+  topping = 0;
+  /** The stroke in progress' style, topping and soil height (fixed when it starts). */
+  private strokeStyle: BedStyle = 'stone';
+  private strokeTopping = 0;
+  private lift = 0;
+  /** Raised beds' soil, drawn with the lawn's own shader so the topping shows on it. */
+  raised: RaisedSoil | null = null;
   /** A clump or single flower went in at (x, z) (for its sound). */
   onPlace: (x: number, z: number, water: boolean) => void = () => {};
   private placeAt: THREE.Vector2 | null = null;
+  private plan: BedPlan | null = null;
+  private row = 0;
   private rng = createRng(4321);
   private last: THREE.Vector2 | null = null;
   private strokeTime = 0;
   /** Every dab of every bed so far (centre + which stroke made it), and the stroke in progress. */
-  private readonly beds: { c: THREE.Vector2; stroke: number }[] = [];
+  private readonly beds: { c: THREE.Vector2; stroke: number; lift?: number }[] = [];
   /** Bed dabs by 1 m cell, for quick "how far is the nearest bed?" checks. */
   private readonly bedCells = new Map<number, THREE.Vector2[]>();
   private stroke: THREE.Vector2[] = [];
@@ -114,13 +177,18 @@ export class FlowerBrush {
    */
   get selection(): string {
     const code = AMOUNT_CODE[this.amount];
-    return code ? `${this.selected}@${code}` : this.selected;
+    const bed = this.bedStyle !== 'stone' || this.topping ? `#${BED_CODE[this.bedStyle]}${this.topping}` : '';
+    return `${this.selected}${bed}${code ? '@' + code : ''}`;
   }
 
+  /** "species[:colour][#<edge><topping>][@<amount>]" (old saves have neither # nor @). */
   set selection(s: string) {
-    const [sel, code] = s.split('@');
+    const [rest, code] = s.split('@');
+    const [sel, bed] = rest.split('#');
     this.selected = sel;
     this.amount = code === 'c' ? 'clump' : code === '1' ? 'one' : 'drift';
+    this.bedStyle = (bed && BED_STYLES.find((b) => BED_CODE[b] === bed[0])) || 'stone';
+    this.topping = bed ? Math.min(TOPPING_STEPS - 1, Math.max(0, Number(bed.slice(1)) || 0)) : 0;
   }
 
   /** The ring under the finger for a clump or single flower (null for a drift). */
@@ -133,12 +201,16 @@ export class FlowerBrush {
   }
 
   begin(p: THREE.Vector3) {
+    this.strokeStyle = this.bedStyle;
+    this.strokeTopping = this.topping;
+    this.lift = LIFT[this.bedStyle];
     // A clump or one flower: nothing goes in until the finger lifts, exactly where it lifts.
     if (this.amount !== 'drift') {
       this.placeAt = new THREE.Vector2(p.x, p.z);
       return;
     }
     this.last = new THREE.Vector2(p.x, p.z);
+    this.plan = this.makePlan();
     this.strokeTime = 0;
     this.stroke = [];
     this.strokeId++;
@@ -174,6 +246,7 @@ export class FlowerBrush {
 
   /** Forget bed dabs centred within `r` of (x, z). */
   erase(x: number, z: number, r: number) {
+    this.raised?.erase(x, z, r);
     for (const [k, list] of this.foliageAt) this.foliageAt.set(k, list.filter((p) => (p.x - x) ** 2 + (p.z - z) ** 2 > r * r));
     for (let i = this.beds.length - 1; i >= 0; i--) {
       if (Math.hypot(this.beds[i].c.x - x, this.beds[i].c.y - z) < r) this.beds.splice(i, 1);
@@ -184,6 +257,8 @@ export class FlowerBrush {
   /** Back to an untouched garden (before an undo replays what remains). */
   reset() {
     this.rng = createRng(4321);
+    this.raised?.reset();
+    this.row = 0;
     this.last = null;
     this.placeAt = null;
     this.strokeTime = 0;
@@ -373,11 +448,11 @@ export class FlowerBrush {
           // In a blended curve (inside the outline, outside every round dab): mulch it in.
           const plain = P[i * nz + j] - EDGE_RADIUS;
           if (plain > -0.06 && !this.blocked(x, z) && this.distanceToPaths(x, z) > 0.75) {
-            this.paint.bed(x, z, 0.32);
+            this.paint.bed(x, z, 0.32, 1, this.strokeTopping);
             if (this.rng() < 0.08 && !this.foliageNear(x, z, FOLIAGE_SPACING)) {
               this.addFoliageSpot(x, z);
               const green = new THREE.Color(greens[Math.floor(this.rng() * greens.length)]);
-              this.flowers.plantFoliage(x, this.ground.heightAt(x, z) - 0.02, z, this.rng() * 6.28, lerp(0.9, 1.3, this.rng()), 0.2 + this.rng() * 0.4, green);
+              this.flowers.plantFoliage(x, this.ground.heightAt(x, z) - 0.02 + this.lift, z, this.rng() * 6.28, lerp(0.9, 1.3, this.rng()), 0.2 + this.rng() * 0.4, green);
             }
           }
           continue;
@@ -400,6 +475,10 @@ export class FlowerBrush {
 
     // Lay stones along the outline, in stroke order so they settle like someone working round.
     edge.sort((a, b) => a.order - b.order);
+    if (this.strokeStyle !== 'stone') {
+      this.layEdge(edge, field);
+      return;
+    }
     let delay = 0.15;
     for (const e of edge) {
       if (this.blocked(e.x, e.z) || this.distanceToPaths(e.x, e.z) < 0.52) continue;
@@ -426,6 +505,72 @@ export class FlowerBrush {
   }
 
   /**
+   * Edge a bed in its style, along its outline (in the order someone would work round it):
+   * bricks on end leaning like a row of dominoes, a woven willow hurdle between stakes, a raised
+   * timber frame of boards on edge with posts, or a low dry-stone wall holding raised soil.
+   */
+  private layEdge(edge: { x: number; z: number }[], field: (x: number, z: number) => number) {
+    const style = this.strokeStyle;
+    if (style === 'none') return;
+    let delay = 0.15;
+    let since = Infinity;
+    let last: { x: number; z: number } | null = null;
+    const spacing = style === 'brick' ? 0.075 : style === 'wattle' ? 0.13 : style === 'timber' ? 0.27 : 0.2;
+    const v3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+    const tone = (list: string[], lo = 0.92, hi = 1.06) => new THREE.Color(list[Math.floor(this.rng() * list.length)]).multiplyScalar(lerp(lo, hi, this.rng()));
+    let posts = 0;
+    for (const e of edge) {
+      if (last) since += Math.hypot(e.x - last.x, e.z - last.z);
+      last = e;
+      if (since < spacing) continue;
+      if (this.blocked(e.x, e.z) || this.distanceToPaths(e.x, e.z) < 0.52) continue;
+      const gx = field(e.x + 0.02, e.z) - field(e.x - 0.02, e.z);
+      const gz = field(e.x, e.z + 0.02) - field(e.x, e.z - 0.02);
+      const gl = Math.hypot(gx, gz) || 1;
+      const nx = gx / gl;
+      const nz = gz / gl;
+      // Pieces long along their z: line them up with the outline's tangent.
+      const yaw = Math.atan2(-nz, nx);
+      const y = this.ground.heightAt(e.x, e.z);
+      if (style === 'brick') {
+        if (this.stones.isOccupied(e.x, e.z, 0.03, 'brick')) continue;
+        since = 0;
+        // On end, leaning a little along the edge: the old "sawtooth" brick edging.
+        this.stones.add('brick', e.x, y - 0.012, e.z, v3(1, 1, lerp(0.97, 1.03, this.rng())), yaw, 0.05, tone(BRICKS, 0.86, 1.04), delay, 0, -Math.PI / 2 + 0.42 + (this.rng() - 0.5) * 0.06);
+        delay += 0.012;
+      } else if (style === 'wattle') {
+        since = 0;
+        // A woven willow edge: three withies, in and out round each stake.
+        const k = this.row++;
+        for (let h = 0; h < 3; h++) {
+          const out = ((k + h) % 2 === 0 ? 1 : -1) * 0.012;
+          this.stones.add('plank', e.x + nx * out, y + 0.05 + h * 0.05, e.z + nz * out, v3(0.22, 0.85, lerp(0.15, 0.18, this.rng())), yaw + (this.rng() - 0.5) * 0.08, 0.04, tone(WILLOW), delay, 0, (this.rng() - 0.5) * 0.06);
+        }
+        if (k % 4 === 0) this.stones.add('plank', e.x, y + 0.11, e.z, v3(0.3, 1.2, 0.26), yaw, 0.03, tone(WILLOW, 0.78, 0.92), delay, 0, -Math.PI / 2 + (this.rng() - 0.5) * 0.08);
+        delay += 0.02;
+      } else if (style === 'timber') {
+        since = 0;
+        // Boards on edge, a hair outside the soil; a post every few boards.
+        const bx = e.x + nx * 0.02;
+        const bz = e.z + nz * 0.02;
+        this.stones.add('plank', bx, y + 0.15, bz, v3(2.35, lerp(0.9, 1.1, this.rng()), lerp(0.29, 0.31, this.rng())), yaw + (this.rng() - 0.5) * 0.04, 0.14, tone(BOARD), delay, 0, 0, Math.PI / 2 + (this.rng() - 0.5) * 0.03);
+        if (posts++ % 4 === 0) this.stones.add('plank', bx + nx * 0.03, y + 0.17, bz + nz * 0.03, v3(0.6, 2.2, 0.36), yaw, 0.05, tone(BOARD, 0.78, 0.9), delay + 0.05, 0, -Math.PI / 2);
+        delay += 0.04;
+      } else {
+        // A low dry-stone wall: a course of stones, then a smaller course on top.
+        if (this.stones.isOccupied(e.x, e.z, 0.09, 'rock')) continue;
+        since = 0;
+        for (let c = 0; c < 2; c++) {
+          const size = c === 0 ? lerp(0.24, 0.3, this.rng()) : lerp(0.2, 0.25, this.rng());
+          const o = c === 0 ? 0 : (this.rng() - 0.5) * 0.06;
+          this.stones.add('rock', e.x + nx * 0.03, y - 0.03 + c * 0.15, e.z + nz * 0.03 + o, v3(size, size * lerp(0.7, 0.9, this.rng()), size * 0.8), yaw + Math.PI / 2 + (this.rng() - 0.5) * 0.5, size * 0.4, tone(ROCK_TONES), delay + c * 0.1, 0);
+        }
+        delay += 0.03;
+      }
+    }
+  }
+
+  /**
    * The chosen species and, for those with a colour choice (roses), which colour: the selection
    * is saved as "species" or "species:colourIndex".
    */
@@ -437,8 +582,9 @@ export class FlowerBrush {
   private pickSpecies(): FlowerSpecies {
     const { id } = this.choice();
     if (id !== MIX_ID) return SPECIES.find((s) => s.id === id) ?? SPECIES[0];
-    const blooming = SPECIES.filter((s) => this.inSeason(s));
-    const land = SPECIES.filter((s) => !s.zone);
+    // (Mixes are flowers: foliage is added by the bed plan, or picked on its own.)
+    const blooming = SPECIES.filter((s) => this.inSeason(s) && s.form.kind !== 'foliage');
+    const land = SPECIES.filter((s) => !s.zone && s.form.kind !== 'foliage');
     const pool = blooming.filter((s) => !s.zone).length ? blooming.filter((s) => !s.zone) : land;
     return pool[Math.floor(this.rng() * pool.length)];
   }
@@ -457,8 +603,11 @@ export class FlowerBrush {
   }
 
   /** A colour for one plant: from the species' list (or the one chosen for it); "base|edge" is a bicolour. */
-  private plantColour(sp: FlowerSpecies): { color: THREE.Color; edge?: THREE.Color } {
-    const pick = Math.floor(this.rng() * sp.colors.length);
+  private plantColour(sp: FlowerSpecies, theme: Theme = 'jumble'): { color: THREE.Color; edge?: THREE.Color } {
+    // In a themed bed, a species shows the colours that suit the theme (if it has any).
+    const suits = sp.colors.map((c, i) => (fits(c, theme) ? i : -1)).filter((i) => i >= 0);
+    const r = this.rng();
+    const pick = suits.length ? suits[Math.floor(r * suits.length)] : Math.floor(r * sp.colors.length);
     const { id: chosenId, colour: chosen } = this.choice();
     const entry = sp.colors[sp.id === chosenId && chosen >= 0 && chosen < sp.colors.length ? chosen : pick];
     const [baseHex, edgeHex] = entry.split('|');
@@ -522,13 +671,16 @@ export class FlowerBrush {
     if (id === WATER_MIX_ID || SPECIES.find((s) => s.id === id)?.zone) return;
     if (this.blocked(c.x, c.y) || this.distanceToPaths(c.x, c.y) < 0.35) return;
     const reach = FOOTPRINT[this.amount]!;
+    // In a raised bed, plants go in on top of its soil.
+    let lift = 0;
+    for (const b of this.beds) if (b.lift && b.c.distanceTo(c) < EDGE_RADIUS) lift = Math.max(lift, b.lift);
     // On open lawn: a small, hand-dug circle of soil.
-    if (this.distanceToBeds(c.x, c.y) > -0.15) this.paint.bed(c.x, c.y, reach * 1.25);
+    if (this.distanceToBeds(c.x, c.y) > -0.15) this.paint.bed(c.x, c.y, reach * 1.25, 1, this.strokeTopping);
     this.wildflowers.clearNear(c.x, c.y, reach);
     const sp = this.pickSpecies();
     const { color, edge } = this.plantColour(sp);
     if (one) {
-      this.setPlant(sp, c, this.ground.heightAt(c.x, c.y) - 0.01, 0.05, color, edge);
+      this.setPlant(sp, c, this.ground.heightAt(c.x, c.y) - 0.01 + lift, 0.05, color, edge);
     } else {
       // A clump: one kind, the first right under the finger, the rest close round it, with a
       // leafy tuft tucked in.
@@ -538,7 +690,7 @@ export class FlowerBrush {
         const at = i === 0 ? c.clone() : this.around(c, ring, i, n);
         if (this.blocked(at.x, at.y) || this.distanceToPaths(at.x, at.y) < 0.35) continue;
         if (i > 0 && this.flowers.isCrowded(at.x, at.y, sp.spacing * FLOWER_SCALE * 0.45)) continue;
-        this.setPlant(sp, at, this.ground.heightAt(at.x, at.y) - 0.01, 0.05 + i * 0.12, color, edge);
+        this.setPlant(sp, at, this.ground.heightAt(at.x, at.y) - 0.01 + lift, 0.05 + i * 0.12, color, edge);
       }
       const greens = this.season === 'autumn' ? FOLIAGE_AUTUMN : this.season === 'winter' ? FOLIAGE_WINTER : FOLIAGE_GREEN;
       const a = this.rng() * Math.PI * 2;
@@ -547,7 +699,7 @@ export class FlowerBrush {
       if (!this.foliageNear(fx, fz, FOLIAGE_SPACING * 0.6)) {
         this.addFoliageSpot(fx, fz);
         const green = new THREE.Color(greens[Math.floor(this.rng() * greens.length)]).multiplyScalar(lerp(0.9, 1.1, this.rng()));
-        this.flowers.plantFoliage(fx, this.ground.heightAt(fx, fz) - 0.02, fz, this.rng() * Math.PI * 2, lerp(0.8, 1.2, this.rng()), 0.02, green);
+        this.flowers.plantFoliage(fx, this.ground.heightAt(fx, fz) - 0.02 + lift, fz, this.rng() * Math.PI * 2, lerp(0.8, 1.2, this.rng()), 0.02, green);
       }
     }
     this.onPlace(c.x, c.y, false);
@@ -568,6 +720,92 @@ export class FlowerBrush {
     this.flowers.plant(sp, variant, at.x, y, at.y, yaw, scale, delay, look.open, look.color, look.edge);
   }
 
+  /** Plan a new bed (see BedPlan). With one species chosen, it's that species at every height. */
+  private makePlan(): BedPlan {
+    const { id } = this.choice();
+    const theme = THEMES[Math.floor(this.rng() * THEMES.length)];
+    const tall = (sp: FlowerSpecies) => sp.height[1] >= 0.75;
+    const low = (sp: FlowerSpecies) => sp.height[1] <= 0.42;
+    let tiers: BedPlan['tiers'];
+    if (id !== MIX_ID) {
+      const sp = SPECIES.find((s) => s.id === id) ?? SPECIES[0];
+      tiers = { tall: [sp], mid: [sp], low: [sp] };
+    } else {
+      const flower = (s: FlowerSpecies) => !s.zone && s.form.kind !== 'foliage';
+      const blooming = SPECIES.filter((s) => flower(s) && this.inSeason(s));
+      const pool = blooming.length >= 4 ? blooming : SPECIES.filter(flower);
+      const themed = pool.filter((s) => s.colors.some((c) => fits(c, theme)));
+      const from = themed.length >= 4 ? themed : pool;
+      const pick = (list: FlowerSpecies[], n: number, fallback: FlowerSpecies[]) => {
+        const src = [...(list.length ? list : fallback)];
+        const out: FlowerSpecies[] = [];
+        while (out.length < n && src.length) out.push(src.splice(Math.floor(this.rng() * src.length), 1)[0]);
+        return out;
+      };
+      const mids = from.filter((s) => !tall(s) && !low(s));
+      tiers = {
+        tall: pick(from.filter(tall), 1, pool.filter(tall).length ? pool.filter(tall) : mids),
+        mid: pick(mids, 2, from),
+        low: pick(from.filter(low), 2, pool.filter(low).length ? pool.filter(low) : mids),
+      };
+    }
+    const tallLeaves: LeafKind[] = ['grass', 'fern', 'hosta', 'box', 'clump'];
+    const lowLeaves: LeafKind[] = ['silver', 'hosta', 'clump', 'box', 'fern'];
+    const a = tallLeaves[Math.floor(this.rng() * tallLeaves.length)];
+    let b = lowLeaves[Math.floor(this.rng() * lowLeaves.length)];
+    if (b === a) b = 'clump';
+    return { theme, tiers, drift: { tall: null, mid: null, low: null }, leaves: [a, b] };
+  }
+
+  /**
+   * Plant one dab of a bed, as a gardener would: foliage woven through, tall plants towards the
+   * middle of the bed, mid-height round them and low edgers at the rim, each in drifts.
+   */
+  private plantBed(c: THREE.Vector2) {
+    const plan = this.plan ?? (this.plan = this.makePlan());
+    const autumnal = this.season === 'autumn' || this.season === 'winter';
+    // Foliage first: the bed fills with green (and silver, and bronze), then flowers rise through it.
+    for (let i = 0; i < 3; i++) {
+      const a = this.rng() * Math.PI * 2;
+      const t = Math.sqrt(this.rng());
+      const r = t * PLANT_RADIUS * 0.95;
+      const x = c.x + Math.cos(a) * r;
+      const z = c.y + Math.sin(a) * r;
+      const kind = t < 0.55 ? plan.leaves[0] : plan.leaves[1];
+      if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.62 || this.foliageNear(x, z, kind === 'clump' ? FOLIAGE_SPACING : 0.5)) continue;
+      this.addFoliageSpot(x, z);
+      const tints = kind === 'grass' && autumnal ? ['#b89a5c', '#a88a50', '#c4a76a'] : kind === 'clump' ? (this.season === 'autumn' ? FOLIAGE_AUTUMN : this.season === 'winter' ? FOLIAGE_WINTER : FOLIAGE_GREEN) : LEAF_TINTS[kind];
+      const tint = new THREE.Color(tints[Math.floor(this.rng() * tints.length)]).multiplyScalar(lerp(0.9, 1.1, this.rng()) * (this.season === 'winter' ? 0.85 : 1));
+      const size = kind === 'clump' ? lerp(1.0, 1.6, this.rng()) : lerp(0.85, 1.2, this.rng()) * FLOWER_SCALE;
+      this.flowers.plantLeaf(kind, x, this.ground.heightAt(x, z) - 0.02 + this.lift, z, this.rng() * Math.PI * 2, size, this.strokeTime * 0.2 + this.rng() * 0.4, tint);
+    }
+    // Flowers by tier: where a plant falls across the bed decides how tall it is.
+    for (let i = 0; i < 20; i++) {
+      const a = this.rng() * Math.PI * 2;
+      const t = Math.sqrt(this.rng());
+      const r = t * PLANT_RADIUS;
+      const x = c.x + Math.cos(a) * r;
+      const z = c.y + Math.sin(a) * r;
+      let tier: 'tall' | 'mid' | 'low' = t < 0.4 ? 'tall' : t < 0.75 ? 'mid' : 'low';
+      if (!plan.tiers[tier].length) tier = plan.tiers.mid.length ? 'mid' : plan.tiers.low.length ? 'low' : 'tall';
+      const list = plan.tiers[tier];
+      // Each tier carries on with the same species for a while (a drift), then moves on.
+      if (!plan.drift[tier] || this.rng() < 0.22) plan.drift[tier] = list[Math.floor(this.rng() * list.length)];
+      const sp = plan.drift[tier]!;
+      if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.67) continue;
+      // Room round each plant (edgers sit a little closer, like a real border's front row).
+      if (this.flowers.isCrowded(x, z, sp.spacing * FLOWER_SCALE * SPACING * (tier === 'low' ? 0.85 : 1))) continue;
+      const { color, edge } = this.plantColour(sp, plan.theme);
+      // The wave: plants further from the stroke sprout a little later.
+      const delay = this.strokeTime * 0.2 + 0.1 + t * 0.9 + this.rng() * 0.25;
+      const variant = Math.floor(this.rng() * 5);
+      const yaw = this.rng() * Math.PI * 2;
+      const scale = FLOWER_SCALE * lerp(0.85, 1.15, this.rng());
+      const look = this.seasonal(sp, this.rng(), color, edge);
+      this.flowers.plant(sp, variant, x, this.ground.heightAt(x, z) - 0.01 + this.lift, z, yaw, scale, delay, look.open, look.color, look.edge);
+    }
+  }
+
   private dab(c: THREE.Vector2) {
     // Over a pond (or its damp bank): water flowers instead of a bed.
     if (this.water.zone(c.x, c.y)) {
@@ -578,50 +816,17 @@ export class FlowerBrush {
     const { id } = this.choice();
     if (id === WATER_MIX_ID || SPECIES.find((s) => s.id === id)?.zone) return;
     if (this.blocked(c.x, c.y) || this.distanceToPaths(c.x, c.y) < 0.52) return;
-    this.paint.bed(c.x, c.y, BED_RADIUS);
+    this.paint.bed(c.x, c.y, BED_RADIUS, 1, this.strokeTopping);
+    // A raised bed: its soil comes up to the top of the frame, with the plants on it.
+    if (this.lift > 0) this.raised?.add(c.x, this.ground.heightAt(c.x, c.y) + this.lift, c.y, EDGE_RADIUS * 0.96, this.strokeTime * 0.2);
     const centre = c.clone();
-    this.beds.push({ c: centre, stroke: this.strokeId });
+    this.beds.push({ c: centre, stroke: this.strokeId, lift: this.lift || undefined });
     const key = Math.floor(centre.x) * 4096 + Math.floor(centre.y);
     let cell = this.bedCells.get(key);
     if (!cell) this.bedCells.set(key, (cell = []));
     cell.push(centre);
     this.stroke.push(centre);
     this.wildflowers.clearNear(c.x, c.y, BED_RADIUS);
-    // Leafy foliage first: the bed fills with green, then the flowers rise out of it.
-    const greens = this.season === 'autumn' ? FOLIAGE_AUTUMN : this.season === 'winter' ? FOLIAGE_WINTER : FOLIAGE_GREEN;
-    // Just a few leafy clumps, well apart, so the mulch shows between the plants.
-    for (let i = 0; i < 2; i++) {
-      const a = this.rng() * Math.PI * 2;
-      const r = Math.sqrt(this.rng()) * PLANT_RADIUS * 0.95;
-      const x = c.x + Math.cos(a) * r;
-      const z = c.y + Math.sin(a) * r;
-      if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.62 || this.foliageNear(x, z, FOLIAGE_SPACING)) continue;
-      this.addFoliageSpot(x, z);
-      const green = new THREE.Color(greens[Math.floor(this.rng() * greens.length)]).multiplyScalar(lerp(0.9, 1.1, this.rng()));
-      this.flowers.plantFoliage(x, this.ground.heightAt(x, z) - 0.02, z, this.rng() * Math.PI * 2, lerp(1.0, 1.6, this.rng()), this.strokeTime * 0.2 + this.rng() * 0.4, green);
-    }
-    // In a mix, neighbouring plants tend to share a species, in soft drifts like a real border.
-    let drift = this.pickSpecies();
-    for (let i = 0; i < 16; i++) {
-      if (this.rng() < 0.35) drift = this.pickSpecies();
-      const sp = drift;
-      const a = this.rng() * Math.PI * 2;
-      const r = Math.sqrt(this.rng()) * PLANT_RADIUS;
-      const x = c.x + Math.cos(a) * r;
-      const z = c.y + Math.sin(a) * r;
-      if (this.blocked(x, z) || this.distanceToPaths(x, z) < 0.67) continue;
-      // Room round each plant: a cottage-garden scatter, not a carpet.
-      if (this.flowers.isCrowded(x, z, sp.spacing * FLOWER_SCALE * SPACING)) continue;
-      const { color, edge } = this.plantColour(sp);
-      // The wave: plants further from the stroke sprout a little later.
-      const delay = this.strokeTime * 0.2 + 0.1 + (r / PLANT_RADIUS) * 0.9 + this.rng() * 0.25;
-      // (Random draws in the same order as ever, so saved gardens grow back exactly.)
-      const variant = Math.floor(this.rng() * 5);
-      const yaw = this.rng() * Math.PI * 2;
-      const scale = FLOWER_SCALE * lerp(0.85, 1.15, this.rng());
-      // Blooming, in bud, gone to seed, or resting, by where it is in its year.
-      const look = this.seasonal(sp, this.rng(), color, edge);
-      this.flowers.plant(sp, variant, x, this.ground.heightAt(x, z) - 0.01, z, yaw, scale, delay, look.open, look.color, look.edge);
-    }
+    this.plantBed(c);
   }
 }

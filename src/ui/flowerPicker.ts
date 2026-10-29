@@ -1,3 +1,4 @@
+import { BED_ICONS } from './bedPicker';
 import { MIX_ID, WATER_MIX_ID, type FlowerSpecies } from '../world/flowerSpecies';
 
 /** A small illustrated flower icon for a species chip (inline SVG, 40×40). */
@@ -71,6 +72,56 @@ export function icon(sp: FlowerSpecies | null, water = false): string {
     }).join('');
     return svg(dots);
   }
+  if (f.kind === 'arch') {
+    // Arching stems hung with hearts or bells.
+    const [base, tip] = sp.colors[0].split('|');
+    const hang = [0.45, 0.6, 0.72, 0.84, 0.95].map((t) => {
+      const x = 8 + t * 24;
+      const y = 26 - Math.sin(t * Math.PI * 0.85) * 18 + 3;
+      return f.shape === 'heart'
+        ? `<path d="M${x} ${y}l-3 3c-2 2 0 5 3 3 3 2 5-1 3-3z" fill="${base}"/><circle cx="${x}" cy="${y + 6.5}" r="1.1" fill="${tip ?? '#fff'}"/>`
+        : `<path d="M${x - 2.6} ${y + 6}c0-4 1-6 2.6-6s2.6 2 2.6 6z" fill="${tip ?? base}"/><path d="M${x - 3} ${y + 3}l3-3 3 3z" fill="${base}"/>`;
+    }).join('');
+    return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 37C8 20 18 8 33 14" stroke="#5f8f3e" stroke-width="2" fill="none" stroke-linecap="round"/>${hang}</svg>`;
+  }
+  if (f.kind === 'cloud') {
+    // A haze of tiny florets on fine branching stems.
+    const dots = Array.from({ length: 30 }, (_, i) => `<circle cx="${(20 + Math.cos(i * 2.4) * Math.sqrt(i / 30) * 13).toFixed(1)}" cy="${(14 + Math.sin(i * 2.4) * Math.sqrt(i / 30) * 8).toFixed(1)}" r="1.3" fill="${c}"/>`).join('');
+    return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 38V22M20 26l-9-9M20 24l8-9M20 30l-5-12M20 28l11-6" stroke="#6f9a48" stroke-width="1.2" fill="none" stroke-linecap="round"/>${dots}</svg>`;
+  }
+  if (f.kind === 'pincushion') {
+    // Scabious: a pincushion with a frilly skirt; globe thistle: a spiky steel-blue ball.
+    if (f.spiky) {
+      const spikes = Array.from({ length: 16 }, (_, i) => {
+        const a = (i / 16) * Math.PI * 2;
+        return `<path d="M${(20 + Math.cos(a) * 5).toFixed(1)} ${(14 + Math.sin(a) * 5).toFixed(1)}L${(20 + Math.cos(a) * 9).toFixed(1)} ${(14 + Math.sin(a) * 9).toFixed(1)}" stroke="${c}" stroke-width="1.8" stroke-linecap="round"/>`;
+      }).join('');
+      return svg(`${spikes}<circle cx="20" cy="14" r="5.5" fill="${c}"/>`);
+    }
+    return svg(`${bloom(20, 15, c, 14, 5, c, 6)}<circle cx="20" cy="15" r="4.6" fill="${c}" stroke="rgba(0,0,0,.25)" stroke-width=".6"/>${[0, 1, 2, 3, 4, 5].map((i) => `<circle cx="${(20 + Math.cos(i) * 2.5).toFixed(1)}" cy="${(15 + Math.sin(i) * 2.5).toFixed(1)}" r=".9" fill="#fff"/>`).join('')}`);
+  }
+  if (f.kind === 'torch') {
+    // Red hot poker: a torch shading from gold at the bottom to scarlet at the top.
+    const [lo, hi] = sp.colors[0].split('|');
+    return `<svg viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="tg-${sp.id}" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${lo}"/><stop offset="1" stop-color="${hi ?? lo}"/></linearGradient></defs>
+      <path d="M20 38V20" stroke="#5f8f3e" stroke-width="2" stroke-linecap="round"/><path d="M14 38c2-8 3-12 5-16M26 38c-2-8-3-12-5-16" stroke="#6fa848" stroke-width="1.6" fill="none"/>
+      <ellipse cx="20" cy="12" rx="4.2" ry="10" fill="url(#tg-${sp.id})"/></svg>`;
+  }
+  if (f.kind === 'foliage') {
+    // Foliage: grass blades, a fern frond, broad hosta leaves, a silvery rosette, a box ball.
+    const fill = c;
+    const art =
+      f.leaf === 'grass'
+        ? Array.from({ length: 9 }, (_, i) => `<path d="M20 37C${20 + (i - 4) * 1.5} 25 ${20 + (i - 4) * 3.5} 16 ${20 + (i - 4) * 4} ${8 + Math.abs(i - 4) * 2}" stroke="${fill}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`).join('')
+        : f.leaf === 'fern'
+          ? [-1, 1].map((sd) => `<path d="M20 36C${20 + sd * 4} 26 ${20 + sd * 10} 16 ${20 + sd * 15} 12" stroke="${fill}" stroke-width="1.4" fill="none"/>${Array.from({ length: 6 }, (_, i) => `<path d="M${20 + sd * (3 + i * 2)} ${33 - i * 3.5}l${sd * 3} -3" stroke="${fill}" stroke-width="2" stroke-linecap="round"/>`).join('')}`).join('') + `<path d="M20 37V10" stroke="${fill}" stroke-width="1.6"/>`
+          : f.leaf === 'hosta'
+            ? [-50, -20, 10, 40].map((r) => `<path d="M20 34c-8-4-9-13-2-18 7 5 6 14 2 18z" fill="${fill}" stroke="rgba(0,0,0,.2)" stroke-width=".7" transform="rotate(${r} 20 34)"/>`).join('')
+            : f.leaf === 'silver'
+              ? Array.from({ length: 8 }, (_, i) => `<ellipse cx="20" cy="26" rx="3.2" ry="8" fill="${fill}" stroke="rgba(0,0,0,.15)" stroke-width=".6" transform="rotate(${i * 45} 20 30)"/>`).join('')
+              : `<circle cx="20" cy="22" r="11" fill="${fill}"/><circle cx="16" cy="18" r="4" fill="rgba(255,255,255,.12)"/>`;
+    return `<svg viewBox="0 0 40 40" aria-hidden="true">${art}</svg>`;
+  }
   if (f.domed) {
     // Pom-pom: rings of petals building up to a crown.
     return svg(`${bloom(20, 15, c, 12, 5, c)}${bloom(20, 14, c, 9, 4, c, 3.6)}<circle cx="20" cy="13.5" r="3.4" fill="${c}" stroke="rgba(0,0,0,.2)" stroke-width=".6"/>`);
@@ -133,7 +184,10 @@ export class FlowerPicker {
   onBook: () => void = () => {};
   /** The amount chip was tapped: move on to the next amount (drift → clump → one). */
   onAmount: () => void = () => {};
+  /** The bed chip was tapped: open or close the bed panel (edges and toppings). */
+  onBed: () => void = () => {};
   private readonly amountChip: HTMLButtonElement;
+  private readonly bedChip: HTMLButtonElement;
 
   constructor(
     private readonly species: FlowerSpecies[],
@@ -166,7 +220,16 @@ export class FlowerPicker {
       this.onAmount();
     });
     this.setAmount('drift');
-    row.append(this.amountChip, book);
+    this.bedChip = document.createElement('button');
+    this.bedChip.type = 'button';
+    this.bedChip.className = 'flower-chip bed-chip amount-chip';
+    this.bedChip.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.bedChip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.onBed();
+    });
+    this.setBed(BED_ICONS.stone[0]);
+    row.append(this.amountChip, this.bedChip, book);
     const entries: [string, string, FlowerSpecies | null, boolean][] = [
       [MIX_ID, 'Seasonal mix', null, true],
       [WATER_MIX_ID, 'Water mix', null, true],
@@ -231,6 +294,12 @@ export class FlowerPicker {
   }
 
   /** Choose a species (from a chip or the book), as if its chip were tapped. */
+  /** Show the current bed style's drawing on the Bed chip. */
+  setBed(svg: string) {
+    this.bedChip.setAttribute('aria-label', 'Bed edge and topping');
+    this.bedChip.innerHTML = `<span class="chip-face">${svg}</span><span class="chip-name">Bed</span>`;
+  }
+
   /** Show which amount is chosen on its chip. */
   setAmount(amount: 'drift' | 'clump' | 'one') {
     const [svg, label] = AMOUNT_ICONS[amount];

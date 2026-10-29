@@ -225,6 +225,9 @@ interface Placed {
   pos: THREE.Vector3;
   scale: THREE.Vector3;
   yaw: number;
+  /** Optional tilt: pitch about the piece's own x, and roll about its own z (applied before yaw). */
+  pitch: number;
+  roll: number;
   r: number;
   owner: number;
   removed?: boolean;
@@ -357,7 +360,7 @@ export class Stones {
     return gone;
   }
 
-  add(kind: StoneKind, x: number, y: number, z: number, scale: THREE.Vector3, yaw: number, r: number, tone: THREE.Color, delay: number, owner = 0) {
+  add(kind: StoneKind, x: number, y: number, z: number, scale: THREE.Vector3, yaw: number, r: number, tone: THREE.Color, delay: number, owner = 0, pitch = 0, roll = 0) {
     const list = this.meshes.get(kind)!;
     const mesh = list[Math.floor(this.rng() * list.length)];
     if (mesh.count >= CAPACITY) return;
@@ -365,7 +368,7 @@ export class Stones {
     mesh.visible = true;
     mesh.setColorAt(index, tone);
     if (mesh.instanceColor) touch(mesh.instanceColor, index);
-    const stone: Placed = { kind, mesh, index, pos: new THREE.Vector3(x, y, z), scale: scale.clone(), yaw, r, owner };
+    const stone: Placed = { kind, mesh, index, pos: new THREE.Vector3(x, y, z), scale: scale.clone(), yaw, pitch, roll, r, owner };
     const k = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
     if (!this.grid.has(k)) this.grid.set(k, []);
     this.grid.get(k)!.push(stone);
@@ -375,7 +378,7 @@ export class Stones {
 
   private write(st: Placed, lift: number, k: number, squash = 0, force = false) {
     if (st.removed && !force) return;
-    this.e.set(0, st.yaw, 0);
+    this.e.set(st.pitch, st.yaw, st.roll, 'YXZ');
     this.q.setFromEuler(this.e);
     this.s.set(st.scale.x * k * (1 + squash * 0.4), st.scale.y * k * (1 - squash), st.scale.z * k * (1 + squash * 0.4));
     this.m.compose(this.p.set(st.pos.x, st.pos.y + lift, st.pos.z), this.q, this.s);
