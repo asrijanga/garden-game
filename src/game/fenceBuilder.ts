@@ -1,15 +1,19 @@
 import * as THREE from 'three';
 import { createRng, lerp } from '../core/random';
-import type { Fences, FenceStyle, Part } from '../world/fences';
+import { EDGE_STYLES, type Fences, type FenceStyle, type Part } from '../world/fences';
 import type { Wildflowers } from '../world/wildflowers';
 import type { Vines } from '../world/vines';
 
 const SAMPLE = 0.1; // metres between smoothed stroke samples
 /** Longest run between two posts (hedges are built in shorter sections). */
-const SPAN: Record<FenceStyle, number> = { picket: 2.0, rustic: 2.4, hedge: 1.4, wall: 2.0 };
+const SPAN: Record<FenceStyle, number> = { picket: 2.0, rustic: 2.4, hedge: 1.4, wall: 2.0, boxEdge: 1.2, stoneEdge: 1.2, brickEdge: 1.2, willowEdge: 1.0, picketEdge: 1.2 };
 /** How far the line may bow away from a straight run before a corner post goes in. */
 const CORNER = 0.16;
-const PATH_CLEAR = 0.78; // keep this far from a path's centre line (its gravel edge)
+const PATH_CLEAR = 0.78; // keep this far from a path's centre line
+/** Edgings may run close beside a path (its stones are ~0.3 m from the centre line). */
+const pathClear = (style: FenceStyle) => (EDGE_STYLES.has(style) ? 0.45 : PATH_CLEAR);
+const BRICK_TINTS = ['#e0866a', '#d27560', '#e8977a', '#c96a55', '#dc8b68', '#c27058'];
+const WILLOW_TINTS = ['#c9b49a', '#bba68b', '#d4c2a8', '#b09a80'];
 const PICKET_TINTS = ['#ffffff', '#fbf8f2', '#f4f0e8', '#ece6da'];
 const LOG_TINTS = ['#ffffff', '#f2eee8', '#e6dfd5', '#d9d2c8'];
 // Weathered grey stone: some warmer, some cooler, the odd darker or rust-stained one.
@@ -215,7 +219,7 @@ export class FenceBuilder {
     }
     // Never set a post down in a path: wait until the line is clear of it, so a crossing always
     // falls between two posts and gets a gate.
-    const inPath = (q: THREE.Vector2) => this.distanceToPaths(q.x, q.y) < PATH_CLEAR + 0.15;
+    const inPath = (q: THREE.Vector2) => this.distanceToPaths(q.x, q.y) < pathClear(this.style) + 0.15;
     if (worst > CORNER && at >= 0 && !inPath(s[at])) {
       // A bend: the corner post goes exactly where the line turned.
       const corner = s[at].clone();
@@ -249,7 +253,7 @@ export class FenceBuilder {
       const t = (i / n) * len;
       const x = seg.a.x + dir.x * t;
       const z = seg.a.y + dir.y * t;
-      const kind = this.distanceToPaths(x, z) < PATH_CLEAR ? 'path' : this.blocked(x, z) ? 'blocked' : 'fence';
+      const kind = this.distanceToPaths(x, z) < pathClear(seg.style) ? 'path' : this.blocked(x, z) ? 'blocked' : 'fence';
       const last = out[out.length - 1];
       if (last && last.kind === kind) last.to = t;
       else out.push({ from: t, to: t, kind });
@@ -283,18 +287,22 @@ export class FenceBuilder {
 
   /** A post at (x, z), unless one is already there (corners and joins share posts). */
   private post(seg: Segment, x: number, z: number, delay: number, tall = 1): Part | null {
-    const existing = this.fences.postNear(x, z, 0.3);
-    if (existing) return existing;
     const style = seg.style;
-    if (style === 'hedge' || style === 'wall') return null;
-    const shape = style === 'picket' ? 'picketPost' : 'logPost';
+    const mini = style === 'picketEdge' || style === 'willowEdge';
+    if (!mini && style !== 'picket' && style !== 'rustic') return null;
+    const existing = this.fences.postNear(x, z, mini ? 0.12 : 0.3);
+    if (existing) return existing;
+    const shape = style === 'picket' || style === 'picketEdge' ? 'picketPost' : 'logPost';
     const yaw = Math.atan2(-(seg.b.y - seg.a.y), seg.b.x - seg.a.x) + (this.rng() - 0.5) * 0.15;
     // Hand-set: each post leans a hair and stands a touch higher or lower than its neighbour.
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler((this.rng() - 0.5) * 0.05, yaw, (this.rng() - 0.5) * 0.05, 'YXZ'));
-    const tint = new THREE.Color(style === 'picket' ? PICKET_TINTS[Math.floor(this.rng() * 4)] : LOG_TINTS[Math.floor(this.rng() * 4)]);
-    const y = this.heightAt(x, z) - lerp(0.05, 0.1, this.rng());
+    const tint = new THREE.Color(shape === 'picketPost' ? PICKET_TINTS[Math.floor(this.rng() * 4)] : style === 'willowEdge' ? WILLOW_TINTS[Math.floor(this.rng() * 4)] : LOG_TINTS[Math.floor(this.rng() * 4)]);
+    const y = this.heightAt(x, z) - lerp(0.05, 0.1, this.rng()) * (mini ? 0.5 : 1);
     this.wildflowers.clearNear(x, z, 0.3);
-    return this.fences.add(shape, new THREE.Vector3(x, y, z), q, new THREE.Vector3(1, tall * lerp(0.96, 1.04, this.rng()), 1), tint, 'drop', delay, seg.id);
+    // An edging's posts are little: a mini picket post, or a short willow stake.
+    const scale = style === 'picketEdge' ? new THREE.Vector3(0.62, 0.42 * tall, 0.62) : style === 'willowEdge' ? new THREE.Vector3(0.42, 0.3 * tall, 0.42) : new THREE.Vector3(1, tall, 1);
+    scale.y *= lerp(0.96, 1.04, this.rng());
+    return this.fences.add(shape, new THREE.Vector3(x, y, z), q, scale, tint, 'drop', delay, seg.id);
   }
 
   /** A rail (or log) from one point to another, given heights above the ground at each end. */
@@ -320,6 +328,10 @@ export class FenceBuilder {
     for (let t = 0; t <= len; t += 0.3) this.wildflowers.clearNear(a.x + dir.x * t, a.y + dir.y * t, 0.35);
     if (seg.style === 'wall') {
       this.wall(seg, a, b, delay, startEnd, endEnd);
+      return;
+    }
+    if (EDGE_STYLES.has(seg.style)) {
+      this.edging(seg, a, b, delay);
       return;
     }
     if (seg.style === 'hedge') {
@@ -442,9 +454,113 @@ export class FenceBuilder {
     }
   }
 
+  /**
+   * A run of low edging for a bed or a path: a clipped box hedge, a row of natural stones,
+   * bricks set on end and leaning like a row of dominoes, willow withies woven between short
+   * stakes, or a mini white picket. Each piece a little different, the odd one nudged or missing.
+   */
+  private edging(seg: Segment, a: THREE.Vector2, b: THREE.Vector2, delay: number) {
+    const len = a.distanceTo(b);
+    const dir = b.clone().sub(a).divideScalar(Math.max(len, 1e-6));
+    const yaw = Math.atan2(-dir.y, dir.x);
+    const at = (t: number, side = 0) => {
+      const x = a.x + dir.x * t - dir.y * side;
+      const z = a.y + dir.y * t + dir.x * side;
+      return new THREE.Vector3(x, this.heightAt(x, z), z);
+    };
+    const quat = (wobble: number, tilt = 0) => new THREE.Quaternion().setFromEuler(new THREE.Euler((this.rng() - 0.5) * wobble, yaw + (this.rng() - 0.5) * wobble, tilt + (this.rng() - 0.5) * wobble, 'YXZ'));
+    switch (seg.style) {
+      case 'boxEdge': {
+        // A low clipped box hedge: little overlapping sections, growing up in a wave.
+        const n = Math.max(1, Math.round(len / 0.2));
+        for (let i = 0; i <= n; i++) {
+          const t = (i / n) * len;
+          const p = at(t, (this.rng() - 0.5) * 0.03);
+          p.y -= 0.02;
+          const w = lerp(0.3, 0.36, this.rng());
+          this.fences.add('hedge', p, quat(0.1), new THREE.Vector3(w, lerp(0.26, 0.32, this.rng()), w), new THREE.Color(1, 1, 1).multiplyScalar(lerp(0.92, 1.08, this.rng())), 'grow', delay + t * 0.1, seg.id);
+        }
+        break;
+      }
+      case 'stoneEdge': {
+        // Natural stones laid end to end, rounded and a little uneven, with small gaps.
+        let t = lerp(0, 0.08, this.rng());
+        while (t < len) {
+          const l = lerp(0.16, 0.26, this.rng());
+          const mid = Math.min(len, t + l / 2);
+          t += l + lerp(0.01, 0.04, this.rng());
+          if (this.rng() < 0.03) continue;
+          const h = lerp(0.09, 0.14, this.rng());
+          const p = at(mid, (this.rng() - 0.5) * 0.04);
+          p.y += h * 0.3;
+          const tint = new THREE.Color(STONE_TINTS[Math.floor(this.rng() * STONE_TINTS.length)]).multiplyScalar(lerp(0.92, 1.05, this.rng()));
+          this.fences.add('wallStone', p, quat(0.25), new THREE.Vector3(l, h, lerp(0.13, 0.18, this.rng())), tint, 'drop', delay + (mid / len) * 0.6, seg.id);
+        }
+        break;
+      }
+      case 'brickEdge': {
+        // Bricks on end, set at a slant all the same way, like a row of dominoes.
+        for (let t = 0.04; t < len; t += 0.075) {
+          if (this.rng() < 0.03) continue;
+          const p = at(t, (this.rng() - 0.5) * 0.015);
+          p.y += 0.04;
+          const tint = new THREE.Color(BRICK_TINTS[Math.floor(this.rng() * BRICK_TINTS.length)]).multiplyScalar(lerp(0.9, 1.05, this.rng()));
+          this.fences.add('wallStone', p, quat(0.06, -0.5), new THREE.Vector3(0.065, 0.2, 0.1), tint, 'drop', delay + (t / len) * 0.7, seg.id);
+        }
+        break;
+      }
+      case 'willowEdge': {
+        // Short stakes at each end and every 30 cm, with three withies woven along between.
+        this.post(seg, a.x, a.y, delay);
+        this.post(seg, b.x, b.y, delay + 0.1);
+        const stakes = Math.max(1, Math.round(len / 0.3));
+        for (let i = 1; i < stakes; i++) {
+          const p = at((i / stakes) * len);
+          const q = quat(0.08);
+          this.fences.add('logPost', new THREE.Vector3(p.x, p.y - 0.03, p.z), q, new THREE.Vector3(0.32, 0.26, 0.32), new THREE.Color(WILLOW_TINTS[Math.floor(this.rng() * 4)]), 'drop', delay + 0.1 + i * 0.03, seg.id);
+        }
+        for (let k = 0; k < 3; k++) {
+          const h = 0.07 + k * 0.065;
+          const side = (k % 2 ? 1 : -1) * 0.012;
+          const pa = at(0, side);
+          const pb = at(len, side);
+          pa.y += h + (this.rng() - 0.5) * 0.015;
+          pb.y += h + (this.rng() - 0.5) * 0.015;
+          const mid = pa.clone().add(pb).multiplyScalar(0.5);
+          mid.y -= len * 0.01;
+          const d = pb.clone().sub(pa);
+          const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), d.clone().normalize());
+          this.fences.add('log', mid, q, new THREE.Vector3(d.length() + 0.06, 0.34, 0.34), new THREE.Color(WILLOW_TINTS[Math.floor(this.rng() * 4)]), 'pop', delay + 0.35 + k * 0.08, seg.id, d.length() / 2);
+        }
+        break;
+      }
+      case 'picketEdge': {
+        // A little white picket edging: knee-low, with one rail and pickets close together.
+        this.post(seg, a.x, a.y, delay);
+        this.post(seg, b.x, b.y, delay + 0.1);
+        const pa = new THREE.Vector3(a.x, this.heightAt(a.x, a.y) + 0.17, a.y);
+        const pb = new THREE.Vector3(b.x, this.heightAt(b.x, b.y) + 0.17, b.y);
+        const d = pb.clone().sub(pa);
+        const rq = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), d.clone().normalize());
+        this.fences.add('rail', pa.clone().add(pb).multiplyScalar(0.5), rq, new THREE.Vector3(d.length() + 0.02, 0.6, 0.7), new THREE.Color(PICKET_TINTS[Math.floor(this.rng() * 4)]), 'pop', delay + 0.25, seg.id, d.length() / 2);
+        const gap = 0.075;
+        const n = Math.floor((len - 0.08) / gap);
+        const start = (len - n * gap) / 2;
+        for (let i = 0; i <= n; i++) {
+          if (this.rng() < 0.02) continue;
+          const t = start + i * gap + (this.rng() - 0.5) * 0.008;
+          const p = at(t, -0.022);
+          p.y += 0.03;
+          this.fences.add('picket', p, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, (this.rng() - 0.5) * 0.06)), new THREE.Vector3(0.6, lerp(0.34, 0.38, this.rng()), 0.6), new THREE.Color(PICKET_TINTS[Math.floor(this.rng() * 4)]), 'pop', delay + 0.35 + i * 0.02, seg.id);
+        }
+        break;
+      }
+    }
+  }
+
   /** A gate across an opening from a to b, hung on a and left a little ajar. */
   private gate(seg: Segment, a: THREE.Vector2, b: THREE.Vector2, delay: number) {
-    if (seg.style === 'wall') return; // walls finish in a neat opening instead
+    if (seg.style === 'wall' || EDGE_STYLES.has(seg.style)) return; // walls and edgings just leave an opening
     const width = a.distanceTo(b);
     const dir = b.clone().sub(a).divideScalar(Math.max(width, 1e-6));
     if (seg.style === 'hedge') {
@@ -515,7 +631,7 @@ export class FenceBuilder {
       const s1 = this.segments[i];
       const s2 = this.segments[i + 1];
       if (s1.locked || s2.locked || s1.style !== s2.style || s1.b.distanceTo(s2.a) > 1e-3) continue;
-      if (this.distanceToPaths(s1.b.x, s1.b.y) >= PATH_CLEAR) continue;
+      if (this.distanceToPaths(s1.b.x, s1.b.y) >= pathClear(s1.style)) continue;
       const d1 = s1.b.clone().sub(s1.a).normalize();
       const d2 = s2.b.clone().sub(s2.a).normalize();
       if (d1.dot(d2) < 0.9) continue;
@@ -526,7 +642,7 @@ export class FenceBuilder {
     }
     for (const seg of this.segments) {
       if (seg.locked) continue;
-      const touched = near.some((p) => distToSegment(p, seg.a, seg.b) < PATH_CLEAR + 1.5);
+      const touched = near.some((p) => distToSegment(p, seg.a, seg.b) < pathClear(seg.style) + 1.5);
       if (!touched) continue;
       const sig = this.stretches(seg)
         .map((p) => `${p.kind}${p.from.toFixed(1)}`)

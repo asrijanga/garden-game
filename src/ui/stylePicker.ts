@@ -1,6 +1,9 @@
 import type { BuildStyle } from '../game/tools';
 import type { PropKind } from '../world/props';
 
+/** A few flowers peeking over an edging, in the edging chips. */
+const EDGE_FLOWERS = `<path d="M10 22v-8M20 21v-10M30 22v-7" stroke="#5f8f3e" stroke-width="1.6"/><circle cx="10" cy="13" r="3" fill="#f08fb4"/><circle cx="20" cy="10" r="3.2" fill="#f2c94c"/><circle cx="30" cy="14" r="3" fill="#9b7fd6"/>`;
+
 export const BUILD_CHIPS: { id: BuildStyle; label: string; icon: string }[] = [
   {
     id: 'picket',
@@ -51,6 +54,45 @@ export const BUILD_CHIPS: { id: BuildStyle; label: string; icon: string }[] = [
       <path d="M6 33c0-8 4-15 11-16 6-1 10 3 12 8 1 3 1 6 0 8z" fill="#a9a196" stroke="#6f685f" stroke-width="1.4" stroke-linejoin="round"/>
       <path d="M11 22c3-3 8-4 12-2" stroke="#7fa64a" stroke-width="3" stroke-linecap="round" opacity=".85"/>
       <path d="M27 33c0-4 2-7 5-7s4 3 4 7z" fill="#bdb5a9" stroke="#6f685f" stroke-width="1.3" stroke-linejoin="round"/>
+    </svg>`,
+  },
+  // Low edgings for beds and paths (each drawn with a few flowers behind it).
+  {
+    id: 'boxEdge',
+    label: 'Box edging',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">${EDGE_FLOWERS}
+      <rect x="4" y="22" width="32" height="11" rx="5.5" fill="#4f8636" stroke="#335f24" stroke-width="1.3"/>
+      <path d="M9 26c2-1 3-1 5 0M20 25c2-1 3-1 5 0M28 27c1.5-1 3-1 4 0" stroke="#78ad55" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>`,
+  },
+  {
+    id: 'stoneEdge',
+    label: 'Stone edging',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">${EDGE_FLOWERS}
+      ${[[4, 9], [13.5, 8], [22, 9.5], [32, 6]].map(([x, w]) => `<rect x="${x}" y="${25 + (x % 3)}" width="${w}" height="7" rx="3.2" fill="#b3aca1" stroke="#6f685f" stroke-width="1.2"/>`).join('')}
+    </svg>`,
+  },
+  {
+    id: 'brickEdge',
+    label: 'Brick edging',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">${EDGE_FLOWERS}
+      ${[0, 1, 2, 3, 4, 5, 6].map((i) => `<rect x="${5 + i * 4.4}" y="21" width="3.4" height="11" rx=".6" transform="rotate(-22 ${6.7 + i * 4.4} 32)" fill="${['#c9654b', '#b8573f', '#d27a5c'][i % 3]}" stroke="#7a3a28" stroke-width=".6"/>`).join('')}
+    </svg>`,
+  },
+  {
+    id: 'willowEdge',
+    label: 'Willow edging',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">${EDGE_FLOWERS}
+      ${[7, 16, 25, 34].map((x) => `<path d="M${x} 33v-12" stroke="#8a7258" stroke-width="2.4" stroke-linecap="round"/>`).join('')}
+      ${[24, 27.5, 31].map((y, i) => `<path d="M4 ${y}c4 ${i % 2 ? 1.6 : -1.6} 9 ${i % 2 ? 1.6 : -1.6} 12 0s8 ${i % 2 ? -1.6 : 1.6} 12 0 6 ${i % 2 ? 1.6 : -1.6} 8 0" stroke="#c9b49a" stroke-width="2" fill="none" stroke-linecap="round"/>`).join('')}
+    </svg>`,
+  },
+  {
+    id: 'picketEdge',
+    label: 'Mini picket',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">${EDGE_FLOWERS}
+      <path d="M4 28h32" stroke="#d8ccb4" stroke-width="2" stroke-linecap="round"/>
+      ${[6, 10.5, 15, 19.5, 24, 28.5, 33].map((x) => `<path d="M${x - 1.6} 34V24l1.6-2 1.6 2v10z" fill="#fbf7ee" stroke="#9c8667" stroke-width="1" stroke-linejoin="round"/>`).join('')}
     </svg>`,
   },
 ];

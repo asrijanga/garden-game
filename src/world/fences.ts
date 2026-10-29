@@ -6,7 +6,10 @@ import { createRng, lerp } from '../core/random';
 import { regrow } from '../core/regrow';
 import { addWind } from '../render/wind';
 
-export type FenceStyle = 'picket' | 'rustic' | 'hedge' | 'wall';
+export type FenceStyle = 'picket' | 'rustic' | 'hedge' | 'wall' | EdgeStyle;
+/** Low edgings for flower beds and paths, drawn just like a fence. */
+export type EdgeStyle = 'boxEdge' | 'stoneEdge' | 'brickEdge' | 'willowEdge' | 'picketEdge';
+export const EDGE_STYLES = new Set<FenceStyle>(['boxEdge', 'stoneEdge', 'brickEdge', 'willowEdge', 'picketEdge']);
 export type PartShape = 'picketPost' | 'picket' | 'rail' | 'logPost' | 'log' | 'hedge' | 'wallStone';
 /** How a part arrives: knocked in from above, popped into place, or grown up out of the lawn. */
 import type { Perch } from './perchingBirds';
