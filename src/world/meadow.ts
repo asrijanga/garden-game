@@ -103,6 +103,8 @@ export class Meadow {
   private cursor = 0;
   /** How many sites (in growth order) are allowed to bloom so far. */
   grown = 0;
+  /** Kept mown: the meadow doesn't creep back in. */
+  keepMown = false;
   private readonly m = new THREE.Matrix4();
   private readonly sc = new THREE.Matrix4();
 
@@ -184,8 +186,13 @@ export class Meadow {
     touch(s.mesh.instanceMatrix, s.index);
   }
 
+  /** Mow it all down: every clump shrinks back into the lawn (and it starts over from nothing). */
+  mow() {
+    this.grown = 0;
+  }
+
   update(dt: number) {
-    this.grown = Math.min(this.sites.length, this.grown + dt * GROW_PER_SECOND);
+    if (!this.keepMown) this.grown = Math.min(this.sites.length, this.grown + dt * GROW_PER_SECOND);
     const limit = Math.floor(this.grown);
     // Walk round the sites a few at a time: grown and unbuilt-on → bloom; built over → fade.
     for (let c = 0; c < CHECKS_PER_FRAME && this.sites.length; c++) {

@@ -158,3 +158,59 @@ export class ChipPicker<T extends string> {
     this.el.classList.toggle('show', v);
   }
 }
+
+const MOW_ICON = `<svg viewBox="0 0 40 40" aria-hidden="true">
+  <rect x="4" y="9" width="32" height="24" rx="5" fill="#6fa848"/>
+  ${[0, 1, 2, 3].map((i) => `<rect x="${4 + i * 8}" y="9" width="8" height="24" fill="${i % 2 ? '#86bd5c' : '#6fa848'}"/>`).join('')}
+  <path d="M9 13l1-3 1 3M29 30l1-3 1 3" stroke="#3f7a26" stroke-width="1.2" fill="none"/>
+  ${[[30, 13, '#f08fb4'], [10, 28, '#f2c94c']].map(([x, y, c]) => `<circle cx="${x}" cy="${y}" r="2" fill="${c}" opacity=".45"/>`).join('')}
+</svg>`;
+const KEEP_ICON = `<svg viewBox="0 0 40 40" aria-hidden="true">
+  <rect x="4" y="9" width="32" height="24" rx="5" fill="#6fa848"/>
+  ${[0, 1, 2, 3].map((i) => `<rect x="${4 + i * 8}" y="9" width="8" height="24" fill="${i % 2 ? '#86bd5c' : '#6fa848'}"/>`).join('')}
+  <circle cx="29" cy="14" r="7" fill="#fffaf0" stroke="#c9a96a" stroke-width="1.2"/>
+  <path d="M25.6 14.2l2.4 2.4 4.4-5" stroke="#5f8f3e" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+/**
+ * The Tidy up tool's extras: mow the wild growth (the meadow and the lawn's wildflowers) away in
+ * one go, and a "keep it mown" switch so it doesn't creep back in.
+ */
+export class TidyPicker {
+  private readonly el: HTMLDivElement;
+  private readonly keep: HTMLButtonElement;
+
+  constructor(onMow: () => void, onKeep: (on: boolean) => void, keepMown: boolean) {
+    this.el = document.createElement('div');
+    this.el.className = 'flower-picker';
+    const row = document.createElement('div');
+    row.className = 'flower-picker-row';
+    this.el.append(row);
+    const chip = (label: string, icon: string, act: () => void) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'flower-chip';
+      b.setAttribute('aria-label', label);
+      b.innerHTML = `<span class="chip-face">${icon}</span><span class="chip-name">${label}</span>`;
+      b.addEventListener('pointerdown', (e) => e.stopPropagation());
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        act();
+      });
+      row.append(b);
+      return b;
+    };
+    chip('Mow wild growth', MOW_ICON, onMow);
+    this.keep = chip('Keep it mown', KEEP_ICON, () => {
+      const on = !this.keep.classList.contains('active');
+      this.keep.classList.toggle('active', on);
+      onKeep(on);
+    });
+    this.keep.classList.toggle('active', keepMown);
+    document.body.append(this.el);
+  }
+
+  setVisible(v: boolean) {
+    this.el.classList.toggle('show', v);
+  }
+}

@@ -49,8 +49,12 @@ export class Wildflowers {
     }
   }
 
+  /** Kept mown: cleared flowers don't grow back. */
+  keepMown = false;
+
   /** Cleared flowers wherever `free(x, z)` is true grow back, one by one, after a moment. */
   restoreIf(free: (x: number, z: number) => boolean, delay = 1) {
+    if (this.keepMown) return;
     for (let i = 0; i < this.positions.length; i++) {
       if (this.target[i] === 1 || !free(this.positions[i].x, this.positions[i].y)) continue;
       this.target[i] = 1;

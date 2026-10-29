@@ -44,7 +44,7 @@ import { PondBrush } from './game/pondBrush';
 import { EraseBrush } from './game/eraseBrush';
 import { FenceBuilder } from './game/fenceBuilder';
 import { Fences } from './world/fences';
-import { ChipPicker, BUILD_CHIPS, DECOR_CHIPS } from './ui/stylePicker';
+import { ChipPicker, BUILD_CHIPS, DECOR_CHIPS, TidyPicker } from './ui/stylePicker';
 import { Props } from './world/props';
 import { PropBrush } from './game/propBrush';
 import { Boulders } from './world/boulders';
@@ -418,6 +418,7 @@ function tuckAway(tool: Tool) {
     picker.setVisible(false);
     stylePicker.setVisible(false);
     decorPicker.setVisible(false);
+    tidyPicker.setVisible(false);
     document.body.classList.remove('picking');
     if (tuckHints++ < 3) window.setTimeout(() => toolbar.showLabel('Tap the tool again to choose another', 2000), 1400);
   }, 350);
@@ -479,6 +480,53 @@ try {
 } catch {
   // no storage: the meadow just starts afresh
 }
+// Wild growth (the meadow and the lawn's wildflowers) can be mown away, and kept mown.
+const MOWN_KEY = 'garden-keep-mown';
+let keepMown = false;
+try {
+  keepMown = localStorage.getItem(MOWN_KEY) === '1';
+} catch {
+  // no storage: let it grow
+}
+const setKeepMown = (on: boolean) => {
+  keepMown = on;
+  meadow.keepMown = on;
+  wildflowers.keepMown = on;
+  try {
+    localStorage.setItem(MOWN_KEY, on ? '1' : '0');
+  } catch {
+    // nothing to do
+  }
+};
+let mownWild = false;
+const mow = () => {
+  mownWild = true;
+  meadow.mow();
+  wildflowers.clearIf(() => true);
+};
+setKeepMown(keepMown);
+if (keepMown) mow();
+const tidyPicker = new TidyPicker(
+  () => {
+    mow();
+    ambience.erase(1);
+    toolbar.showLabel(keepMown ? 'Mown, and kept that way' : 'Mown · it will grow back slowly', 2200);
+    tuckAway('erase');
+  },
+  (on) => {
+    setKeepMown(on);
+    if (on) mow();
+    else {
+      // Let it go wild again: the wildflowers creep back over the open lawn, a few at a time.
+      mownWild = false;
+      wildflowers.restoreIf((x, z) => !(cottage.contains(x, z, 0.4) || paths.distanceToPaths(x, z) < 0.8 || flowerBrush.distanceToBeds(x, z) < 0.15 || ponds.contains(x, z, 0.4)), 1 + Math.random() * 8);
+    }
+    ambience.tap(on ? 1.2 : 0.9);
+    toolbar.showLabel(on ? 'Kept mown: no wild growth' : 'Letting it grow wild again', 2200);
+    tuckAway('erase');
+  },
+  keepMown,
+);
 setInterval(() => {
   try {
     localStorage.setItem(MEADOW_KEY, String(Math.floor(meadow.grown)));
@@ -756,7 +804,8 @@ tools = new ToolController(
     picker.setVisible(tool === 'flowers');
     stylePicker.setVisible(tool === 'fence');
     decorPicker.setVisible(tool === 'decor');
-    document.body.classList.toggle('picking', tool === 'flowers' || tool === 'fence' || tool === 'decor');
+    tidyPicker.setVisible(tool === 'erase');
+    document.body.classList.toggle('picking', tool === 'flowers' || tool === 'fence' || tool === 'decor' || tool === 'erase');
   },
 );
 const controller = tools;
@@ -830,6 +879,7 @@ cottagePanelRef = cottagePanel;
       picker.setVisible(false);
       stylePicker.setVisible(false);
       decorPicker.setVisible(false);
+      tidyPicker.setVisible(false);
       cottagePanel.setVisible(true);
       document.body.classList.add('picking');
       ambience.tap(1.4);
@@ -851,6 +901,8 @@ function rebuildInstantly() {
   for (const s of [paint, stones, edgePlants, paths, flowers, flowerBrush, ponds, pondPlants, fish, pondBrush, wildflowers, fences, fenceBuilder, boulders, rockBrush, bridgeBuilder, props, vines]) s.reset();
   cottage.setStyle(DEFAULT_STYLE, false);
   for (const a of store.actions) replayAction(a);
+  // Mown this visit (or kept mown): the wildflowers stay mown through an undo.
+  if (mownWild) wildflowers.clearIf(() => true);
   flowers.update(10);
   for (let i = 0; i < 120; i++) {
     const d = 0.1;
