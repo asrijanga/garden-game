@@ -7,8 +7,9 @@ export interface QualityTier {
 }
 
 /**
- * Best first. Phones start at 1.75× and climb to 2× when frames stay steady; only the first
- * five are chosen automatically. (Phone screens are 3×; the final pass sharpens the upscale.)
+ * Best first. Phones start at 1.75× and climb to 2× when frames stay steady; the first five are
+ * chosen automatically, and the sixth only as a last resort (it's softer, but smooth beats sharp).
+ * (Phone screens are 3×; the final pass sharpens the upscale.)
  */
 export const TIERS: QualityTier[] = [
   { pixelRatio: 2.0, samples: 4, bloom: true },
@@ -16,13 +17,17 @@ export const TIERS: QualityTier[] = [
   { pixelRatio: 1.5, samples: 4, bloom: true },
   { pixelRatio: 1.35, samples: 4, bloom: true },
   { pixelRatio: 1.2, samples: 4, bloom: true },
-  // Debugging only (`?q=4`, `?q=5`): below this the picture looks soft and pixelated.
+  // Last resort: a device still too slow at 1.2× after a long while.
+  { pixelRatio: 1.0, samples: 4, bloom: true },
+  // Debugging only (`?q=6`, `?q=7`): below this the picture looks soft and pixelated.
   { pixelRatio: 1.0, samples: 2, bloom: false },
   { pixelRatio: 0.85, samples: 0, bloom: false },
 ];
 
-/** The lowest tier the game picks on its own: it never trades away a crisp picture. */
+/** The lowest tier the game picks on its own in the ordinary way. */
 const AUTO_FLOOR = 4;
+/** Below the floor, only after this many slow seconds in a row. */
+const LAST_RESORT_AFTER = 6;
 const WINDOW = 60; // frames per measurement (~1 s)
 
 /**
@@ -37,6 +42,8 @@ export class Quality {
   private samples: number[] = [];
   private slow = 0;
   private skip = 2;
+  /** Hold the picture steady: no trying a sharper tier (e.g. while admiring, when a resize hitch shows). */
+  holdSteady = false;
   private steadyFor = 0;
   private probeAfter = 12; // seconds of steady frames before trying a step up
   /** Windows left in which a slowdown counts against the last step up. */
@@ -69,18 +76,19 @@ export class Quality {
     if (median > 19) {
       this.steadyFor = 0;
       // Two slow seconds in a row: genuinely too much for this device at this resolution.
-      if (++this.slow >= 2 && this.tier < AUTO_FLOOR) {
+      this.slow++;
+      if (this.slow >= 2 && this.tier < AUTO_FLOOR) {
         if (this.probing > 0) this.probeAfter = Math.min(120, this.probeAfter * 2); // the step up didn't hold
         this.probing = 0;
         this.set(this.tier + 1);
-      }
+      } else if (this.slow >= LAST_RESORT_AFTER && this.tier === AUTO_FLOOR) this.set(AUTO_FLOOR + 1);
       return;
     }
     this.slow = 0;
     if (this.probing > 0) this.probing--;
     // Steady at 60fps: after a while, see whether a sharper picture holds too.
     this.steadyFor += seconds;
-    if (this.tier > 0 && this.steadyFor > this.probeAfter) {
+    if (this.tier > 0 && this.steadyFor > this.probeAfter && !this.holdSteady) {
       this.set(this.tier - 1);
       this.probing = 6;
     }

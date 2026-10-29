@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { regrow } from '../core/regrow';
 import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
-import type { FlowerSpecies } from './flowerSpecies';
+import { SPECIES, type FlowerSpecies } from './flowerSpecies';
+import type { Season } from './season';
 
 const VARIANTS = 5; // geometry variants per species (plus per-plant scale, yaw, colour)
 const CAPACITY = 1500; // plants per variant
@@ -131,6 +132,21 @@ function withFar(build: () => THREE.BufferGeometry): [THREE.BufferGeometry, THRE
   } finally {
     farDetail = false;
   }
+}
+
+/**
+ * A recipe for one plant shape (a species' variant, or a foliage kind's): the same recipe makes
+ * the same shape on any thread, so shapes can be built ahead of time in a worker.
+ */
+export type ShapeRecipe = { kind: 'flower'; species: string; variant: number } | { kind: 'leaf'; leaf: LeafKind; variant: number };
+
+export const shapeKey = (r: ShapeRecipe) => (r.kind === 'flower' ? `f:${r.species}:${r.variant}` : `l:${r.leaf}:${r.variant}`);
+
+/** Build a shape (in full, and simplified for far off) from its recipe. */
+export function buildShape(r: ShapeRecipe, species: FlowerSpecies[]): [THREE.BufferGeometry, THREE.BufferGeometry] {
+  if (r.kind === 'leaf') return withFar(() => leafGeometry(r.leaf, 2000 + LEAF_KINDS.indexOf(r.leaf) * 101 + r.variant * 17));
+  const si = species.findIndex((s) => s.id === r.species);
+  return withFar(() => flowerGeometry(species[si], 1000 + si * 97 + r.variant * 13));
 }
 
 const STEM = new THREE.Color('#4f8a3a');
@@ -1368,12 +1384,40 @@ export class Flowers {
   private variants(sp: FlowerSpecies): THREE.InstancedMesh[] {
     let list = this.meshes.get(sp.id);
     if (!list) {
-      const si = this.species.indexOf(sp);
       list = [];
-      for (let v = 0; v < VARIANTS; v++) list.push(this.makeMesh(withFar(() => flowerGeometry(sp, 1000 + si * 97 + v * 13)), this.material, CAPACITY));
+      for (let v = 0; v < VARIANTS; v++) list.push(this.makeMesh(this.shape({ kind: 'flower', species: sp.id, variant: v }), this.material, CAPACITY));
       this.meshes.set(sp.id, list);
     }
     return list;
+  }
+
+  /** Shapes built ahead of time (in a worker), waiting to be used. */
+  private readonly ready = new Map<string, [THREE.BufferGeometry, THREE.BufferGeometry]>();
+
+  /** A shape built elsewhere from its recipe: used the first time that plant goes in. */
+  adopt(key: string, near: THREE.BufferGeometry, far: THREE.BufferGeometry) {
+    if (!this.used.has(key)) this.ready.set(key, [near, far]);
+  }
+
+  private readonly used = new Set<string>();
+
+  private shape(r: ShapeRecipe): [THREE.BufferGeometry, THREE.BufferGeometry] {
+    const key = shapeKey(r);
+    this.used.add(key);
+    const have = this.ready.get(key);
+    this.ready.delete(key);
+    return have ?? buildShape(r, this.species);
+  }
+
+  /** The shapes worth building ahead of time: everything a bed planted now might use. */
+  static wanted(season: Season): ShapeRecipe[] {
+    const out: ShapeRecipe[] = [];
+    for (const sp of SPECIES) {
+      if (sp.zone || !(sp.seasons.includes(season) || sp.form.kind === 'foliage')) continue;
+      for (let v = 0; v < VARIANTS; v++) out.push({ kind: 'flower', species: sp.id, variant: v });
+    }
+    for (const leaf of LEAF_KINDS) if (leaf !== 'clump') for (let v = 0; v < 3; v++) out.push({ kind: 'leaf', leaf, variant: v });
+    return out;
   }
 
   private makeMesh([geo, far]: [THREE.BufferGeometry, THREE.BufferGeometry], material: THREE.Material, capacity: number): THREE.InstancedMesh {
@@ -1404,7 +1448,7 @@ export class Flowers {
     if (kind === 'clump') return this.plantFoliage(x, y, z, yaw, scale, delay, color);
     let list = this.leaves.get(kind);
     if (!list) {
-      list = [0, 1, 2].map((v) => this.makeMesh(withFar(() => leafGeometry(kind, 2000 + LEAF_KINDS.indexOf(kind) * 101 + v * 17)), this.material, 1500));
+      list = [0, 1, 2].map((variant) => this.makeMesh(this.shape({ kind: 'leaf', leaf: kind, variant }), this.material, 1500));
       this.leaves.set(kind, list);
     }
     const mesh = list[Math.floor(this.rng() * list.length)];

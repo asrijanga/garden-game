@@ -12,6 +12,7 @@ import type { PropKind } from '../world/props';
 import type { WeatherKind } from '../world/weather';
 import { Link } from './link';
 import { nextFrame } from './env';
+import type { PackedShape } from './shapes.worker';
 import { Ground, CLEARING_RADIUS } from '../world/ground';
 import { createForest } from '../world/trees';
 import { CameraRig } from '../core/cameraRig';
@@ -920,6 +921,27 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   // doesn't hitch while its material compiles.
   const warmed = renderer.compileAsync(scene, camera).catch(() => {});
 
+  // --- Plant shapes, built ahead of time in a worker of their own -------------------------------
+  // (So the first bed of a kind doesn't hitch while its shapes are made. Without the worker, they
+  // are simply made when first planted, as before.)
+  const prepareShapes = () => {
+    try {
+      const shapes = new Worker(new URL('./shapes.worker.ts', import.meta.url), { type: 'module' });
+      const unpack = (p: PackedShape) => {
+        const g = new THREE.BufferGeometry();
+        for (const [name, a] of Object.entries(p.attributes)) g.setAttribute(name, new THREE.BufferAttribute(a.array, a.itemSize));
+        g.userData = p.userData;
+        return g;
+      };
+      shapes.addEventListener('message', (e: MessageEvent<{ key: string; near: PackedShape; far: PackedShape }>) => {
+        flowers.adopt(e.data.key, unpack(e.data.near), unpack(e.data.far));
+      });
+      shapes.postMessage(Flowers.wanted(season));
+    } catch {
+      // No workers from here: shapes are made when first planted.
+    }
+  };
+
   // --- Loading: the saved garden is rebuilt while shaders compile -------------------------------
   // The garden's own clock stands still meanwhile, so it regrows in front of you once the loader
   // fades: stroke after stroke, a little apart.
@@ -943,6 +965,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       step();
     });
     regrow.offset = 0;
+    prepareShapes();
   }
   // --- Loop -----------------------------------------------------------------------------------
   const timer = new THREE.Timer();
@@ -1110,6 +1133,8 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     },
     admire: (on: boolean) => {
       admiring = on;
+      // A sharper tier is tried only when not admiring (the switch itself shows as a hitch).
+      quality.holdSteady = on;
       admireTime = 0;
     },
     restorePaint: () => paint.restore(),
