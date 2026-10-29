@@ -6,20 +6,10 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 
-export type StoneKind = 'curb' | 'step' | 'rock' | 'shore' | 'flag' | 'brick' | 'cobble' | 'plank';
-const SHAPES: Record<StoneKind, number> = { curb: 5, step: 8, rock: 7, shore: 7, flag: 7, brick: 4, cobble: 5, plank: 4 };
+export type StoneKind = 'step' | 'rock' | 'shore' | 'brick' | 'plank';
+const SHAPES: Record<StoneKind, number> = { step: 8, rock: 7, shore: 7, brick: 4, plank: 4 };
 const CAPACITY = 2000; // per shape
 const CELL = 0.5; // spatial hash cell, metres
-
-/** A low, hand-cut edging stone with softly worn arrises, 0.4 m long along z. */
-function curbGeometry(seed: number): THREE.BufferGeometry {
-  const rng = createRng(seed);
-  const g = new RoundedBoxGeometry(lerp(0.09, 0.12, rng()), lerp(0.09, 0.11, rng()), 0.4, 2, lerp(0.025, 0.04, rng()));
-  g.translate(0, 0.045, 0);
-  g.deleteAttribute('uv');
-  colorByHeight(g, -0.02, 0.12);
-  return g;
-}
 
 /**
  * A hand-dressed stepping stone: a rounded-square outline (superellipse) whose corners are each
@@ -116,49 +106,6 @@ function shoreGeometry(seed: number): THREE.BufferGeometry {
   return g;
 }
 
-/**
- * A crazy-paving flagstone: an irregular five- to seven-sided slab (~0.2 m across, scaled per
- * stone) with slightly wavering sides and softly bevelled edges, no two alike.
- */
-function flagGeometry(seed: number): THREE.BufferGeometry {
-  const rng = createRng(seed);
-  const sides = 5 + Math.floor(rng() * 3);
-  const start = rng() * Math.PI * 2;
-  const shape = new THREE.Shape();
-  const N = sides * 6;
-  const corners = Array.from({ length: sides }, (_, i) => start + (i / sides) * Math.PI * 2 + (rng() - 0.5) * 0.5);
-  const radii = corners.map(() => lerp(0.17, 0.23, rng()));
-  for (let i = 0; i < N; i++) {
-    // Walk the polygon's edges, bowing each a touch, so the slab looks split rather than cut.
-    const e = Math.floor(i / 6);
-    const t = (i % 6) / 6;
-    const a0 = corners[e];
-    const a1 = corners[(e + 1) % sides] + (e + 1 === sides ? Math.PI * 2 : 0);
-    const x0 = Math.cos(a0) * radii[e];
-    const z0 = Math.sin(a0) * radii[e];
-    const x1 = Math.cos(a1) * radii[(e + 1) % sides];
-    const z1 = Math.sin(a1) * radii[(e + 1) % sides];
-    const bow = Math.sin(t * Math.PI) * 0.012 * (rng() < 0.5 ? -1 : 1);
-    const nx = -(z1 - z0);
-    const nz = x1 - x0;
-    const nl = Math.hypot(nx, nz) || 1;
-    const x = lerp(x0, x1, t) + (nx / nl) * bow;
-    const z = lerp(z0, z1, t) + (nz / nl) * bow;
-    if (i === 0) shape.moveTo(x, z);
-    else shape.lineTo(x, z);
-  }
-  shape.closePath();
-  const g = new THREE.ExtrudeGeometry(shape, { depth: 0.035, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 2, curveSegments: 1 });
-  g.rotateX(Math.PI / 2);
-  g.translate(0, 0.05, 0);
-  g.deleteAttribute('uv');
-  g.deleteAttribute('normal');
-  const merged = mergeVertices(g, 1e-4);
-  colorByHeight(merged, 0.0, 0.065);
-  merged.computeVertexNormals();
-  return merged;
-}
-
 /** A clay brick (long along z), its arrises softly worn. */
 function brickGeometry(seed: number): THREE.BufferGeometry {
   const rng = createRng(seed);
@@ -166,25 +113,6 @@ function brickGeometry(seed: number): THREE.BufferGeometry {
   g.translate(0, 0.0275, 0);
   g.deleteAttribute('uv');
   colorByHeight(g, -0.01, 0.06);
-  return g;
-}
-
-/** A small rounded cobble (~0.12 m across), its top worn smooth. */
-function cobbleGeometry(seed: number): THREE.BufferGeometry {
-  const rng = createRng(seed);
-  let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(0.06, 1);
-  g.deleteAttribute('normal');
-  g.deleteAttribute('uv');
-  g = mergeVertices(g);
-  const pos = g.attributes.position as THREE.BufferAttribute;
-  const sx = lerp(0.9, 1.2, rng());
-  const sz = lerp(0.85, 1.1, rng());
-  for (let i = 0; i < pos.count; i++) {
-    const y = pos.getY(i);
-    pos.setXYZ(i, pos.getX(i) * sx * lerp(0.94, 1.06, rng()), y > 0 ? y * 0.55 : y * 0.3, pos.getZ(i) * sz * lerp(0.94, 1.06, rng()));
-  }
-  colorByHeight(g, -0.02, 0.035);
-  g.computeVertexNormals();
   return g;
 }
 
@@ -242,8 +170,8 @@ interface Falling {
 }
 
 /**
- * Stones (stepping stones, edging, bed borders, pond rocks, and paving: flagstones, bricks,
- * cobbles and boardwalk planks) that drop into place with a soft squash and bounce.
+ * Stones (stepping stones, edging, bed borders, pond rocks, and the bricks and boards of bed
+ * edges) that drop into place with a soft squash and bounce.
  * All stones of a shape share one InstancedMesh; only those still settling update each frame.
  */
 export class Stones {
@@ -262,18 +190,15 @@ export class Stones {
   constructor(private readonly onLand: (p: THREE.Vector3, size: number, kind: StoneKind) => void) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
     addWet(mat);
-    (Object.keys(SHAPES) as StoneKind[]).forEach((kind, ki) => {
+    (Object.keys(SHAPES) as StoneKind[]).forEach((kind) => {
       const list: THREE.InstancedMesh[] = [];
       for (let k = 0; k < SHAPES[kind]; k++) {
         const geo =
-          kind === 'curb' ? curbGeometry(300 + k * 11)
-          : kind === 'rock' ? rockGeometry(700 + k * 17)
+          kind === 'rock' ? rockGeometry(700 + k * 17)
           : kind === 'shore' ? shoreGeometry(900 + k * 23)
-          : kind === 'flag' ? flagGeometry(1100 + k * 29)
           : kind === 'brick' ? brickGeometry(1300 + k * 31)
-          : kind === 'cobble' ? cobbleGeometry(1500 + k * 37)
           : kind === 'plank' ? plankGeometry(1700 + k * 41)
-          : stepGeometry(500 + ki * 50 + k * 13);
+          : stepGeometry(550 + k * 13); // (the seeds stepping stones have always had)
         const mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
         mesh.count = 0;
         mesh.visible = false; // drawn only once something of this shape is laid
