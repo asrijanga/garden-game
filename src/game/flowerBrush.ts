@@ -816,7 +816,8 @@ export class FlowerBrush {
     const { id } = this.choice();
     if (id === WATER_MIX_ID || SPECIES.find((s) => s.id === id)?.zone) return;
     if (this.blocked(c.x, c.y) || this.distanceToPaths(c.x, c.y) < 0.52) return;
-    this.paint.bed(c.x, c.y, BED_RADIUS, 1, this.strokeTopping);
+    // (A raised bed's own soil sits up in its frame; the ground under it stays inside the frame.)
+    this.paint.bed(c.x, c.y, this.lift > 0 ? EDGE_RADIUS * 0.9 : BED_RADIUS, 1, this.strokeTopping);
     // A raised bed: its soil comes up to the top of the frame, with the plants on it.
     if (this.lift > 0) this.raised?.add(c.x, this.ground.heightAt(c.x, c.y) + this.lift, c.y, EDGE_RADIUS * 0.96, this.strokeTime * 0.2);
     const centre = c.clone();
