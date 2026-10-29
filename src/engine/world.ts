@@ -386,7 +386,10 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   // The page's toolbar: which tool is in hand, and its floating label.
   const toolbar = {
     tool: 'move' as Tool,
-    showLabel: (text: string, ms?: number) => link.call('label', text, ms),
+    // (Not while the saved garden is being replayed: those hints are for strokes made now.)
+    showLabel: (text: string, ms?: number) => {
+      if (!loading && !regrow.instant) link.call('label', text, ms);
+    },
   };
   renderer.domElement.addEventListener('webglcontextrestored', () => {
     paint.restore(true);
@@ -880,6 +883,26 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   resize();
   applyTime(init.time);
   started = true;
+  // The opening: the garden first appears close up by the cottage, low and turned a little, and
+  // the view glides up and back to the whole clearing while it regrows. Any touch takes over.
+  const INTRO_TIME = 6.5;
+  let intro: { t: number; from: { distance: number; azimuth: number; target: THREE.Vector3 }; to: { distance: number; azimuth: number; target: THREE.Vector3 } } | null = null;
+  const prepareIntro = () => {
+    const to = { distance: rig.distance, azimuth: rig.azimuth, target: rig.target.clone() };
+    // Just in front of the cottage, looking at it from a little to one side.
+    const front = cottage.position.clone().add(new THREE.Vector3(Math.sin(-0.18), 0, Math.cos(-0.18)).multiplyScalar(3));
+    const from = { distance: Math.max(rig.minDistance * 2.6, 24), azimuth: to.azimuth + 0.32, target: new THREE.Vector3(front.x, to.target.y + 0.8, front.z) };
+    intro = { t: -0.3, from, to };
+    applyIntro(0);
+  };
+  const applyIntro = (k: number) => {
+    if (!intro) return;
+    const { from, to } = intro;
+    rig.distance = THREE.MathUtils.lerp(from.distance, to.distance, k);
+    rig.azimuth = THREE.MathUtils.lerp(from.azimuth, to.azimuth, k);
+    rig.target.lerpVectors(from.target, to.target, k);
+  };
+  surface.addEventListener('pointerdown', () => (intro = null));
   // Admire mode: no buttons, just a slow drift round the garden.
   let admiring = false;
   let admireTime = 0;
@@ -966,6 +989,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     });
     regrow.offset = 0;
     prepareShapes();
+    prepareIntro();
   }
   // --- Loop -----------------------------------------------------------------------------------
   const timer = new THREE.Timer();
@@ -1037,6 +1061,13 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     }
     paint.update(dt);
     (motes.material as THREE.ShaderMaterial).uniforms.uTime.value = elapsed;
+    if (intro && !loading) {
+      intro.t += dt;
+      // Slow to leave, slow to arrive.
+      const x = THREE.MathUtils.clamp(intro.t / INTRO_TIME, 0, 1);
+      applyIntro(x * x * x * (x * (x * 6 - 15) + 10));
+      if (x >= 1) intro = null;
+    }
     if (admiring) {
       // Admire: a slow turn round the garden, drifting across the clearing and easing between a
       // wide view and a closer, lower one. It eases in from wherever the view was.
@@ -1133,6 +1164,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     },
     admire: (on: boolean) => {
       admiring = on;
+      intro = null;
       // A sharper tier is tried only when not admiring (the switch itself shows as a hitch).
       quality.holdSteady = on;
       admireTime = 0;
@@ -1141,6 +1173,12 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     shot,
     load,
     /** The page has shown its loading sprout long enough: the garden's clock starts. */
-    start: () => (loading = false),
+    start: () => {
+      loading = false;
+      // A few birds cross the sky as the garden opens (if any are about at this hour).
+      setTimeout(() => {
+        if (flyingBirds.activity > 0.2) flyingBirds.launchNow();
+      }, 1800);
+    },
   };
 }
