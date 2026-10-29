@@ -569,6 +569,11 @@ if (useWorker) {
   worker.postMessage({ init: init(), canvas: offscreen }, [offscreen]);
 } else void runHere();
 
+// --- A home-screen app: cached on the first visit, so it opens (and plays) offline -----------
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  addEventListener('load', () => void navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+
 // --- Loading: a seed sprouts while shaders compile and the saved garden is rebuilt ------------
 // The garden's own clock stands still meanwhile, so it regrows in front of you once the loader
 // fades: stroke after stroke, a little apart.

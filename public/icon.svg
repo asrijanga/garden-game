@@ -1,12 +1,51 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#9fc3d8"/>
-      <stop offset="1" stop-color="#f6cfa0"/>
+      <stop offset="0" stop-color="#a9cbe0"/>
+      <stop offset="0.55" stop-color="#f4d3a8"/>
+      <stop offset="1" stop-color="#f7c98f"/>
     </linearGradient>
+    <linearGradient id="lawn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9cc260"/>
+      <stop offset="1" stop-color="#6f9a3f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffd27a" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffd27a" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <rect width="128" height="128" rx="28" fill="url(#sky)"/>
-  <ellipse cx="64" cy="86" rx="42" ry="16" fill="#7a5a3e"/>
-  <ellipse cx="64" cy="78" rx="42" ry="15" fill="#8fb35a"/>
-  <path d="M64 76 C64 60 60 50 52 44 C62 44 68 52 66 62 C70 50 78 46 86 48 C78 54 70 62 66 76 Z" fill="#5f8f3a"/>
+  <rect width="512" height="512" fill="url(#sky)"/>
+  <circle cx="392" cy="150" r="70" fill="url(#glow)"/>
+  <circle cx="392" cy="150" r="26" fill="#fff1c9"/>
+  <!-- the woods behind -->
+  <path d="M0 300 C30 250 70 262 92 238 C112 212 150 226 168 250 C190 226 230 232 248 262 L248 330 L0 330 Z" fill="#4f7a3a"/>
+  <path d="M300 268 C322 236 362 230 386 250 C404 224 446 222 470 248 C490 238 506 246 512 256 L512 330 L300 330 Z" fill="#4f7a3a"/>
+  <path d="M40 292 L64 214 L88 292 Z" fill="#3c6630"/>
+  <path d="M440 288 L462 220 L484 288 Z" fill="#3c6630"/>
+  <!-- the clearing -->
+  <path d="M0 312 C110 280 400 280 512 316 L512 512 L0 512 Z" fill="url(#lawn)"/>
+  <!-- the cottage -->
+  <rect x="196" y="256" width="124" height="74" rx="4" fill="#f2e6cf"/>
+  <path d="M182 262 L258 208 L334 262 Z" fill="#c2553a"/>
+  <path d="M182 262 L258 208 L334 262 L322 268 L258 222 L194 268 Z" fill="#a8452e"/>
+  <rect x="290" y="206" width="16" height="34" fill="#8a7a6a"/>
+  <rect x="244" y="288" width="26" height="42" rx="12" fill="#6d4a33"/>
+  <rect x="210" y="276" width="24" height="22" rx="3" fill="#ffcf74"/>
+  <rect x="282" y="276" width="24" height="22" rx="3" fill="#ffcf74"/>
+  <!-- stepping stones -->
+  <ellipse cx="262" cy="352" rx="16" ry="7" fill="#d9ccb4"/>
+  <ellipse cx="246" cy="378" rx="19" ry="8" fill="#d9ccb4"/>
+  <ellipse cx="266" cy="410" rx="22" ry="9" fill="#d9ccb4"/>
+  <ellipse cx="240" cy="448" rx="26" ry="10" fill="#d9ccb4"/>
+  <!-- flowers -->
+  <g>
+    <circle cx="120" cy="388" r="13" fill="#e85d75"/><circle cx="120" cy="388" r="5" fill="#ffd45a"/>
+    <circle cx="152" cy="410" r="11" fill="#f2a43a"/><circle cx="152" cy="410" r="4" fill="#fff0b0"/>
+    <circle cx="96" cy="420" r="12" fill="#ffffff"/><circle cx="96" cy="420" r="4.5" fill="#f2c230"/>
+    <circle cx="136" cy="446" r="13" fill="#8d7be0"/><circle cx="136" cy="446" r="5" fill="#f7e3a0"/>
+    <circle cx="372" cy="396" r="13" fill="#ff8fb1"/><circle cx="372" cy="396" r="5" fill="#ffe08a"/>
+    <circle cx="404" cy="420" r="12" fill="#ffffff"/><circle cx="404" cy="420" r="4.5" fill="#f2c230"/>
+    <circle cx="380" cy="446" r="12" fill="#e8402f"/><circle cx="380" cy="446" r="4.5" fill="#3a3020"/>
+    <circle cx="420" cy="452" r="11" fill="#6f8cf0"/><circle cx="420" cy="452" r="4" fill="#fff4c0"/>
+  </g>
 </svg>
