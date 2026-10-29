@@ -10,7 +10,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current story:** 6.1 — Share my garden as a link (built, awaiting review). The hand-drawn art prototype (7.1) was tried and **reverted** at the player's request. Next: 6.2 admire mode (or the requested 2.8/2.9 bed stories).
+**Current story:** 2.10 — Precise planting (built, awaiting review). The player asked for precision and variety (flowers, paths, beds) and chose to start here. Next, in this order unless they say otherwise: 2.11 path precision and the finger blob → 2.12 path types → 2.13 beds that look designed (with 2.8 styles, 2.9 toppings) → 2.14 more kinds of plants; then 6.2+.
 **Preview URL:** https://asrijanga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
@@ -49,14 +49,16 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 4.5 Weather | ✅ Done | Weather chips under the sun dial: **Clear**, **Sunbeams**, **Rain**, **Mist** (remembered; Rain is hidden in winter, where it snows). Changes blend in over ~6 s and shade the day's light at any time of day. *Rain:* grey, soft light; slanting streaks that follow the wind, little splashes, a rash of rings on the ponds; soil, beds and paths soak dark, puddles form in the dips of paths (mirroring the sky, ringed by drops), stones and boulders go dark with a wet sheen, and it all dries slowly (~2 min) after the rain stops; a soft rain hiss in the ambience. *Mist:* pale, close haze plus three sheets of low mist rolling in banks across the lawn with the wind (thinning where the forest floor rises). *Sunbeams:* broken cloud whose shadows drift over the lawn (brighter in the gaps), with soft shafts of sun slanting down. All GPU-driven. |
 | 5.1 Richer ambience | ✅ Done | The soundscape follows the sun dial, the season and the weather; everything synthesised, far off and soft. Songbirds: a dawn chorus (about 3× livelier, answering each other more), quieter towards dusk, asleep at night, mostly hushed in rain. After dark: crickets (four in summer, two in autumn, one in spring; each with its own steady rhythm and pauses, quiet in the rain), frogs by the pond on spring and summer nights (only if there's a pond, sometimes answering across the water), and a distant tawny owl. By day, one seasonal caller from the woods now and then: a cuckoo (or a woodpecker) in spring, a wood pigeon in summer, crows in autumn, a woodpecker drumming in winter. Drips off leaves patter in the rain and slow as the garden dries. Far voices go through a soft forest echo. |
 | 5.2 Satisfying build sounds | ✅ Done | Fills the gaps in the build sounds (stones, posts, hedges, walls, boulders, props, blooms, fish, pond filling and tidying already had theirs). New sounds follow your finger as you draw: gravel scrunching under a new path (a soft scrunch with a few clicking grains), a spade thudding into earth as you dig a pond, plants patted into the soil with a whisper of leaves (or a "bloop" when planting into water), a happy pop as you pick up a decoration, and rocks set into a pond plop in instead of clacking. Each is a little different every time and rate-limited, so strokes sound lively, never machine-gun. Silent while the garden rebuilds. |
-| 6.1 Share my garden as a link | 👀 Awaiting feedback | The camera button's share sheet now sends the picture **with a link to the garden** ("Come and see my garden 🌷 …"); where there's no share sheet (desktop), the picture downloads and the link is copied. The link carries the stroke log, deflated and base64url-encoded in the URL's #fragment (never sent to a server; a small garden is ~200 characters), plus the time of day and weather it was shared in. It's kept ready in the background so the share sheet still opens inside the tap. Opening a link: the garden grows in for the visitor in the sharer's light and weather (the visitor's own settings untouched), with a banner "Visiting a shared garden · **Keep it** · **Back to mine**". The visitor's own saved garden is never touched while visiting (edits there aren't saved); Keep it asks first, then replaces theirs. A link opened while the game is already showing loads properly; a broken link falls back to your own garden with a gentle note. |
-| 6.2 – 6.x (+ follow-ups
+| 6.1 Share my garden as a link | ✅ Done | The camera button's share sheet now sends the picture **with a link to the garden** ("Come and see my garden 🌷 …"); where there's no share sheet (desktop), the picture downloads and the link is copied. The link carries the stroke log, deflated and base64url-encoded in the URL's #fragment (never sent to a server; a small garden is ~200 characters), plus the time of day and weather it was shared in. It's kept ready in the background so the share sheet still opens inside the tap. Opening a link: the garden grows in for the visitor in the sharer's light and weather (the visitor's own settings untouched), with a banner "Visiting a shared garden · **Keep it** · **Back to mine**". The visitor's own saved garden is never touched while visiting (edits there aren't saved); Keep it asks first, then replaces theirs. A link opened while the game is already showing loads properly; a broken link falls back to your own garden with a gentle note. |
+| 2.10 Precise planting | 👀 Awaiting feedback | A new **amount chip** at the start of the flower picker cycles **Drift → Clump → One** (with a hint each time). *Drift* is today's bed stroke. *Clump* and *One*: a ring under the finger shows the spot (slide to adjust); the plants go in exactly where the finger lifts. One: a single flower right there. Clump: 3–5 of one kind (one from the mix), the first right under the finger, the rest close round it, plus a leafy tuft. On open lawn they get a small hand-dug circle of soil (no stone border); in a bed they just join it; over a pond, the same in water flowers. A soft pat (or plop) as they go in. Saved per stroke as `species@1` / `species@c` (old saves are drifts), so rebuilds and undo are exact (verified). |
+| 2.11 – 2.14, 6.2 – 6.x (+ follow-ups
 
 Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · ✅ Done
 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **6.1 → 2.10 (precision and variety):** *Feedback:* "Is there a story on improving the visual style of garden beds? I also lack precision on how I place flowers, it's just a blob; I also lack precision on placing the pathway, the pathway got way boring now; that finger blob is still happening and looks ugly; I want different types of pathways and precision on where I place individual flowers; brown garden bed is very very boring now, all flowers look the same." Clarified: "all the same" means all four of: a uniform carpet, too few kinds, no foliage, every bed alike. Chose to start with precise planting. *Changes:* 6.1 accepted. New stories 2.10–2.14 (below); 2.8 and 2.9 already covered bed styles and toppings. Story 2.10 built.
 - **Hand-drawn revert → 6.1:** *Feedback:* "Next story yes". *Changes:* Story 6.1 built (and the time dial fixed, below).
 - **Bug: time dial:** *Feedback:* "I tried changing time, buttons don't work". *Cause:* the page blocks touch scrolling (touchmove preventDefault everywhere but the flower picker), which also stopped iOS from dragging the native slider, and iOS never jumps a slider to a tapped spot, so the dial was stuck on iPhone (desktop testing with a mouse hid it). *Fix:* the dial now follows the finger itself (pointer events): tap anywhere on it to jump, or slide along it. Verified with real touch events (the old build failed the same drag test).
 - **Hand-drawn art (7.1), reverted:** *Feedback:* "this is impressive" (build sounds accepted); asked which engine (three.js); then asked for a hand-drawn art overhaul and chose pencil sketch, prototyped behind a switch. Review 1: "can you give me options", "it looks robotic", "crosshatches are ugly [in] the high level view" → three options (Pencil, Hatched, Coloured) with varied strokes and patch hatching. Review 2: "Yikes very janky and terrible, revert". *Changes:* Both prototype commits reverted; the game is back to the painted look exactly as after 5.2. Lesson: a screen-space post-process sketch filter reads as janky (lines boil and swim, hatching slides with the camera); see the parking lot.
@@ -400,6 +402,39 @@ Demo script: draw a pond next to the path and wait for the first fish to jump.
 - **Combinations are free:** any topping with any bed style. The flower book or the bed chips can show a tiny preview of the current combination.
 - **Saves:** old saves keep cedar bark. Erasing a bed lets its topping fade away like today's mulch.
 - **Performance:** one extra paint channel or a small topping index texture, so the lawn stays a single cheap shader pass.
+
+### Story 2.10 — Precise planting (S) — *requested by the player*
+**As a** player, **I want** to place a single flower or a small clump exactly where I choose, **so that** I'm not limited to painting blobs.
+- An amount choice in the flower picker: **Drift** (a bed along the stroke, as today), **Clump** (3–5 of one kind), **One** (a single flower).
+- For Clump and One, a ring under the finger shows the spot; the plants go in where the finger lifts.
+- On lawn: a small circle of soil, no stone border. In a bed: joins it. In a pond: water flowers.
+- Saved per stroke; old saves unchanged.
+
+### Story 2.11 — Precise paths, and no more finger blob (M) — *requested by the player*
+**As a** player, **I want** a path to go exactly where my finger goes, at a steady width, **so that** I can lay it precisely and it never swells into a blob.
+- Find and fix the "finger blob" for good (where a held or slow finger grows a big round patch of gravel); reproduce it on a real touch first.
+- The path follows the finger as a clean, smoothed line (no wobble from finger jitter), at a steady width; a light preview of its edges under the finger while drawing.
+- Starts and ends finish neatly (a rounded end, not a puddle).
+
+### Story 2.12 — Path types (M) — *requested by the player*
+**As a** player, **I want** to choose different kinds of paths, **so that** my garden's paths aren't all the same.
+- Chips when the path tool is active: **gravel** (today's, refreshed), **stepping stones**, **crazy-paving flagstones**, **brick** (herringbone or basket weave, bending with the curve), **cobbles**, **wooden boardwalk** (over lawn and across water), **bark chips**, **mown grass path** (shorter, lighter stripe in the lawn).
+- Each looks laid by hand: irregular stones, the odd missing or tilted brick, moss in the joints, worn centres.
+- Where different types meet they join neatly (a threshold stone or a soft blend). Saved per stroke; old saves stay gravel with stepping stones.
+
+### Story 2.13 — Beds that look designed (L) — *requested by the player*
+**As a** player, **I want** my beds to look planted by a gardener, **so that** they're not a flat brown carpet where every flower looks the same.
+- **Structure:** tall plants towards the back or middle, low ones and edgers at the front, in-between in between (relative to the view and the bed's shape).
+- **Drifts and repeats:** each species in a few soft drifts of 3–7 that repeat along the bed, instead of an even sprinkle.
+- **Foliage:** ornamental grasses, ferns, hostas, silvery leaves and small shrubs (box balls, lavender mounds) woven between the flowers, so beds read green and full rather than brown.
+- **Every bed different:** each new bed gets its own palette and plant mix (cool blues and whites, hot oranges and reds, pastels, a cottage jumble), unless one species is chosen.
+- **Less bare soil:** fuller planting, ground-cover at the edges; whatever soil shows takes the bed's topping (2.9).
+- Built together with 2.8 (bed styles) and 2.9 (toppings).
+
+### Story 2.14 — More kinds of plants (M) — *requested by the player*
+**As a** player, **I want** more distinct kinds of plants, **so that** my beds have real variety.
+- New flower shapes beyond today's forms (e.g. bell-shaped foxgloves and campanulas, umbels like yarrow, pom-poms like alliums, spires like delphiniums and lupins, daisy clouds, trailing nasturtiums), each with a distinct silhouette and leaf.
+- Foliage plants as their own picks in the flower book (grasses, ferns, hostas, heucheras, lavender, box).
 
 Demo script for 2.8 and 2.9: plant a raised timber bed of roses with white chippings, an in-ground bed of lavender with pea gravel, and a wattle-edged cottage bed with straw, side by side.
 

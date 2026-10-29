@@ -30,7 +30,7 @@ import { Stones } from './world/stones';
 import { EdgePlants } from './world/edgePlants';
 import { Dust } from './world/dust';
 import { PathBuilder } from './game/pathBuilder';
-import { FlowerBrush } from './game/flowerBrush';
+import { FlowerBrush, type PlantAmount } from './game/flowerBrush';
 import { Flowers } from './world/flowers';
 import { SPECIES } from './world/flowerSpecies';
 import { FlowerBook } from './ui/flowerBook';
@@ -412,6 +412,21 @@ const picker = new FlowerPicker(flowerBrush.ordered(), (sp) => flowerBrush.inSea
   ambience.tap(1.3);
   toolbar.showLabel(label, 1800);
 });
+// How much each touch plants: a drift (a bed), a clump, or exactly one flower.
+const AMOUNTS: PlantAmount[] = ['drift', 'clump', 'one'];
+const AMOUNT_HINT: Record<PlantAmount, string> = {
+  drift: 'Drift · draw a flower bed',
+  clump: 'Clump · lift your finger where it goes',
+  one: 'One flower · lift your finger where it goes',
+};
+picker.onAmount = () => {
+  flowerBrush.amount = AMOUNTS[(AMOUNTS.indexOf(flowerBrush.amount) + 1) % AMOUNTS.length];
+  picker.setAmount(flowerBrush.amount);
+  tools?.refreshMarker();
+  ambience.tap(1.2);
+  toolbar.showLabel(AMOUNT_HINT[flowerBrush.amount], 2200);
+};
+flowerBrush.onPlace = (_x, _z, water) => (water ? ambience.plop(0.3) : ambience.pat());
 // The flower book: every species to browse, blooming-now first.
 const flowerBook = new FlowerBook(SPECIES, season, (id) => picker.pick(id));
 picker.onBook = () => {
@@ -735,7 +750,7 @@ const controller = tools;
 const strokeSound = { x: 0, z: 0, travel: 0 };
 const STROKE_STEP: Partial<Record<Tool, number>> = { path: 0.32, pond: 0.5, flowers: 0.42 };
 controller.onTouch = (p, tool, down) => {
-  const step = STROKE_STEP[tool];
+  const step = tool === 'flowers' && flowerBrush.amount !== 'drift' ? undefined : STROKE_STEP[tool];
   if (down) {
     strokeSound.travel = step ?? 0;
     if (tool === 'decor') ambience.pop();

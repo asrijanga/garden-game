@@ -32,8 +32,19 @@ const FOLIAGE_WINTER = ['#557a50', '#5f8459', '#4d7048'];
  * Paints flower beds. Each dab digs soft soil and scatters plants around it; their birth times
  * are offset by distance from the stroke, so the bed blooms outward in a wave.
  */
+/** How much each touch plants: a drift (a bed along the stroke), a little clump, or one flower. */
+export type PlantAmount = 'drift' | 'clump' | 'one';
+const AMOUNT_CODE: Record<PlantAmount, string> = { drift: '', clump: 'c', one: '1' };
+/** How far round the finger a clump or a single flower reaches (and the soil it gets on lawn). */
+const FOOTPRINT: Record<PlantAmount, number | null> = { drift: null, clump: 0.5, one: 0.26 };
+
 export class FlowerBrush {
   selected = MIX_ID;
+  /** Drift (today's bed stroke), a clump, or a single flower placed exactly where the finger lifts. */
+  amount: PlantAmount = 'drift';
+  /** A clump or single flower went in at (x, z) (for its sound). */
+  onPlace: (x: number, z: number, water: boolean) => void = () => {};
+  private placeAt: THREE.Vector2 | null = null;
   private rng = createRng(4321);
   private last: THREE.Vector2 | null = null;
   private strokeTime = 0;
@@ -97,11 +108,36 @@ export class FlowerBrush {
   }
 
   /** Species blooming now first, then the rest. */
+  /**
+   * The choice as saved with each stroke: "species", "species:colour", plus "@c" for a clump or
+   * "@1" for a single flower (old saves have neither, so they replay as drifts).
+   */
+  get selection(): string {
+    const code = AMOUNT_CODE[this.amount];
+    return code ? `${this.selected}@${code}` : this.selected;
+  }
+
+  set selection(s: string) {
+    const [sel, code] = s.split('@');
+    this.selected = sel;
+    this.amount = code === 'c' ? 'clump' : code === '1' ? 'one' : 'drift';
+  }
+
+  /** The ring under the finger for a clump or single flower (null for a drift). */
+  get footprint(): number | null {
+    return FOOTPRINT[this.amount];
+  }
+
   ordered(): FlowerSpecies[] {
     return [...SPECIES.filter((s) => this.inSeason(s)), ...SPECIES.filter((s) => !this.inSeason(s))];
   }
 
   begin(p: THREE.Vector3) {
+    // A clump or one flower: nothing goes in until the finger lifts, exactly where it lifts.
+    if (this.amount !== 'drift') {
+      this.placeAt = new THREE.Vector2(p.x, p.z);
+      return;
+    }
     this.last = new THREE.Vector2(p.x, p.z);
     this.strokeTime = 0;
     this.stroke = [];
@@ -110,6 +146,10 @@ export class FlowerBrush {
   }
 
   extend(p: THREE.Vector3) {
+    if (this.placeAt) {
+      this.placeAt.set(p.x, p.z);
+      return;
+    }
     if (!this.last) return;
     const to = new THREE.Vector2(p.x, p.z);
     let d = to.distanceTo(this.last);
@@ -122,6 +162,11 @@ export class FlowerBrush {
   }
 
   end() {
+    if (this.placeAt) {
+      this.placeExactly(this.placeAt);
+      this.placeAt = null;
+      return;
+    }
     if (this.stroke.length) this.layBorder(this.stroke);
     this.stroke = [];
     this.last = null;
@@ -140,6 +185,7 @@ export class FlowerBrush {
   reset() {
     this.rng = createRng(4321);
     this.last = null;
+    this.placeAt = null;
     this.strokeTime = 0;
     this.beds.length = 0;
     this.bedCells.clear();
@@ -448,6 +494,78 @@ export class FlowerBrush {
       const look = this.seasonal(sp, this.rng(), color, edge);
       this.flowers.plant(sp, variant, x, y, z, yaw, scale, delay, look.open, look.color, look.edge);
     }
+  }
+
+  /**
+   * One flower exactly at `c`, or a little clump of one kind round it. On open lawn it gets just
+   * a small circle of soil (no stone border); in a bed or a pond it simply joins in.
+   */
+  private placeExactly(c: THREE.Vector2) {
+    const one = this.amount === 'one';
+    const zone = this.water.zone(c.x, c.y);
+    if (zone) {
+      const sp = this.pickWater(zone);
+      if (!sp) return;
+      const n = one ? 1 : 3 + Math.floor(this.rng() * 2);
+      const { color, edge } = this.plantColour(sp);
+      for (let i = 0; i < n; i++) {
+        const at = i === 0 ? c.clone() : this.around(c, sp.spacing * FLOWER_SCALE * 0.6, i, n);
+        const z2 = this.water.zone(at.x, at.y);
+        if (!z2 || (i > 0 && this.flowers.isCrowded(at.x, at.y, sp.spacing * FLOWER_SCALE * 0.5))) continue;
+        const y = z2 === 'bank' ? this.ground.heightAt(at.x, at.y) - 0.01 : (this.water.level(at.x, at.y) ?? this.ground.heightAt(at.x, at.y)) - 0.004;
+        this.setPlant(sp, at, y, 0.05 + i * 0.12, color, edge);
+      }
+      this.onPlace(c.x, c.y, true);
+      return;
+    }
+    const { id } = this.choice();
+    if (id === WATER_MIX_ID || SPECIES.find((s) => s.id === id)?.zone) return;
+    if (this.blocked(c.x, c.y) || this.distanceToPaths(c.x, c.y) < 0.35) return;
+    const reach = FOOTPRINT[this.amount]!;
+    // On open lawn: a small, hand-dug circle of soil.
+    if (this.distanceToBeds(c.x, c.y) > -0.15) this.paint.bed(c.x, c.y, reach * 1.25);
+    this.wildflowers.clearNear(c.x, c.y, reach);
+    const sp = this.pickSpecies();
+    const { color, edge } = this.plantColour(sp);
+    if (one) {
+      this.setPlant(sp, c, this.ground.heightAt(c.x, c.y) - 0.01, 0.05, color, edge);
+    } else {
+      // A clump: one kind, the first right under the finger, the rest close round it, with a
+      // leafy tuft tucked in.
+      const n = 3 + Math.floor(this.rng() * 3);
+      const ring = Math.min(reach * 0.75, sp.spacing * FLOWER_SCALE * 0.7);
+      for (let i = 0; i < n; i++) {
+        const at = i === 0 ? c.clone() : this.around(c, ring, i, n);
+        if (this.blocked(at.x, at.y) || this.distanceToPaths(at.x, at.y) < 0.35) continue;
+        if (i > 0 && this.flowers.isCrowded(at.x, at.y, sp.spacing * FLOWER_SCALE * 0.45)) continue;
+        this.setPlant(sp, at, this.ground.heightAt(at.x, at.y) - 0.01, 0.05 + i * 0.12, color, edge);
+      }
+      const greens = this.season === 'autumn' ? FOLIAGE_AUTUMN : this.season === 'winter' ? FOLIAGE_WINTER : FOLIAGE_GREEN;
+      const a = this.rng() * Math.PI * 2;
+      const fx = c.x + Math.cos(a) * ring * 0.5;
+      const fz = c.y + Math.sin(a) * ring * 0.5;
+      if (!this.foliageNear(fx, fz, FOLIAGE_SPACING * 0.6)) {
+        this.addFoliageSpot(fx, fz);
+        const green = new THREE.Color(greens[Math.floor(this.rng() * greens.length)]).multiplyScalar(lerp(0.9, 1.1, this.rng()));
+        this.flowers.plantFoliage(fx, this.ground.heightAt(fx, fz) - 0.02, fz, this.rng() * Math.PI * 2, lerp(0.8, 1.2, this.rng()), 0.02, green);
+      }
+    }
+    this.onPlace(c.x, c.y, false);
+  }
+
+  /** The i-th of n spots round `c`, roughly evenly spaced, each nudged a little by hand. */
+  private around(c: THREE.Vector2, r: number, i: number, n: number): THREE.Vector2 {
+    const a = ((i - 1) / Math.max(1, n - 1)) * Math.PI * 2 + this.rng() * 0.9;
+    const k = r * lerp(0.75, 1.15, this.rng());
+    return new THREE.Vector2(c.x + Math.cos(a) * k, c.y + Math.sin(a) * k);
+  }
+
+  private setPlant(sp: FlowerSpecies, at: THREE.Vector2, y: number, delay: number, color: THREE.Color, edge?: THREE.Color) {
+    const variant = Math.floor(this.rng() * 5);
+    const yaw = this.rng() * Math.PI * 2;
+    const scale = FLOWER_SCALE * lerp(0.9, 1.1, this.rng());
+    const look = this.seasonal(sp, this.rng(), color, edge);
+    this.flowers.plant(sp, variant, at.x, y, at.y, yaw, scale, delay, look.open, look.color, look.edge);
   }
 
   private dab(c: THREE.Vector2) {

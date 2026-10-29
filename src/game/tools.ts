@@ -96,9 +96,14 @@ export class ToolController {
   setTool(tool: Tool) {
     this.rig.oneFingerPans = tool === 'move';
     this.marker.setColor(MARKER_COLORS[tool]);
-    this.marker.brush = tool === 'erase' ? this.eraser.radius : null;
+    this.refreshMarker(tool);
     this.endStroke();
     this.onToolChange(tool);
+  }
+
+  /** The ring under the finger: the eraser's reach, a clump's or one flower's spot, or a fingertip. */
+  refreshMarker(tool: Tool = this.toolbar.tool) {
+    this.marker.brush = tool === 'erase' ? this.eraser.radius : tool === 'flowers' ? this.flowers.footprint : null;
   }
 
   /** Rebuild one saved stroke, exactly as it was first drawn. */
@@ -106,9 +111,9 @@ export class ToolController {
     if (action.kind === 'cottage') return; // not a stroke: main applies it to the cottage
     const tool: BuildTool = action.kind === 'rocks' || action.kind === 'bridge' ? 'fence' : action.kind === 'prop' ? 'decor' : action.kind;
     const brush = this.brushes[tool];
-    const selected = this.flowers.selected;
+    const selected = this.flowers.selection;
     const style = this.buildStyle;
-    if (action.kind === 'flowers') this.flowers.selected = action.species;
+    if (action.kind === 'flowers') this.flowers.selection = action.species;
     if (action.kind === 'fence') this.buildStyle = action.style as FenceStyle;
     if (action.kind === 'rocks') this.buildStyle = 'rocks';
     if (action.kind === 'bridge') this.buildStyle = 'bridge';
@@ -122,7 +127,7 @@ export class ToolController {
       else brush.extend(p);
     }
     brush.end();
-    this.flowers.selected = selected;
+    this.flowers.selection = selected;
     this.buildStyle = style;
     this.decor.kind = item;
   }
@@ -158,7 +163,7 @@ export class ToolController {
       this.eraser.radius = roundCm(Math.min(2.2, Math.max(0.7, this.rig.distance * 0.028)));
       this.marker.brush = this.eraser.radius;
     }
-    this.stroke = { tool, points: [hit.x, hit.z], species: this.flowers.selected, style: this.buildStyle, item: this.decor.kind };
+    this.stroke = { tool, points: [hit.x, hit.z], species: this.flowers.selection, style: this.buildStyle, item: this.decor.kind };
     this.marker.down(hit);
     this.brushes[tool].begin(hit);
   };

@@ -111,6 +111,15 @@ const BOOK_ICON = `<svg viewBox="0 0 40 40" aria-hidden="true">
  * book first (every species, to browse), then the seasonal mix and the flowers blooming now,
  * each wearing a little green leaf badge. A species picked from the book gets a chip too.
  */
+const AMOUNT_ICONS: Record<'drift' | 'clump' | 'one', [string, string]> = {
+  // A soft sweep of little blooms along a curve.
+  drift: [`<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 27c7-9 17 2 26-8" fill="none" stroke="#b9a37f" stroke-width="2.4" stroke-linecap="round" opacity=".55"/>${[[8, 26, '#e88aa8'], [14, 22, '#f2c14e'], [20, 24, '#c58ad8'], [26, 22, '#e88aa8'], [32, 18, '#f2c14e']].map(([x, y, c]) => `<circle cx="${x}" cy="${y}" r="3.4" fill="${c}"/>`).join('')}</svg>`, 'Drift'],
+  // Three or four blooms close together.
+  clump: [`<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="21" r="12" fill="#7a5a3c" opacity=".18"/>${[[15, 18], [24, 16], [18, 26], [26, 24]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4.6" fill="#e88aa8"/><circle cx="${x}" cy="${y}" r="1.6" fill="#f6d36a"/>`).join('')}</svg>`, 'Clump'],
+  // A single flower on its stem.
+  one: [`<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 33V19" stroke="#5f8a3e" stroke-width="2.2" stroke-linecap="round"/><path d="M20 27c-4-1-6-4-6-6 3 0 5 2 6 6z" fill="#6aa548"/>${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="20" cy="11" rx="3.2" ry="5" fill="#e88aa8" transform="rotate(${a} 20 16)"/>`).join('')}<circle cx="20" cy="16" r="2.8" fill="#f6d36a"/></svg>`, 'One'],
+};
+
 export class FlowerPicker {
   private readonly el: HTMLDivElement;
   private readonly chips = new Map<string, HTMLButtonElement>();
@@ -122,6 +131,9 @@ export class FlowerPicker {
   private readonly colour = new Map<string, number>();
   /** Opens the flower book (set by whoever owns it). */
   onBook: () => void = () => {};
+  /** The amount chip was tapped: move on to the next amount (drift → clump → one). */
+  onAmount: () => void = () => {};
+  private readonly amountChip: HTMLButtonElement;
 
   constructor(
     private readonly species: FlowerSpecies[],
@@ -144,7 +156,17 @@ export class FlowerPicker {
       e.stopPropagation();
       this.onBook();
     });
-    row.append(book);
+    // How much each touch plants, first in the row: a drift, a clump, or one flower.
+    this.amountChip = document.createElement('button');
+    this.amountChip.type = 'button';
+    this.amountChip.className = 'flower-chip amount-chip';
+    this.amountChip.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.amountChip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.onAmount();
+    });
+    this.setAmount('drift');
+    row.append(this.amountChip, book);
     const entries: [string, string, FlowerSpecies | null, boolean][] = [
       [MIX_ID, 'Seasonal mix', null, true],
       [WATER_MIX_ID, 'Water mix', null, true],
@@ -209,6 +231,13 @@ export class FlowerPicker {
   }
 
   /** Choose a species (from a chip or the book), as if its chip were tapped. */
+  /** Show which amount is chosen on its chip. */
+  setAmount(amount: 'drift' | 'clump' | 'one') {
+    const [svg, label] = AMOUNT_ICONS[amount];
+    this.amountChip.setAttribute('aria-label', `Planting: ${label}`);
+    this.amountChip.innerHTML = `<span class="chip-face">${svg}</span><span class="chip-name">${label}</span>`;
+  }
+
   pick(id: string) {
     const sp = this.species.find((s) => s.id === id);
     const label = sp?.name ?? (id === WATER_MIX_ID ? 'Water mix' : 'Seasonal mix');
