@@ -6,7 +6,7 @@
  *
  * Format (version 1), as JSON:
  *   { v: 1, a: [ [kind, ...settings, points] ] }
- *   kind: 'p' path · 'n' fence (style) · 'r' rocks · 'c' cottage look (style code, no points) · 'b' bridge · 'd' decor (prop) · 'f' flowers (species id) · 'o' pond · 'e' erase (radius in cm)
+ *   kind: 'p' path (style, unless gravel) · 'n' fence (style) · 'r' rocks · 'c' cottage look (style code, no points) · 'b' bridge · 'd' decor (prop) · 'f' flowers (species id) · 'o' pond · 'e' erase (radius in cm)
  *   points: "x,z,dx,dz,dx,dz…" in centimetres, each after the first relative to the one before.
  */
 
@@ -14,7 +14,7 @@ export const SAVE_VERSION = 1;
 const KEY = 'garden-save';
 
 export type Action =
-  | { kind: 'path'; points: number[] }
+  | { kind: 'path'; style?: string; points: number[] }
   | { kind: 'fence'; style: string; points: number[] }
   | { kind: 'rocks'; points: number[] }
   | { kind: 'cottage'; style: string; points: number[] }
@@ -61,7 +61,8 @@ export function encode(actions: Action[]): string {
     const pts = encodePoints(act.points);
     switch (act.kind) {
       case 'path':
-        return ['p', pts];
+        // The style rides along only when it isn't the original gravel (old saves have none).
+        return act.style && act.style !== 'gravel' ? ['p', act.style, pts] : ['p', pts];
       case 'fence':
         return ['n', act.style, pts];
       case 'rocks':
@@ -94,7 +95,7 @@ export function decode(json: string): Action[] {
     }
     const pts = decodePoints(String(row[row.length - 1]));
     if (pts.length < 2) continue;
-    if (row[0] === 'p') out.push({ kind: 'path', points: pts });
+    if (row[0] === 'p') out.push(row.length > 2 ? { kind: 'path', style: String(row[1]), points: pts } : { kind: 'path', points: pts });
     else if (row[0] === 'n') out.push({ kind: 'fence', style: String(row[1]), points: pts });
     else if (row[0] === 'r') out.push({ kind: 'rocks', points: pts });
     else if (row[0] === 'b') out.push({ kind: 'bridge', points: pts });

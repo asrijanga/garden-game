@@ -43,7 +43,9 @@ const ROPE_PX = 14;
 
 export class ToolController {
   private readonly pointers = new Set<number>();
-  private stroke: { tool: BuildTool; points: number[]; species: string; style: BuildStyle; item: PropKind } | null = null;
+  private stroke: { tool: BuildTool; points: number[]; species: string; style: BuildStyle; item: PropKind; path: string } | null = null;
+  /** The Path tool's current kind of path (set from its chips). */
+  pathStyle = 'gravel';
   /** The Build tool's current choice (set from its chips). */
   buildStyle: BuildStyle = 'picket';
   private building: Brush | null = null;
@@ -123,6 +125,8 @@ export class ToolController {
     const item = this.decor.kind;
     if (action.kind === 'prop') this.decor.kind = action.item as PropKind;
     if (action.kind === 'erase') this.eraser.radius = action.radius;
+    const pathStyle = this.pathStyle;
+    if (action.kind === 'path') this.pathStyle = action.style ?? 'gravel';
     const pts = action.points;
     for (let i = 0; i < pts.length; i += 2) {
       const p = this.p.set(pts[i], this.heightAt(pts[i], pts[i + 1]), pts[i + 1]);
@@ -133,6 +137,7 @@ export class ToolController {
     this.flowers.selection = selected;
     this.buildStyle = style;
     this.decor.kind = item;
+    this.pathStyle = pathStyle;
   }
 
   /** Where the finger is, on the ground, rounded to the centimetre (as saved). */
@@ -166,7 +171,7 @@ export class ToolController {
       this.eraser.radius = roundCm(Math.min(2.2, Math.max(0.7, this.rig.distance * 0.028)));
       this.marker.brush = this.eraser.radius;
     }
-    this.stroke = { tool, points: [hit.x, hit.z], species: this.flowers.selection, style: this.buildStyle, item: this.decor.kind };
+    this.stroke = { tool, points: [hit.x, hit.z], species: this.flowers.selection, style: this.buildStyle, item: this.decor.kind, path: this.pathStyle };
     this.marker.down(hit);
     this.brushes[tool].begin(hit);
   };
@@ -245,6 +250,7 @@ export class ToolController {
     else if (s.tool === 'decor') this.onAction({ kind: 'prop', item: s.item, points });
     else if (s.tool === 'fence') this.onAction({ kind: 'fence', style: s.style, points });
     else if (s.tool === 'erase') this.onAction({ kind: 'erase', radius: this.eraser.radius, points });
+    else if (s.tool === 'path') this.onAction({ kind: 'path', style: s.path, points });
     else this.onAction({ kind: s.tool, points });
   }
 }

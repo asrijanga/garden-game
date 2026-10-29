@@ -1,3 +1,4 @@
+import type { PathStyle } from '../game/pathBuilder';
 import type { BuildStyle } from '../game/tools';
 import type { PropKind } from '../world/props';
 
@@ -121,6 +122,75 @@ export const DECOR_CHIPS: { id: PropKind; label: string; icon: string }[] = [
 ];
 
 /** A row of illustrated choice chips floating above the toolbar (the flower picker's look). */
+/** The kinds of path, each with a little drawing of a stretch of it. */
+export const PATH_CHIPS: { id: PathStyle; label: string; icon: string }[] = [
+  {
+    id: 'gravel',
+    label: 'Gravel',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M4 12c12 3 20-3 32 0v16c-12-3-20 3-32 0z" fill="#d9cdb2"/>
+      ${[[9, 18], [16, 22], [24, 17], [31, 21], [12, 25], [27, 25], [20, 14]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1" fill="#a39477"/>`).join('')}
+      ${[[11, 20], [20, 20], [29, 20]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="3.6" ry="3" fill="#f1ebdf" stroke="#a89f8f" stroke-width="1"/>`).join('')}
+      <path d="M4 12c12 3 20-3 32 0M4 28c12 3 20-3 32 0" stroke="#9f988c" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+    </svg>`,
+  },
+  {
+    id: 'stepping',
+    label: 'Stepping stones',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      ${[[9, 27, 5.4, 4.2, -10], [18, 18, 5, 4.4, 15], [27, 25, 5.6, 4.1, -5], [33, 13, 4.6, 3.8, 20]].map(([x, y, rx, ry, r]) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" transform="rotate(${r} ${x} ${y})" fill="#e7e0d3" stroke="#9c9384" stroke-width="1.2"/>`).join('')}
+    </svg>`,
+  },
+  {
+    id: 'flagstone',
+    label: 'Flagstones',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <rect x="4" y="11" width="32" height="18" rx="3" fill="#cdbf9c"/>
+      <path d="M5 12l9-1 2 7-6 3-5-2zM16 11h9l1 6-8 2zM27 11l8 1v7l-7-1zM5 22l5-1 6 2-1 6H6zM17 21l9-2 2 6-3 4h-9zM30 20l5 1v7l-6 1-1-4z" fill="#d6ccb9" stroke="#998d78" stroke-width="1" stroke-linejoin="round"/>
+    </svg>`,
+  },
+  {
+    id: 'brick',
+    label: 'Brick',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <rect x="4" y="10" width="32" height="20" rx="2" fill="#d9b9a0"/>
+      ${[0, 1, 2, 3].map((r) => [0, 1, 2, 3].map((c) => `<rect x="${4.6 + c * 8 + (r % 2) * 4 - (r % 2 && c === 3 ? 0 : 0)}" y="${10.6 + r * 4.8}" width="${r % 2 && c === 3 ? 3.4 : 7.2}" height="4.2" rx="0.8" fill="${['#b5583d', '#a94f37', '#c0654a', '#9c4a35'][(r + c) % 4]}"/>`).join('')).join('')}
+    </svg>`,
+  },
+  {
+    id: 'cobble',
+    label: 'Cobbles',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <rect x="4" y="10" width="32" height="20" rx="3" fill="#c9bfa8"/>
+      ${[0, 1, 2, 3].map((r) => [0, 1, 2, 3, 4].map((c) => `<ellipse cx="${7.5 + c * 6.3 + (r % 2) * 3}" cy="${13 + r * 4.7}" rx="2.7" ry="2.1" fill="${['#9d968b', '#8c867c', '#a8a194', '#958d80'][(r * 2 + c) % 4]}"/>`).join('')).join('')}
+    </svg>`,
+  },
+  {
+    id: 'boardwalk',
+    label: 'Boardwalk',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      ${[0, 1, 2, 3, 4, 5, 6].map((i) => `<rect x="${5 + i * 4.4}" y="${9 + (i % 3) * 0.6}" width="3.6" height="${21 - (i % 2) * 0.8}" rx="0.8" fill="${['#a88763', '#9c7b5a', '#b0906b', '#8f6f50'][i % 4]}" stroke="#6f5238" stroke-width=".6"/>`).join('')}
+    </svg>`,
+  },
+  {
+    id: 'bark',
+    label: 'Bark chips',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M4 12c12 3 20-3 32 0v16c-12-3-20 3-32 0z" fill="#6e3a22"/>
+      ${[[8, 17, 20], [14, 23, -30], [20, 16, 60], [26, 22, 10], [31, 17, -50], [11, 20, 80], [24, 26, -15], [30, 25, 40]].map(([x, y, r]) => `<rect x="${x - 2}" y="${y - 0.8}" width="4" height="1.6" rx=".8" transform="rotate(${r} ${x} ${y})" fill="#a8603a"/>`).join('')}
+      <path d="M4 12c12 3 20-3 32 0M4 28c12 3 20-3 32 0" stroke="#7a5a3e" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+    </svg>`,
+  },
+  {
+    id: 'earth',
+    label: 'Earth track',
+    icon: `<svg viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M3 14c10 4 22-4 34 1v11c-12-5-24 3-34-1z" fill="#8a6a4a"/>
+      <path d="M6 13l1-3 1 3M14 15l1-3 1 3M30 12l1-3 1 3M9 28l1 3 1-3M22 28l1 3 1-3M33 27l1 3 1-3" stroke="#5f9a3e" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+    </svg>`,
+  },
+];
+
 export class ChipPicker<T extends string> {
   private readonly el: HTMLDivElement;
   private readonly chips = new Map<T, HTMLButtonElement>();

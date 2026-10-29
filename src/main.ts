@@ -29,7 +29,7 @@ import { GroundPaint } from './world/groundPaint';
 import { Stones } from './world/stones';
 import { EdgePlants } from './world/edgePlants';
 import { Dust } from './world/dust';
-import { PathBuilder } from './game/pathBuilder';
+import { PathBuilder, type PathStyle } from './game/pathBuilder';
 import { FlowerBrush, type PlantAmount } from './game/flowerBrush';
 import { Flowers } from './world/flowers';
 import { SPECIES } from './world/flowerSpecies';
@@ -44,7 +44,7 @@ import { PondBrush } from './game/pondBrush';
 import { EraseBrush } from './game/eraseBrush';
 import { FenceBuilder } from './game/fenceBuilder';
 import { Fences } from './world/fences';
-import { ChipPicker, BUILD_CHIPS, DECOR_CHIPS } from './ui/stylePicker';
+import { ChipPicker, BUILD_CHIPS, DECOR_CHIPS, PATH_CHIPS } from './ui/stylePicker';
 import { Props } from './world/props';
 import { PropBrush } from './game/propBrush';
 import { Boulders } from './world/boulders';
@@ -195,7 +195,8 @@ const stones = new Stones((p, r, kind) => {
   if (kind === 'step') dust.puff(p, 4, r * 1.2);
   // A rock set down in the water plops in; everything else settles into the soil.
   if (kind !== 'step' && ponds.waterDepth(p.x, p.z) > 0.08) ambience.plop(Math.min(1, r * 2.5));
-  else ambience.stone(kind === 'step' ? 0.3 : kind === 'rock' ? 0.14 : kind === 'shore' ? Math.min(0.3, r * 0.9) : 0.18);
+  else if (kind === 'plank') ambience.wood(0.4);
+  else ambience.stone(kind === 'step' ? 0.3 : kind === 'rock' ? 0.14 : kind === 'shore' ? Math.min(0.3, r * 0.9) : kind === 'flag' ? 0.24 : kind === 'brick' ? 0.12 : kind === 'cobble' ? 0.08 : 0.18);
 });
 scene.add(stones.group);
 const edgePlants = new EdgePlants(palette.wildflowers);
@@ -299,6 +300,7 @@ const bridgeBuilder = new BridgeBuilder(
 let pathTrail: THREE.Vector2[] = [];
 const pathBrush = {
   begin(p: THREE.Vector3) {
+    paths.style = (tools?.pathStyle ?? 'gravel') as PathStyle;
     pathTrail = [new THREE.Vector2(p.x, p.z)];
     paths.begin(p);
   },
@@ -401,6 +403,11 @@ const decorPicker = new ChipPicker(DECOR_CHIPS, (kind, label) => {
   propBrush.kind = kind;
   ambience.tap(1.15);
   toolbar.showLabel(label, 1400);
+});
+const pathPicker = new ChipPicker(PATH_CHIPS, (style, label) => {
+  if (tools) tools.pathStyle = style;
+  ambience.tap(1.1);
+  toolbar.showLabel(label, 1600);
 });
 const stylePicker = new ChipPicker(BUILD_CHIPS, (style, label) => {
   if (tools) tools.buildStyle = style;
@@ -739,8 +746,9 @@ tools = new ToolController(
     cottagePanelRef?.setVisible(false);
     picker.setVisible(tool === 'flowers');
     stylePicker.setVisible(tool === 'fence');
+    pathPicker.setVisible(tool === 'path');
     decorPicker.setVisible(tool === 'decor');
-    document.body.classList.toggle('picking', tool === 'flowers' || tool === 'fence' || tool === 'decor');
+    document.body.classList.toggle('picking', tool === 'flowers' || tool === 'fence' || tool === 'decor' || tool === 'path');
   },
 );
 const controller = tools;
