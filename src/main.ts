@@ -21,6 +21,7 @@ import { SeasonFx } from './world/seasonFx';
 import { NightMagic } from './world/nightMagic';
 import { Weather } from './world/weather';
 import { mountWeatherPicker } from './ui/weatherPicker';
+import { mountArtStylePicker } from './ui/artStylePicker';
 import { TimeOfDay } from './world/timeOfDay';
 import { mountTimeDial } from './ui/timeDial';
 import { GroundPaint } from './world/groundPaint';
@@ -901,6 +902,8 @@ mountWeatherPicker(
   },
   (w) => weather.allows(w),
 );
+// The art style: painted, or the pencil-sketch prototype.
+mountArtStylePicker((style) => post.setStyle(style));
 started = true;
 
 // --- Adaptive quality: hold 60fps ------------------------------------------------------------

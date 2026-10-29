@@ -112,13 +112,106 @@ void main() {
   gl_FragColor = vec4(c, 1.0);
 }`;
 
+/**
+ * The pencil-sketch look (a prototype art style): graphite outlines found from depth (silhouettes)
+ * and colour (inner detail), drawn twice with a hand's wobble and redrawn ~8 times a second like
+ * hand-drawn animation; hatching in the shadows, cross-hatching in the darkest; and a light wash of
+ * colour on cream paper with a visible tooth.
+ */
+const sketchFrag = /* glsl */ `
+uniform sampler2D tScene;
+uniform sampler2D tDepth;
+uniform vec3 uLift, uGain;
+uniform float uSaturation, uAspect, uNear, uFar, uTime, uLine;
+uniform vec2 uTexel;
+varying vec2 vUv;
+${finalFrag.slice(finalFrag.indexOf('vec3 neutral'), finalFrag.indexOf('void main'))}
+float sHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float sNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(sHash(i), sHash(i + vec2(1.0, 0.0)), f.x), mix(sHash(i + vec2(0.0, 1.0)), sHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float lin(vec2 uv) {
+  float d = texture2D(tDepth, uv).r;
+  return uNear * uFar / (uFar - d * (uFar - uNear));
+}
+float tone(vec3 c) {
+  float l = dot(c, vec3(0.299, 0.587, 0.114));
+  return l / (l + 0.6);
+}
+/** How strongly a pencil line belongs here: a jump in depth (an outline) or in tone (detail). */
+float edge(vec2 uv, float r) {
+  vec2 o = uTexel * r;
+  vec2 a = vec2(o.x, o.y), b = vec2(o.x, -o.y);
+  float dc = lin(uv);
+  float dd = (abs(lin(uv + a) - lin(uv - a)) + abs(lin(uv + b) - lin(uv - b))) / dc;
+  float outline = smoothstep(0.012, 0.05, dd);
+  float tl = abs(tone(texture2D(tScene, uv + a).rgb) - tone(texture2D(tScene, uv - a).rgb))
+           + abs(tone(texture2D(tScene, uv + b).rgb) - tone(texture2D(tScene, uv - b).rgb));
+  float detail = smoothstep(0.06, 0.18, tl);
+  // Far things are drawn lightly, the way an artist lets the background go.
+  float near = smoothstep(120.0, 40.0, dc);
+  return max(outline, detail * 0.6) * mix(0.35, 1.0, near);
+}
+/** One set of hatching lines across the screen at an angle, slightly wavering. */
+float hatch(vec2 px, vec2 dir, float spacing, float boil) {
+  float s = dot(px, dir) / spacing + sNoise(px * 0.03 + boil * 1.7) * 0.7;
+  float d = abs(fract(s) - 0.5) * 2.0;
+  return smoothstep(0.72, 0.92, d) * (0.55 + 0.45 * sNoise(px * vec2(0.05, 0.3) + boil));
+}
+void main() {
+  vec2 px = vUv / uTexel;
+  float boil = floor(uTime * 8.0);
+  // Two strokes, each wandering a little off the true line, in a different way each "frame".
+  vec2 w1 = (vec2(sNoise(px * 0.012 + boil * 3.1), sNoise(px * 0.012 + 17.0 + boil * 1.7)) - 0.5) * 2.4 * uLine;
+  vec2 w2 = (vec2(sNoise(px * 0.02 + 5.0 - boil * 2.3), sNoise(px * 0.02 + 9.0 + boil * 1.1)) - 0.5) * 3.0 * uLine;
+  float line = max(edge(vUv + w1 * uTexel, uLine), edge(vUv + w2 * uTexel, uLine * 0.75) * 0.7);
+
+  // The colour, graded as usual, then laid down as a light wash.
+  vec3 col = toSRGB(clamp(neutral(texture2D(tScene, vUv).rgb), 0.0, 1.0));
+  col = uLift * 0.35 + col * (uGain - uLift * 0.35);
+  float l = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(l), col, uSaturation * 0.6);
+  // Values gather into a few soft steps, as a hand would shade them.
+  float lv = mix(l, floor(l * 4.0 + 0.5) / 4.0, 0.3);
+  vec3 wash = col * (lv / max(l, 1e-3));
+  float tooth = sNoise(px * 0.9 / uLine) * 0.6 + sNoise(px * 0.21 / uLine) * 0.4;
+  vec3 paper = vec3(0.965, 0.94, 0.87) * (0.95 + 0.05 * tooth);
+  // A pale wash: plenty of paper shows through, deepest where the colour is darkest.
+  vec3 c = paper * mix(vec3(1.0), clamp(wash * 1.3 + 0.08, 0.0, 1.0), 0.62);
+
+  // Shading: hatching in the shadows, cross-hatching where it's darkest.
+  vec2 hp = px / uLine;
+  // Light pencil shading over the mid-tones, hatching in the shadows, cross-hatching darkest.
+  float shade0 = 1.0 - smoothstep(0.5, 0.8, lv);
+  float shade1 = 1.0 - smoothstep(0.32, 0.55, lv);
+  float shade2 = 1.0 - smoothstep(0.12, 0.3, lv);
+  float h = hatch(hp, vec2(0.94, 0.34), 3.2, boil + 3.0) * shade0 * 0.35
+          + hatch(hp, vec2(0.707, 0.707), 4.5, boil) * shade1
+          + hatch(hp, vec2(-0.6, 0.8), 4.0, boil + 7.0) * shade2;
+
+  // Graphite catches on the paper's tooth, so lines and hatching break up a little.
+  float grip = 0.55 + 0.45 * smoothstep(0.2, 0.7, tooth);
+  float graphite = clamp(line * 0.9 + h * 0.45, 0.0, 1.0) * grip;
+  c = mix(c, vec3(0.22, 0.2, 0.19) * (0.6 + 0.4 * lv), graphite);
+
+  // The page darkens a touch towards its edges.
+  vec2 v = (vUv - 0.5) * vec2(uAspect, 1.0);
+  c *= mix(0.88, 1.0, smoothstep(0.95, 0.3, length(v) * 1.1));
+  gl_FragColor = vec4(c, 1.0);
+}`;
+
+export type ArtStyle = 'painted' | 'sketch';
+
 const LEVELS = 3; // bloom chain: 1/4, 1/8, 1/16 of full resolution
 
-function target(w: number, h: number, samples = 0) {
+function target(w: number, h: number, samples = 0, depth = false) {
   return new THREE.WebGLRenderTarget(Math.max(1, w), Math.max(1, h), {
     type: THREE.HalfFloatType,
     samples,
-    depthBuffer: samples > 0,
+    depthBuffer: samples > 0 || depth,
+    ...(depth ? { depthTexture: new THREE.DepthTexture(Math.max(1, w), Math.max(1, h)) } : {}),
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
   });
@@ -149,7 +242,21 @@ export class PostFX {
     uTexel: { value: new THREE.Vector2(1, 1) },
     uSharpen: { value: 0.6 },
   });
+  private readonly sketch = pass(sketchFrag, {
+    tScene: { value: null },
+    tDepth: { value: null },
+    uLift: { value: new THREE.Color('#2a1a10') },
+    uGain: { value: new THREE.Color('#fff4e6') },
+    uSaturation: { value: 1.08 },
+    uAspect: { value: 1 },
+    uNear: { value: 0.5 },
+    uFar: { value: 400 },
+    uTime: { value: 0 },
+    uLine: { value: 1.5 },
+    uTexel: { value: new THREE.Vector2(1, 1) },
+  });
   private samples = 4;
+  private style: ArtStyle = 'painted';
   bloomEnabled = true;
   private black = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
 
@@ -174,7 +281,16 @@ export class PostFX {
     this.samples = samples;
     const { width, height } = this.sceneRT;
     this.sceneRT.dispose();
-    this.sceneRT = target(width, height, samples);
+    this.sceneRT = target(width, height, samples, this.style === 'sketch');
+  }
+
+  /** The art style: the usual painted look, or the pencil-sketch prototype (which needs depth). */
+  setStyle(style: ArtStyle) {
+    if (style === this.style) return;
+    this.style = style;
+    const { width, height } = this.sceneRT;
+    this.sceneRT.dispose();
+    this.sceneRT = target(width, height, this.samples, style === 'sketch');
   }
 
   /** The colour grade (lift/gain/saturation) and bloom strength, e.g. for the time of day. */
@@ -184,6 +300,10 @@ export class PostFX {
     (u.uGain.value as THREE.Color).copy(gain);
     u.uSaturation.value = saturation;
     u.uBloom.value = bloom;
+    const k = this.sketch.uniforms;
+    (k.uLift.value as THREE.Color).copy(lift);
+    (k.uGain.value as THREE.Color).copy(gain);
+    k.uSaturation.value = saturation;
   }
 
   setSize(width: number, height: number, pixelRatio: number) {
@@ -197,6 +317,9 @@ export class PostFX {
     }
     this.final.uniforms.uAspect.value = width / height;
     this.final.uniforms.uTexel.value.set(1 / w, 1 / h);
+    this.sketch.uniforms.uAspect.value = width / height;
+    this.sketch.uniforms.uTexel.value.set(1 / w, 1 / h);
+    this.sketch.uniforms.uLine.value = Math.max(1, pixelRatio * 0.8);
     // Sharpen more the more the screen will stretch the picture.
     const stretch = Math.max(1, (window.devicePixelRatio || 1) / pixelRatio);
     this.final.uniforms.uSharpen.value = Math.min(1.0, 0.45 + (stretch - 1) * 0.6);
@@ -212,6 +335,19 @@ export class PostFX {
     const r = this.renderer;
     r.setRenderTarget(this.sceneRT);
     r.render(this.scene, this.camera);
+
+    if (this.style === 'sketch') {
+      // Pencil on paper: no bloom, just the one pass that draws it all.
+      const u = this.sketch.uniforms;
+      u.tScene.value = this.sceneRT.texture;
+      u.tDepth.value = this.sceneRT.depthTexture;
+      const cam = this.camera as THREE.PerspectiveCamera;
+      u.uNear.value = cam.near;
+      u.uFar.value = cam.far;
+      u.uTime.value = performance.now() / 1000;
+      this.blit(this.sketch, null);
+      return;
+    }
 
     let bloomTex: THREE.Texture = this.black;
     if (this.bloomEnabled) {

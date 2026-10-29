@@ -10,7 +10,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current story:** 5.2 — Satisfying build sounds (built, awaiting review). Next: 6.x share/polish (or the requested 2.8/2.9 bed stories).
+**Current story:** 7.1 — Pencil-sketch art style prototype (built, awaiting review). The player asked for a hand-drawn art overhaul and chose **pencil sketch**, prototyped behind a switch first. Next: 7.2 if they like the direction (else tune 7.1); then 6.x share/polish and the requested 2.8/2.9 bed stories.
 **Preview URL:** https://asrijanga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
@@ -48,7 +48,8 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 4.4 Night magic | ✅ Done | Everything follows the sun dial. Garden lanterns and the cottage's windows and door lamp burn brighter as it gets dark, each with a soft halo and a warm pool of light on the grass (lanterns you place light up too). Fireflies (not in winter) wake from dusk, wander lazily and blink slowly, drifting over to settle round blooming flowers and meadow clumps. Stars come out (bright ones first) and twinkle, and show in the pond's reflection, broken by ripples and hidden by the reflected treeline. All on the GPU, so no cost by day. |
 | 4.5 Weather | ✅ Done | Weather chips under the sun dial: **Clear**, **Sunbeams**, **Rain**, **Mist** (remembered; Rain is hidden in winter, where it snows). Changes blend in over ~6 s and shade the day's light at any time of day. *Rain:* grey, soft light; slanting streaks that follow the wind, little splashes, a rash of rings on the ponds; soil, beds and paths soak dark, puddles form in the dips of paths (mirroring the sky, ringed by drops), stones and boulders go dark with a wet sheen, and it all dries slowly (~2 min) after the rain stops; a soft rain hiss in the ambience. *Mist:* pale, close haze plus three sheets of low mist rolling in banks across the lawn with the wind (thinning where the forest floor rises). *Sunbeams:* broken cloud whose shadows drift over the lawn (brighter in the gaps), with soft shafts of sun slanting down. All GPU-driven. |
 | 5.1 Richer ambience | ✅ Done | The soundscape follows the sun dial, the season and the weather; everything synthesised, far off and soft. Songbirds: a dawn chorus (about 3× livelier, answering each other more), quieter towards dusk, asleep at night, mostly hushed in rain. After dark: crickets (four in summer, two in autumn, one in spring; each with its own steady rhythm and pauses, quiet in the rain), frogs by the pond on spring and summer nights (only if there's a pond, sometimes answering across the water), and a distant tawny owl. By day, one seasonal caller from the woods now and then: a cuckoo (or a woodpecker) in spring, a wood pigeon in summer, crows in autumn, a woodpecker drumming in winter. Drips off leaves patter in the rain and slow as the garden dries. Far voices go through a soft forest echo. |
-| 5.2 Satisfying build sounds | 👀 Awaiting feedback | Fills the gaps in the build sounds (stones, posts, hedges, walls, boulders, props, blooms, fish, pond filling and tidying already had theirs). New sounds follow your finger as you draw: gravel scrunching under a new path (a soft scrunch with a few clicking grains), a spade thudding into earth as you dig a pond, plants patted into the soil with a whisper of leaves (or a "bloop" when planting into water), a happy pop as you pick up a decoration, and rocks set into a pond plop in instead of clacking. Each is a little different every time and rate-limited, so strokes sound lively, never machine-gun. Silent while the garden rebuilds. |
+| 5.2 Satisfying build sounds | ✅ Done | Fills the gaps in the build sounds (stones, posts, hedges, walls, boulders, props, blooms, fish, pond filling and tidying already had theirs). New sounds follow your finger as you draw: gravel scrunching under a new path (a soft scrunch with a few clicking grains), a spade thudding into earth as you dig a pond, plants patted into the soil with a whisper of leaves (or a "bloop" when planting into water), a happy pop as you pick up a decoration, and rocks set into a pond plop in instead of clacking. Each is a little different every time and rate-limited, so strokes sound lively, never machine-gun. Silent while the garden rebuilds. |
+| 7.1 Pencil-sketch prototype | 👀 Awaiting feedback | A **Painted / Sketch** switch at the bottom of the sun-dial panel (remembered). Sketch redraws the whole garden as a coloured-pencil sketch in one final screen pass (no per-object changes, so everything is covered): graphite outlines found from depth (silhouettes) and tone (inner detail), drawn twice with a hand's wobble and redrawn ~8×/s like hand-drawn animation ("boil"), fainter in the distance; pale colour washes over cream paper with a visible tooth; light pencil shading over mid-tones, hatching in shadows, cross-hatching in the darkest; graphite breaking up on the paper grain; the page darkening at its edges. Bloom is skipped in Sketch (it pays for the line pass). Works with every time of day, weather and season. |
 | 6.x (+ follow-ups 3.8, 3.9, 4.1d, 4.1e, 6.6–6.8; requested 2.8 bed styles, 2.9 bed toppings) | ⬜ Not started | See milestones below |
 
 Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · ✅ Done
@@ -56,6 +57,7 @@ Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **5.2 → 7.1:** *Feedback:* "this is impressive" (build sounds accepted); asked which engine (three.js, no game engine); then "i want a different art style, i want hand drawn style art overhaul, is that possible". Chose **pencil sketch** and **prototype first** (a switch to compare on the phone). *Changes:* Milestone 7 (hand-drawn art) added; Story 7.1 built.
 - **5.1 → 5.2:** *Feedback:* "Next story" (ambience accepted). *Changes:* Story 5.2 built.
 - **4.5 → 5.1:** *Feedback:* "Next story" (weather accepted). *Changes:* Story 5.1 built.
 - **4.4 → 4.5:** *Feedback:* "Next story" (night magic accepted). *Changes:* Story 4.5 built.
@@ -226,6 +228,7 @@ _Feedback from each review, newest first, and what we changed because of it._
 | Seasons | `currentSeason()` from the device date and time zone (southern hemisphere flips). `?season=` overrides | "The season should reflect what the current season is." |
 | Vegetation | Lawn is a painted ground shader (fine grain + wind sheen), no blade geometry. GPU-instanced wildflowers. Trees are procedural archetypes (branching wood + alpha-tested leaf-cluster cards from canvas textures), instanced with per-tree size, lean, yaw and color, with near/far detail levels. Wind in the vertex shader | Tens of thousands of swaying blades at 60fps on a phone. |
 | Look | Soft Lambert lighting, neutral tone mapping, bloom, warm grade. **No blur effects** (player feedback) | Storybook diorama feel, crisp everywhere. |
+| Art style (Milestone 7) | Hand-drawn **pencil sketch** done as a post pass (depth + tone edges, screen-space hatching, paper), selectable beside the painted look while it's a prototype | One pass restyles every object at once; cheap enough for phones (replaces bloom); easy to compare before committing. |
 | Audio | Web Audio API, procedural (filtered noise for wind and leaves; synthesized chimes later) | Nothing to download. Unlocks on the first touch. Driven by `WindField`. |
 | Ground paint | `GroundPaint`: a 512² canvas texture over the clearing (R = worn path earth; G = sandiness relative to R; B reserved for flower beds) read by the lawn shader | Cheap live painting with organic edges, and one texture for every ground change. |
 | Ponds | `Ponds`: a 256² signed "inside distance" field over the clearing (strokes merge with a smooth union) gives depth, levelling and banks. The coarse lawn mesh steps down out of sight near ponds and fine chunked basin meshes (same lawn shader, polygon offset) sink into shape. Flat water per connected body, with level = lowest bank − 7 cm. A pond texture (R depth, G shore halo, B height above the waterline) colours banks, pebbles and silt | Smooth organic shapes at any size, live digging, and no holes or seams, without re-meshing the whole lawn. |
@@ -607,6 +610,17 @@ Demo script: dig a pond, choose the water mix, and paint across it. Watch lotus 
 - **Profile what's left:** look at the remaining drawing cost (bloom, edge smoothing).
 
 ---
+
+## Milestone 7 — Hand-drawn art (pencil sketch)
+
+### Story 7.1 — Pencil-sketch prototype (M)
+- A switchable Sketch style: wobbly graphite outlines that "boil", pale colour washes on paper, hatching and cross-hatching for shade.
+
+### Story 7.2 — The whole garden in pencil (L)
+- Restyle what the post pass can't fix alone: water (ink ripples, paper-white glints), sky and haze as blank paper, night as pencil on blue-grey paper, rain/snow/mist/fireflies as pencil marks, lamp glow as soft smudges. Object-space hatching on big surfaces so shading sticks to things when the camera moves (no "shower door"). Line weight by importance (thicker silhouettes, thinner creases).
+
+### Story 7.3 — Sketchbook UI and polish (M)
+- Buttons, panels and labels as pencil drawings on paper (hand-lettered labels, sketched icons); a sketchbook page edge; decide whether Sketch becomes the default (or the only) look; tune performance on older iPhones.
 
 ## Parking lot (ideas to revisit)
 - **Weather and wildlife:** butterflies, bees and hummingbirds could shelter in the rain (and ducks love it); a gentle "auto" weather that changes on its own over a session.
