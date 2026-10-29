@@ -152,6 +152,14 @@ export class GardenStore {
     }
   }
 
+  /** Replace the whole garden (restoring a backup) and save it as the player's own. */
+  replace(actions: Action[]) {
+    this.visiting = false;
+    this.actions.length = 0;
+    this.actions.push(...actions);
+    this.save();
+  }
+
   clear() {
     clearTimeout(this.timer);
     this.actions.length = 0;
