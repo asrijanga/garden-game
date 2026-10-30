@@ -72,15 +72,6 @@ uniform float uSaturation, uVignette, uAspect;
 uniform vec2 uTexel;
 uniform float uSharpen;
 varying vec2 vUv;
-#ifdef STORYBOOK
-uniform sampler2D tDepth;
-uniform float uNear, uFar;
-float viewZ(vec2 uv) {
-  float d = texture2D(tDepth, uv).x;
-  return uNear * uFar / (uFar - d * (uFar - uNear));
-}
-uniform sampler2D tPaper;
-#endif
 vec3 neutral(vec3 color) {
   const float startCompression = 0.8 - 0.04;
   const float desaturation = 0.15;
@@ -108,72 +99,13 @@ void main() {
   vec3 w = texture2D(tScene, vUv - vec2(uTexel.x, 0.0)).rgb;
   vec3 lo = min(c, min(min(n, s), min(e, w)));
   vec3 hi = max(c, max(max(n, s), max(e, w)));
-#ifdef STORYBOOK
-  // Drawn without multisampling (its depth is read for the ink, and on phones resolving a
-  // multisampled depth buffer every frame is ruinously slow): soften stair-stepped edges instead,
-  // blending a pixel towards its neighbours where it differs sharply from them.
-  float edge = dot(hi - lo, vec3(0.3, 0.5, 0.2));
-  c = mix(c, (c * 2.0 + n + s + e + w) / 6.0, smoothstep(0.06, 0.25, edge) * 0.7);
-#else
   c = clamp(c + (c - (n + s + e + w) * 0.25) * uSharpen, lo, hi);
-#endif
   c += texture2D(tBloom, vUv).rgb * uBloom;
-#ifdef STORYBOOK
-  {
-    // Ink: where something stands in front of something further away, a fine line on the near
-    // thing's edge, in a deeper shade of its own colour (as a painter outlines in sepia or
-    // dark green, never black). From the depth alone, so it's as steady as the shapes are;
-    // fading out into the distance, and kept off flat ground however low the view.
-    float zc = viewZ(vUv);
-    float zn = viewZ(vUv + vec2(0.0, uTexel.y));
-    float zs = viewZ(vUv - vec2(0.0, uTexel.y));
-    float ze = viewZ(vUv + vec2(uTexel.x, 0.0));
-    float zw = viewZ(vUv - vec2(uTexel.x, 0.0));
-    // A plane, even seen at a slant, has no curvature: only real steps in depth draw.
-    float bend = max(abs(zn + zs - 2.0 * zc), abs(ze + zw - 2.0 * zc)) / zc;
-    float behind = (max(max(zn, zs), max(ze, zw)) - zc) / zc;
-    // (Up close the threshold drops, so petals lying over petals get their own outline.)
-    float fine = mix(0.4, 1.0, smoothstep(0.8, 2.2, zc));
-    float ink = smoothstep(0.018 * fine, 0.05 * fine, bend) * smoothstep(0.012 * fine, 0.04 * fine, behind);
-    ink *= 1.0 - smoothstep(18.0, 60.0, zc);
-    vec3 inkColour = c * vec3(0.3, 0.25, 0.22) + vec3(0.012, 0.008, 0.004);
-    c = mix(c, inkColour, ink * 0.92);
-  }
-#endif
   c = toSRGB(clamp(neutral(c), 0.0, 1.0));
   // Lift shadows toward a warm brown so darks never go dead black.
   c = uLift * 0.35 + c * (uGain - uLift * 0.35);
   float l = dot(c, vec3(0.299, 0.587, 0.114));
   c = mix(vec3(l), c, uSaturation);
-#ifdef STORYBOOK
-  {
-    // Watercolour: high-key and airy (the darkest shade is a soft lavender, not black), cool in
-    // the shade and warm in the light, a little richer in the mid-tones; on paper with a faint,
-    // still grain (fixed to the page, like a painting's, so it never crawls).
-    float t = dot(c, vec3(0.299, 0.587, 0.114));
-    // Greens lean warm and fresh (yellow-green in the sun), shade leans blue-teal.
-    float green = smoothstep(0.0, 0.12, c.g - max(c.r, c.b));
-    // (Gently: under soft light the lawn should sit back as a calm sage, so the flowers lead.)
-    c = mix(c, c * vec3(1.04, 1.01, 0.9), green * t * 0.9);
-    c = mix(c, vec3(dot(c, vec3(0.299, 0.587, 0.114))), green * 0.22);
-    // (Not on strong colours: a crimson rose's shaded heart deepens to crimson, not lavender-grey.)
-    float chroma = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
-    c = mix(c, c * vec3(0.86, 0.98, 1.14), (1.0 - smoothstep(0.08, 0.45, t)) * 0.7 * (1.0 - smoothstep(0.12, 0.4, chroma)));
-    // Richer colour, airy values: lifted towards the paper, never to black. Colours already
-    // vivid aren't pushed further (a red rose would clip to one flat red), and the brightest
-    // values ease in under a soft shoulder rather than hitting the ceiling.
-    float vivid = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
-    c = mix(vec3(t), c, 1.0 + 0.15 * (1.0 - smoothstep(0.3, 0.7, vivid)));
-    c = max(c, 0.0);
-    c = mix(c, 0.8 + (c - 0.8) / (1.0 + (c - 0.8) * 3.0), step(0.8, c));
-    c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * 0.96;
-    c = max(c, vec3(0.13, 0.12, 0.2) * (1.0 - t) + c * 0.0);
-    // (A small tile made once, fine grain and a broader mottle from two scales of it.)
-    vec2 px = gl_FragCoord.xy;
-    float paper = texture2D(tPaper, px / 128.0).r * 0.6 + texture2D(tPaper, px / 701.0).r * 0.4;
-    c *= 0.975 + paper * 0.05;
-  }
-#endif
   vec2 v = (vUv - 0.5) * vec2(uAspect, 1.0);
   float vig = smoothstep(0.95, 0.25, length(v) * 1.1);
   c *= mix(1.0 - uVignette, 1.0, vig);
@@ -182,41 +114,14 @@ void main() {
 
 const LEVELS = 3; // bloom chain: 1/4, 1/8, 1/16 of full resolution
 
-/** The paper's grain: a small tile of soft noise, made once (cheaper than noise per pixel). */
-function paperTexture(): THREE.DataTexture {
-  const N = 128;
-  const raw = new Float32Array(N * N);
-  let seed = 7;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < raw.length; i++) raw[i] = rnd();
-  const data = new Uint8Array(N * N * 4);
-  for (let y = 0; y < N; y++) {
-    for (let x = 0; x < N; x++) {
-      // A little blur, so it's grain rather than static (and wrapping, so it tiles).
-      let v = 0;
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) v += raw[((y + dy + N) % N) * N + ((x + dx + N) % N)] * (dx || dy ? 1 : 2);
-      const b = Math.round((v / 10) * 255);
-      data.set([b, b, b, 255], (y * N + x) * 4);
-    }
-  }
-  const t = new THREE.DataTexture(data, N, N);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.magFilter = t.minFilter = THREE.LinearFilter;
-  t.needsUpdate = true;
-  return t;
-}
-
-function target(w: number, h: number, samples = 0, depth = false) {
-  const rt = new THREE.WebGLRenderTarget(Math.max(1, w), Math.max(1, h), {
+function target(w: number, h: number, samples = 0) {
+  return new THREE.WebGLRenderTarget(Math.max(1, w), Math.max(1, h), {
     type: THREE.HalfFloatType,
     samples,
-    depthBuffer: samples > 0 || depth,
+    depthBuffer: samples > 0,
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
   });
-  // (Set afterwards: given in the options, this version of three.js trips over it.)
-  if (depth) rt.depthTexture = new THREE.DepthTexture(Math.max(1, w), Math.max(1, h));
-  return rt;
 }
 
 function pass(frag: string, uniforms: Record<string, THREE.IUniform>) {
@@ -252,15 +157,8 @@ export class PostFX {
     private readonly renderer: THREE.WebGLRenderer,
     private scene: THREE.Scene,
     private camera: THREE.Camera,
-    /** The storybook look: ink lines (from the depth), paper and a watercolour grade. */
-    private readonly storybook = false,
   ) {
-    if (storybook) this.samples = 0;
-    this.sceneRT = target(1, 1, this.samples, storybook);
-    if (storybook) {
-      this.final.defines.STORYBOOK = '';
-      Object.assign(this.final.uniforms, { tDepth: { value: null }, uNear: { value: 0.1 }, uFar: { value: 100 }, tPaper: { value: paperTexture() } });
-    }
+    this.sceneRT = target(1, 1, this.samples);
     for (let i = 0; i < LEVELS; i++) {
       this.bloomRTs.push(target(1, 1));
       this.upRTs.push(target(1, 1));
@@ -278,13 +176,11 @@ export class PostFX {
 
   /** MSAA sample count for the scene (0 turns antialiasing off). */
   setSamples(samples: number) {
-    // (The storybook look always draws without: see the final pass.)
-    if (this.storybook) samples = 0;
     if (samples === this.samples) return;
     this.samples = samples;
     const { width, height } = this.sceneRT;
     this.sceneRT.dispose();
-    this.sceneRT = target(width, height, samples, this.storybook);
+    this.sceneRT = target(width, height, samples);
   }
 
   /** The colour grade (lift/gain/saturation) and bloom strength, e.g. for the time of day. */
@@ -325,9 +221,7 @@ export class PostFX {
     r.render(this.scene, this.camera);
 
     let bloomTex: THREE.Texture = this.black;
-    // (No bloom in the storybook look: watercolour doesn't glow, and pale petals in warm light
-    // would halo.)
-    if (this.bloomEnabled && !this.storybook) {
+    if (this.bloomEnabled) {
       this.bright.uniforms.tSrc.value = this.sceneRT.texture;
       this.bright.uniforms.uTexel.value.set(1 / this.sceneRT.width, 1 / this.sceneRT.height);
       this.blit(this.bright, this.bloomRTs[0]);
@@ -350,12 +244,6 @@ export class PostFX {
     }
 
     this.final.uniforms.tScene.value = this.sceneRT.texture;
-    if (this.storybook) {
-      const cam = this.camera as THREE.PerspectiveCamera;
-      this.final.uniforms.tDepth.value = this.sceneRT.depthTexture;
-      this.final.uniforms.uNear.value = cam.near;
-      this.final.uniforms.uFar.value = cam.far;
-    }
     this.final.uniforms.tBloom.value = bloomTex;
     this.blit(this.final, null);
   }
