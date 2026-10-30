@@ -1470,11 +1470,24 @@ export class Flowers {
             #define aBirth aLife.x
             #define aBloomMax aLife.y
             attribute vec3 aHinge, aAxis, aPetalColor, aEdgeColor;
-            varying float vGlow;`,
+            varying float vGlow;
+            float fHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }`,
           )
           .replace(
             '#include <color_vertex>',
-            '#include <color_vertex>\nvColor.rgb = mix(vColor.rgb, vColor.rgb * mix(aPetalColor, aEdgeColor, aEdge), aIsPetal);',
+            /* glsl */ `#include <color_vertex>
+            vColor.rgb = mix(vColor.rgb, vColor.rgb * mix(aPetalColor, aEdgeColor, aEdge), aIsPetal);
+            {
+              // No two alike: each petal a shade lighter or deeper, warmer or cooler; and now and
+              // then a bloom past its best, its colour fading and its edges browning.
+              float plant = fHash(instanceMatrix[3].xz * 7.31);
+              float leaf = fHash(aHinge.xz * 53.7 + aAxis.xz * 17.3 + plant * 9.1);
+              float petal = aIsPetal * step(0.1, length(aAxis.xz));
+              vColor.rgb *= 1.0 + (leaf - 0.5) * mix(0.1, 0.18, petal);
+              vColor.rgb = mix(vColor.rgb, vColor.rgb * vec3(1.04, 1.0, 0.94), petal * step(0.6, fract(leaf * 7.7)) * 0.6);
+              float faded = step(plant, 0.07) * aIsPetal;
+              vColor.rgb = mix(vColor.rgb, mix(vColor.rgb, vec3(dot(vColor.rgb, vec3(0.33))), 0.45) * vec3(0.95, 0.88, 0.76), faded * (0.35 + 0.65 * aEdge));
+            }`,
           )
           .replace(
             '#include <begin_vertex>',
@@ -1487,15 +1500,29 @@ export class Flowers {
               float sprout = g * g * (3.0 - 2.0 * g) + sin(g * 3.14159) * 0.12;
               // Bud → bloom: petals pivot open about their hinges and swell to full size.
               float bloom = smoothstep(${BLOOM_START.toFixed(2)}, ${BLOOM_END.toFixed(2)}, age) * aBloomMax;
+              float plantSeed = fHash(instanceMatrix[3].xz * 7.31);
               if (aIsPetal > 0.5) {
                 vec3 rel = transformed - aHinge;
+                // Each petal its own: a touch bigger or smaller, opened a little more or less; the
+                // odd one drooping, and (rarely) one missing. (Only real petals, set round a
+                // flower by their own axis; florets and stamens share one and are left alone.)
+                float real = step(0.1, length(aAxis.xz));
+                float pr = fHash(aHinge.xz * 53.7 + aAxis.xz * 17.3 + plantSeed * 9.1);
+                float pr2 = fract(pr * 13.37);
+                float pastBest = step(plantSeed, 0.07);
                 float ang = (1.0 - bloom) * aClose;
+                ang += real * bloom * ((pr2 - 0.5) * 0.22 + step(0.88, pr2) * 0.3 + pastBest * 0.35);
+                rel *= mix(1.0, mix(0.88, 1.08, pr) * (1.0 - step(pr, 0.022)), real);
                 float c = cos(ang), s = sin(ang);
                 rel = rel * c + cross(aAxis, rel) * s + aAxis * dot(aAxis, rel) * (1.0 - c);
                 rel *= mix(0.55, 1.0, bloom);
                 transformed = aHinge + rel;
               }
               transformed *= max(sprout, 0.0001);
+              // And each plant leans its own way a little (more the taller it stands).
+              float lean = (fract(plantSeed * 31.7) - 0.5) * 0.14;
+              float leanZ = (fract(plantSeed * 57.3) - 0.5) * 0.14;
+              transformed.xz += vec2(lean, leanZ) * transformed.y;
             }
             #ifdef AQUATIC
             {
