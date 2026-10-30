@@ -38,7 +38,7 @@ import { Stones } from '../world/stones';
 import { EdgePlants } from '../world/edgePlants';
 import { Dust } from '../world/dust';
 import { PathBuilder } from '../game/pathBuilder';
-import { Flowers } from '../world/flowers';
+import { Flowers, setPlantSeason } from '../world/flowers';
 import { Bees } from '../world/bees';
 import { Ponds, createPondTexture } from '../world/pond';
 import { PondPlants } from '../world/pondPlants';
@@ -169,6 +169,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   // --- World ------------------------------------------------------------------------------
   const season = init.season;
   const palette = PALETTES[season];
+  setPlantSeason(season);
 
   const scene = new THREE.Scene();
   const haze = new THREE.Color(palette.fog);
@@ -959,7 +960,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       shapes.addEventListener('message', (e: MessageEvent<{ key: string; near: PackedShape; far: PackedShape }>) => {
         flowers.adopt(e.data.key, unpack(e.data.near), unpack(e.data.far));
       });
-      shapes.postMessage(Flowers.wanted(season));
+      shapes.postMessage({ season, recipes: Flowers.wanted(season) });
     } catch {
       // No workers from here: shapes are made when first planted.
     }

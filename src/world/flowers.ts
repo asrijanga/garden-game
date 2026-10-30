@@ -518,11 +518,82 @@ function leafGeometry(kind: LeafKind, seed: number): THREE.BufferGeometry {
 }
 
 const ROSE_STEM = new THREE.Color('#4a6a32');
+/** Winter canes: bare, ripened to a dull red-brown. */
+const ROSE_CANE_WINTER = new THREE.Color('#6b3f2e');
+const HIP = new THREE.Color('#c8361f');
+const HIP_CROWN = new THREE.Color('#4a3424');
+
+/**
+ * The season plant shapes are made for (set once, by the world and by the shape worker): roses
+ * are bare canes hung with hips in winter, and carry hips among their last blooms in autumn.
+ */
+let plantSeason: Season = 'summer';
+export function setPlantSeason(season: Season) {
+  plantSeason = season;
+}
+
+/** A few rose hips where a bloom was: glossy, oval, scarlet to orange, each with a dried crown. */
+function hips(m: FlowerMesh, at: THREE.Vector3, size: number, rng: () => number) {
+  const n = 1 + Math.floor(rng() * 2.4);
+  for (let i = 0; i < n; i++) {
+    const p = at.clone().add(new THREE.Vector3((rng() - 0.5) * size * 0.9, -i * size * 0.35 - rng() * size * 0.2, (rng() - 0.5) * size * 0.9));
+    const r = size * lerp(0.17, 0.24, rng());
+    const tone = HIP.clone().offsetHSL((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.1);
+    m.addGeometry(new THREE.SphereGeometry(r, 7, 5).scale(0.85, 1.2, 0.85).translate(p.x, p.y, p.z), tone, false, p);
+    m.addGeometry(new THREE.ConeGeometry(r * 0.45, r * 0.6, 5, 1, true).rotateX(Math.PI).translate(p.x, p.y + r * 1.3, p.z), HIP_CROWN, false, p);
+    if (i > 0) m.tri(at.clone().add(new THREE.Vector3(-0.0015, 0, 0)), p, at.clone().add(new THREE.Vector3(0.0015, 0, 0)), { color: ROSE_STEM });
+  }
+}
+
+/** One rose bloom on its own (plain colours, no growth data), for climbing roses on fences and walls. */
+export function climbingRoseGeometry(size: number, opened: number, seed: number): THREE.BufferGeometry {
+  const m = new FlowerMesh();
+  farDetail = true;
+  try {
+    roseBloom(m, new THREE.Vector3(), size, 14, opened, false, createRng(seed));
+  } finally {
+    farDetail = false;
+  }
+  const g = m.build();
+  for (const name of Object.keys(g.attributes)) if (name !== 'position' && name !== 'normal' && name !== 'color') g.deleteAttribute(name);
+  // Thin petals light by whichever way they happen to face (the bed roses' shader sorts that out;
+  // the climbers' plain material can't): light the bloom as a soft dome instead.
+  // Each triangle is also turned to face outward (a double-sided material lights a triangle's
+  // back as its back).
+  const pos = g.attributes.position;
+  const nrm = g.attributes.normal;
+  const col = g.attributes.color;
+  const below = new THREE.Vector3(0, -size * 0.9, 0);
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const face = new THREE.Vector3();
+  const out = new THREE.Vector3();
+  for (let t = 0; t < pos.count; t += 3) {
+    a.fromBufferAttribute(pos, t);
+    b.fromBufferAttribute(pos, t + 1);
+    c.fromBufferAttribute(pos, t + 2);
+    face.subVectors(b, a).cross(c.clone().sub(a));
+    out.addVectors(a, b).add(c).divideScalar(3).sub(below);
+    if (face.dot(out) < 0) {
+      for (const attr of [pos, col]) {
+        const x = [attr.getX(t + 1), attr.getY(t + 1), attr.getZ(t + 1)];
+        attr.setXYZ(t + 1, attr.getX(t + 2), attr.getY(t + 2), attr.getZ(t + 2));
+        attr.setXYZ(t + 2, x[0], x[1], x[2]);
+      }
+    }
+    for (let k = 0; k < 3; k++) {
+      a.fromBufferAttribute(pos, t + k).sub(below).normalize();
+      nrm.setXYZ(t + k, a.x, a.y, a.z);
+    }
+  }
+  return g;
+}
 const ROSE_LEAF = new THREE.Color('#3f6f32');
 const THORN = new THREE.Color('#8a4a3a');
 
 /** A thin tapering cane through `pts`, with a few small hooked thorns along it. */
-function cane(m: FlowerMesh, pts: THREE.Vector3[], r0: number, rng: () => number) {
+function cane(m: FlowerMesh, pts: THREE.Vector3[], r0: number, rng: () => number, color = ROSE_STEM) {
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i];
     const b = pts[i + 1];
@@ -536,8 +607,8 @@ function cane(m: FlowerMesh, pts: THREE.Vector3[], r0: number, rng: () => number
       const a1 = ((k + 1) / 4) * Math.PI * 2;
       const o = (ang: number, r: number) => u.clone().multiplyScalar(Math.cos(ang) * r).addScaledVector(w, Math.sin(ang) * r);
       const n = o((a0 + a1) / 2, 1);
-      m.tri(a.clone().add(o(a0, ra)), b.clone().add(o(a1, rb)), b.clone().add(o(a0, rb)), { n, color: ROSE_STEM });
-      m.tri(a.clone().add(o(a0, ra)), a.clone().add(o(a1, ra)), b.clone().add(o(a1, rb)), { n, color: ROSE_STEM });
+      m.tri(a.clone().add(o(a0, ra)), b.clone().add(o(a1, rb)), b.clone().add(o(a0, rb)), { n, color });
+      m.tri(a.clone().add(o(a0, ra)), a.clone().add(o(a1, ra)), b.clone().add(o(a1, rb)), { n, color });
     }
     // Thorns: little red-brown hooks, pointing a touch downward.
     if (rng() < 0.7) {
@@ -636,10 +707,12 @@ function roseBush(m: FlowerMesh, type: 'tea' | 'floribunda' | 'cabbage' | 'climb
       const droop = type === 'climber' || type === 'wild' ? Math.max(0, t - 0.75) * arch * 0.6 : 0;
       pts.push(new THREE.Vector3(d.x * out, h * t - droop, d.z * out));
     }
-    cane(m, pts, type === 'mini' ? 0.0035 : 0.005, rng);
-    // Leaves all along (climbers more), each a spray of five.
+    const winter = plantSeason === 'winter';
+    cane(m, pts, type === 'mini' ? 0.0035 : 0.005, rng, winter ? ROSE_CANE_WINTER : ROSE_STEM);
+    // Leaves all along (climbers more), each a spray of five; in winter only the odd one hangs on.
     const leaves = type === 'climber' ? 5 : type === 'mini' ? 2 : 3;
     for (let l = 0; l < leaves; l++) {
+      if (winter && l > 0) break;
       const t = lerp(0.2, 0.85, (l + rng() * 0.6) / leaves);
       const at = pts[Math.floor(t * segs)].clone().lerp(pts[Math.min(segs, Math.floor(t * segs) + 1)], (t * segs) % 1);
       const la = rng() * Math.PI * 2;
@@ -663,15 +736,22 @@ function roseBush(m: FlowerMesh, type: 'tea' | 'floribunda' | 'cabbage' | 'climb
       }
     } else blooms.push(tip.clone());
     for (const [b, at] of blooms.entries()) {
-      // A mix of stages on every bush: mostly open, some half, the odd tight bud.
-      const r = rng();
-      const opened = b === 0 && type !== 'wild' ? lerp(0.55, 1, rng()) : r < 0.2 ? 0.05 : r < 0.5 ? 0.45 : lerp(0.7, 1, rng());
       if (b > 0) {
         // A short stalk from the cane to each side bloom.
         const from = tip.clone().lerp(at, 0.2);
         from.y = Math.min(from.y, at.y);
-        m.tri(from.clone().add(new THREE.Vector3(-0.002, 0, 0)), at, from.clone().add(new THREE.Vector3(0.002, 0, 0)), { color: ROSE_STEM });
+        m.tri(from.clone().add(new THREE.Vector3(-0.002, 0, 0)), at, from.clone().add(new THREE.Vector3(0.002, 0, 0)), { color: plantSeason === 'winter' ? ROSE_CANE_WINTER : ROSE_STEM });
       }
+      // Hips where blooms were: all of them in winter, and on wild roses in autumn (they've
+      // flowered); some among the last blooms of the rest.
+      if (plantSeason === 'winter' || (plantSeason === 'autumn' && (type === 'wild' || rng() < 0.35))) {
+        hips(m, at, size, rng);
+        if (at.y > top.y) top = at.clone();
+        continue;
+      }
+      // A mix of stages on every bush: mostly open, some half, the odd tight bud.
+      const r = rng();
+      const opened = b === 0 && type !== 'wild' ? lerp(0.55, 1, rng()) : r < 0.2 ? 0.05 : r < 0.5 ? 0.45 : lerp(0.7, 1, rng());
       const s = size * (opened < 0.2 ? 0.55 : 1) * lerp(0.9, 1.1, rng());
       roseBloom(m, at, s, opened < 0.2 ? Math.round(petals * 0.4) : petals, opened, type === 'wild', rng);
       if (at.y > top.y) top = at.clone();
