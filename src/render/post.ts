@@ -283,7 +283,9 @@ export class PostFX {
     r.render(this.scene, this.camera);
 
     let bloomTex: THREE.Texture = this.black;
-    if (this.bloomEnabled) {
+    // (No bloom in the storybook look: watercolour doesn't glow, and pale petals in warm light
+    // would halo.)
+    if (this.bloomEnabled && !this.storybook) {
       this.bright.uniforms.tSrc.value = this.sceneRT.texture;
       this.bright.uniforms.uTexel.value.set(1 / this.sceneRT.width, 1 / this.sceneRT.height);
       this.blit(this.bright, this.bloomRTs[0]);
