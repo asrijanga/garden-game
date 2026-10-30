@@ -789,6 +789,16 @@ export class Ponds {
     return false;
   }
 
+  /**
+   * The level the water at (x, z) rises to (null on dry land): what water plants are set at, so
+   * those planted while it's still filling (as when a saved garden is replayed) aren't left
+   * under the surface.
+   */
+  restingLevelAt(x: number, z: number): number | null {
+    const body = this.bodyAt(x, z);
+    return body?.filled ? body.target : null;
+  }
+
   /** The water level (now) at (x, z), or null on dry land. */
   levelAt(x: number, z: number): number | null {
     const body = this.bodyAt(x, z);

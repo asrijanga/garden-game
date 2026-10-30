@@ -104,13 +104,34 @@ function buildDuck(look: Look, rng: Rng): Model {
   // Wings: folded along the back (a darker patch, with the drake's blue speculum), they open to fly.
   const wings: THREE.Group[] = [];
   if (!chick) {
+    // A feathered wing: a curved leading edge, and a trailing edge broken into the scallops of
+    // the flight feathers (so an open wing reads as feathers, not a flat board).
     const shape = new THREE.Shape();
     shape.moveTo(0, 0.05);
-    shape.quadraticCurveTo(0.14, 0.04, 0.24, -0.04);
-    shape.quadraticCurveTo(0.12, -0.08, 0, -0.06);
+    shape.quadraticCurveTo(0.14, 0.045, 0.25, -0.035);
+    const tips = [
+      [0.21, -0.07],
+      [0.17, -0.055],
+      [0.14, -0.085],
+      [0.1, -0.068],
+      [0.07, -0.09],
+      [0.035, -0.072],
+    ];
+    let px = 0.25;
+    for (const [x, z] of tips) {
+      shape.quadraticCurveTo((px + x) / 2 + 0.01, z + 0.012, x, z);
+      px = x;
+    }
+    shape.lineTo(0, -0.06);
     shape.closePath();
     const wcol = look === 'white' ? C('#efebe2') : look === 'drake' ? C('#7d7a74') : C('#7a5a3c');
-    const wgeo = paint(new THREE.ShapeGeometry(shape, 6).rotateX(Math.PI / 2), (x, _y, z) => (x > 0.06 && x < 0.13 && z < -0.02 && look !== 'white' ? C('#3a5aa8') : wcol));
+    const tipCol = look === 'white' ? C('#e2ddd2') : look === 'drake' ? C('#5e5b56') : C('#5f4530');
+    const wing = new THREE.ShapeGeometry(shape, 6).rotateX(Math.PI / 2);
+    // A gentle camber: the wing curves down toward its tip and trailing edge.
+    const wp = wing.attributes.position;
+    for (let i = 0; i < wp.count; i++) wp.setY(i, -wp.getX(i) * wp.getX(i) * 0.9 - Math.max(0, -wp.getZ(i) - 0.03) * 0.25);
+    wing.computeVertexNormals();
+    const wgeo = paint(wing, (x, _y, z) => (x > 0.06 && x < 0.13 && z < -0.02 && z > -0.06 && look !== 'white' ? C('#3a5aa8') : z < -0.055 ? tipCol : wcol));
     const wmat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     for (const s of [-1, 1]) {
       const pivot = new THREE.Group();
