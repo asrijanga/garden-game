@@ -15,7 +15,8 @@ type Rng = () => number;
 
 /** A rounded box of the given size, centred at (x, y, z), in one flat colour. */
 function block(w: number, h: number, d: number, x: number, y: number, z: number, color: THREE.Color, round = 0.012, rot?: THREE.Euler): THREE.BufferGeometry {
-  const g = new RoundedBoxGeometry(w, h, d, 1, Math.min(round, w / 2.1, h / 2.1, d / 2.1)).toNonIndexed();
+  // (A rounded box is built as loose triangles already.)
+  const g = new RoundedBoxGeometry(w, h, d, 1, Math.min(round, w / 2.1, h / 2.1, d / 2.1));
   if (rot) g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(rot));
   g.translate(x, y, z);
   return paint(g, color);

@@ -24,6 +24,9 @@ export type Arrival = 'drop' | 'pop' | 'grow';
 const CAPACITY: Record<PartShape, number> = { picketPost: 600, picket: 5000, rail: 1500, logPost: 600, log: 1500, hedge: 2500, wallStone: 2500 };
 const VARIANTS: Record<PartShape, number> = { picketPost: 3, picket: 4, rail: 2, logPost: 4, log: 4, hedge: 5, wallStone: 6 };
 
+/** As separate triangles (some stock shapes already are: they'd warn if asked again). */
+const flat = (g: THREE.BufferGeometry) => (g.index ? g.toNonIndexed() : g);
+
 function colorize(g: THREE.BufferGeometry, color: (x: number, y: number, z: number) => THREE.Color): THREE.BufferGeometry {
   const pos = g.attributes.position;
   const col = new Float32Array(pos.count * 3);
@@ -58,7 +61,6 @@ function picketPostGeometry(seed: number): THREE.BufferGeometry {
   cap.rotateY(Math.PI / 4);
   cap.translate(0, h + 0.03, 0);
   const tone = weathered('#f1ebdf', rng);
-  const flat = (g: THREE.BufferGeometry) => (g.index ? g.toNonIndexed() : g);
   return mergeGeometries([colorize(flat(post), tone), colorize(flat(cap), tone)]);
 }
 
@@ -83,7 +85,7 @@ function picketGeometry(seed: number): THREE.BufferGeometry {
 function railGeometry(seed: number): THREE.BufferGeometry {
   const rng = createRng(seed);
   const g = new RoundedBoxGeometry(1, 0.055, 0.03, 1, 0.008);
-  return colorize(g.toNonIndexed(), weathered('#ece5d6', rng, 0));
+  return colorize(flat(g), weathered('#ece5d6', rng, 0));
 }
 
 /** A rough-split, silvered wooden post, 1.15 m, slightly tapered and out of round. */
@@ -101,7 +103,7 @@ function logPostGeometry(seed: number): THREE.BufferGeometry {
   }
   g.translate(0, h / 2, 0);
   g.computeVertexNormals();
-  return colorize(g.toNonIndexed(), weathered('#9a8b78', rng, 0.4));
+  return colorize(flat(g), weathered('#9a8b78', rng, 0.4));
 }
 
 /** A split log rail, 1 m along x before scaling: flattish, with knots of darker grain. */
@@ -118,7 +120,7 @@ function logGeometry(seed: number): THREE.BufferGeometry {
   }
   g.computeVertexNormals();
   const base = weathered('#8f806c', rng, 0);
-  return colorize(g.toNonIndexed(), (x, y, z) => base(x, y, z).multiplyScalar(Math.sin(x * 23 + ph) > 0.93 ? 0.75 : 1));
+  return colorize(flat(g), (x, y, z) => base(x, y, z).multiplyScalar(Math.sin(x * 23 + ph) > 0.93 ? 0.75 : 1));
 }
 
 /** A clipped section of hedge, 1 m cube before scaling: soft rounded corners, gently lumpy. */

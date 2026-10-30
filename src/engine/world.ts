@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Cottage, DEFAULT_STYLE, decodeStyle, type CottageStyle } from '../world/cottage';
 import { SPECIES } from '../world/flowerSpecies';
+import { Bouquet, forBouquet } from '../world/bouquet';
 import { PALETTES, type Season } from '../world/season';
 import { Quality, TIERS, fpsCounter } from '../render/quality';
 import type { Ambience } from '../audio/ambience';
@@ -39,7 +40,7 @@ import { Stones } from '../world/stones';
 import { EdgePlants } from '../world/edgePlants';
 import { Dust } from '../world/dust';
 import { PathBuilder } from '../game/pathBuilder';
-import { Flowers, setPlantSeason } from '../world/flowers';
+import { Flowers, heroGeometry, setPlantSeason, type LeafKind } from '../world/flowers';
 import { Bees } from '../world/bees';
 import { Ponds, createPondTexture } from '../world/pond';
 import { PondPlants } from '../world/pondPlants';
@@ -709,6 +710,8 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   const weather = new Weather(!!palette.snowy);
   scene.add(weather.group);
   let dayTime = 0.55;
+  /** A bouquet is shown (in its own light: the garden's hour doesn't grade it). */
+  let bouquetShown = false;
   const weatherWind = new THREE.Vector2();
   const lastSun = new THREE.Vector3(Infinity, 0, 0);
   let sunMoved = false;
@@ -735,7 +738,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       scene.fog.near = fogNear * mist;
       scene.fog.far = fogFar * (0.6 + 0.4 * mist);
     }
-    post.setGrade(l.lift, l.gain, l.saturation, l.bloom);
+    if (!bouquetShown) post.setGrade(l.lift, l.gain, l.saturation, l.bloom);
     ponds.setLight(l.sunDir, l.sky, l.haze, l.glow, l.night);
     const dark = THREE.MathUtils.smoothstep(p, 0.68, 0.95);
     night.setNight(l.night, dark);
@@ -1024,8 +1027,9 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
         g.userData = p.userData;
         return g;
       };
-      shapes.addEventListener('message', (e: MessageEvent<{ key: string; near?: PackedShape; far?: PackedShape; hero?: PackedShape }>) => {
-        if (e.data.hero) heroArrived(e.data.key, unpack(e.data.hero));
+      shapes.addEventListener('message', (e: MessageEvent<{ key: string; near?: PackedShape; far?: PackedShape; hero?: PackedShape; stem?: PackedShape }>) => {
+        if (e.data.stem) stemArrived(e.data.key, unpack(e.data.stem));
+        else if (e.data.hero) heroArrived(e.data.key, unpack(e.data.hero));
         else if (e.data.near && e.data.far) flowers.adopt(e.data.key, unpack(e.data.near), unpack(e.data.far));
       });
       shapes.postMessage({ season, recipes: Flowers.wanted(season) });
@@ -1175,6 +1179,52 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
         cuts.splice(i, 1);
       }
     }
+  };
+
+  // --- A bouquet: the stems in your hand, tied, on a turntable of its own -----------------------
+  // Each stem is grown again in full (in the shape worker) from what was cut; the garden isn't
+  // drawn meanwhile (the bouquet's own little scene is, through the same finishing passes).
+  const bouquet = new Bouquet();
+  let bouquetId = 0;
+  let bouquetStems: { color: string; edge?: string; seed: number }[] = [];
+  const stemArrived = (key: string, geo: THREE.BufferGeometry) => {
+    const [id, k] = key.slice(1).split(':').map(Number);
+    const s = bouquetStems[k];
+    if (id !== bouquetId || !s) {
+      geo.dispose();
+      return;
+    }
+    bouquet.add(k, geo, flowers.plantMaterial, new THREE.Color(s.color), new THREE.Color(s.edge ?? s.color), s.seed);
+    if (bouquet.ready) link.call('bouquetReady');
+  };
+  const tie = (stems: { species: string; variant: number; seed: number; color: string; edge?: string }[]) => {
+    bouquetId++;
+    bouquetStems = stems;
+    bouquet.begin(stems.length);
+    renderer.clippingPlanes = bouquet.clip;
+    post.view(bouquet.scene, bouquet.camera);
+    // Seen by soft daylight, whatever the hour in the garden.
+    bouquetShown = true;
+    post.setGrade(new THREE.Color('#1a120c'), new THREE.Color('#fffaf2'), 1.05, 0.12);
+    const asks = stems.map((s, k) => ({ key: `b${bouquetId}:${k}`, species: s.species, variant: s.variant, seed: s.seed }));
+    if (shapes) shapes.postMessage({ season, stems: asks });
+    else {
+      // No shape worker: grown here, a stem a frame.
+      asks.forEach((a, k) =>
+        setTimeout(() => {
+          const sp = a.species.startsWith('leaf:') ? (a.species.slice(5) as LeafKind) : SPECIES.find((x) => x.id === a.species);
+          if (sp) stemArrived(a.key, forBouquet(heroGeometry(sp, a.variant, a.seed)));
+        }, k * 16),
+      );
+    }
+  };
+  const untie = () => {
+    bouquetId++;
+    bouquet.end();
+    renderer.clippingPlanes = [];
+    post.view(scene, camera);
+    bouquetShown = false;
+    applyTime(dayTime);
   };
 
   // --- Loading: the saved garden is rebuilt while shaders compile -------------------------------
@@ -1327,6 +1377,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       if (shadows && c.casts) c.showAll();
       else c.update(view);
     }
+    bouquet.update(dt, screen.width / screen.height);
     post.render(dt);
   }
 
@@ -1348,7 +1399,11 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     tick: (time: number) => {
       if (!ownFrames) frame(time);
     },
-    pointer: (type: string, e: SurfaceEvent) => surface.dispatch(type, e),
+    pointer: (type: string, e: SurfaceEvent) => (bouquet.active ? bouquet.pointer(type, e.clientX, e.timeStamp) : surface.dispatch(type, e)),
+    /** Tie the stems in your hand into a bouquet, and show it. */
+    tie,
+    /** Back from the bouquet. */
+    untie,
     resize: (width: number, height: number, ratio: number) => {
       screen = { width, height, ratio };
       resize();

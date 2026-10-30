@@ -23,7 +23,8 @@ import { confirmCard } from './ui/confirm';
 import { mountShotButton } from './ui/shotButton';
 import { mountUndoButtons } from './ui/undoButtons';
 import { mountBunch } from './ui/bunch';
-import { loadBunch, saveBunch, MAX_STEMS, type CutStem } from './game/bunch';
+import { bouquetName, loadBunch, saveBunch, MAX_STEMS, type CutStem } from './game/bunch';
+import { mountBouquetView } from './ui/bouquetView';
 import type { PlantAmount } from './game/flowerBrush';
 import type { WeatherKind } from './world/weather';
 import { Link, proxied, type Port } from './engine/link';
@@ -413,13 +414,45 @@ handlers.bed = ((count: number) => {
 }) as (...a: never[]) => unknown;
 // Cutting: close to a bed, a tap on a plant cuts it into the bunch in your hand.
 let bunch: CutStem[] = loadBunch();
-const bunchTray = mountBunch(null, () => {
-  ambience.rustle(0.6);
+const emptyHand = () => {
   bunch = [];
   saveBunch(bunch);
   bunchTray.set(bunch);
   world.handFull(false);
-});
+};
+// Tied: the bunch becomes a bouquet, shown on its own until it's untied or given away.
+const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? 'Leaf';
+const bouquetView = mountBouquetView(
+  {
+    untie() {
+      ambience.rustle(0.5);
+      world.untie();
+      bouquetView.hide();
+    },
+    done() {
+      ambience.bloom();
+      world.untie();
+      bouquetView.hide();
+      emptyHand();
+      toolbar.showLabel('Given away, with love', 2200);
+    },
+  },
+  'Give away',
+);
+handlers.bouquetReady = (() => bouquetView.ready()) as (...a: never[]) => unknown;
+const bunchTray = mountBunch(
+  () => {
+    if (bunch.length < 3) return;
+    ambience.rustle(0.8);
+    const kinds = new Set(bunch.map((s) => s.species)).size;
+    bouquetView.show(bouquetName(bunch, speciesName), `${bunch.length} stems · ${kinds === 1 ? 'one kind' : `${kinds} kinds`} · tied by hand`);
+    world.tie(bunch);
+  },
+  () => {
+    ambience.rustle(0.6);
+    emptyHand();
+  },
+);
 bunchTray.set(bunch);
 world.handFull(bunch.length >= MAX_STEMS);
 let cutHints = 0;

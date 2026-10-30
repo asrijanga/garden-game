@@ -155,8 +155,8 @@ export class PostFX {
 
   constructor(
     private readonly renderer: THREE.WebGLRenderer,
-    private readonly scene: THREE.Scene,
-    private readonly camera: THREE.Camera,
+    private scene: THREE.Scene,
+    private camera: THREE.Camera,
   ) {
     this.sceneRT = target(1, 1, this.samples);
     for (let i = 0; i < LEVELS; i++) {
@@ -166,6 +166,12 @@ export class PostFX {
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.final);
     this.quad.frustumCulled = false;
     this.black.needsUpdate = true;
+  }
+
+  /** Draw this scene, through this camera, from now on (the garden, or a bouquet). */
+  view(scene: THREE.Scene, camera: THREE.Camera) {
+    this.scene = scene;
+    this.camera = camera;
   }
 
   /** MSAA sample count for the scene (0 turns antialiasing off). */

@@ -1932,6 +1932,11 @@ export class Flowers {
     mesh.instanceMatrix.needsUpdate = true;
   }
 
+  /** The material every land plant is drawn with (for its stems in a bouquet). */
+  get plantMaterial(): THREE.Material {
+    return this.material;
+  }
+
   /** Cut back to the ground: the plant starts growing again `delay` seconds from now. */
   regrowFrom(mesh: THREE.InstancedMesh, index: number, delay: number) {
     const a = mesh.geometry.attributes.aLife as THREE.InstancedBufferAttribute;
