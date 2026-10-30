@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { climbingRoseGeometry } from './flowers';
 import { touch } from '../render/touch';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
@@ -49,14 +50,8 @@ function geometries(): Record<Part, THREE.BufferGeometry> {
   ivyShape.lineTo(-0.03, 0.022);
   ivyShape.closePath();
   const ivy = colored(new THREE.ShapeGeometry(ivyShape).translate(0, 0.004, 0), '#ffffff');
-  // A rose: overlapping cupped petals round a tight heart (tinted by the instance colour).
-  const roseParts: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2;
-    roseParts.push(colored(new THREE.SphereGeometry(0.016, 5, 3, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.6, 0.7).rotateX(-0.9).translate(0, 0.004, 0.011).rotateY(a), '#ffffff'));
-  }
-  roseParts.push(colored(new THREE.SphereGeometry(0.012, 6, 4).scale(1, 0.85, 1).translate(0, 0.012, 0), '#f2dfe2'));
-  const rose = mergeGeometries(roseParts); // opens toward +y
+  // A rose: the same spiralled bloom as the bed roses (in its far-off detail), tinted by the instance colour.
+  const rose = climbingRoseGeometry(0.03, 0.8, 41);
   // A clematis star: six pointed petals and a pale boss.
   const starShape = new THREE.Shape();
   for (let i = 0; i <= 12; i++) {

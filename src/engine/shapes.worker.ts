@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
-import { buildShape, shapeKey, type ShapeRecipe } from '../world/flowers';
+import { buildShape, setPlantSeason, shapeKey, type ShapeRecipe } from '../world/flowers';
+import type { Season } from '../world/season';
 import { SPECIES } from '../world/flowerSpecies';
 import type * as THREE from 'three';
 
@@ -23,8 +24,9 @@ const pack = (g: THREE.BufferGeometry, transfer: Transferable[]): PackedShape =>
   return { attributes, userData: g.userData };
 };
 
-self.addEventListener('message', (e: MessageEvent<ShapeRecipe[]>) => {
-  const queue = [...e.data];
+self.addEventListener('message', (e: MessageEvent<{ season: Season; recipes: ShapeRecipe[] }>) => {
+  setPlantSeason(e.data.season);
+  const queue = [...e.data.recipes];
   // One shape per task, so a newer, more urgent list could get in between.
   const next = () => {
     const r = queue.shift();
