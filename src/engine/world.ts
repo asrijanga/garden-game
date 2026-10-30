@@ -32,6 +32,7 @@ import { SeasonFx } from '../world/seasonFx';
 import { NightMagic } from '../world/nightMagic';
 import { Weather } from '../world/weather';
 import { cullers, GardenBounds, View } from '../render/cull';
+import { mossUniforms } from '../render/moss';
 import { TimeOfDay } from '../world/timeOfDay';
 import { GroundPaint } from '../world/groundPaint';
 import { Stones } from '../world/stones';
@@ -592,6 +593,12 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       return null;
     },
     inWoods: (x, z) => ground.forestness(x, z) > 0.55,
+    // A faint rustle when one hops through the flowers, heard only from close by.
+    hopped: (x, z) => {
+      if (!flowers.isCrowded(x, z, 0.25)) return;
+      const d = camera.position.distanceTo(new THREE.Vector3(x, ground.heightAt(x, z), z));
+      if (d < 14) ambience.rustle(0.55 * (1 - d / 14));
+    },
   });
   scene.add(bunnies.group);
 
@@ -1030,6 +1037,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     elapsed += dt;
 
     wind.update(dt);
+    if (!loading) mossUniforms.uMossTime.value += dt;
     cottage.update(dt, wind);
     flyingBirds.update(dt);
     marker.update(dt, rig.distance);

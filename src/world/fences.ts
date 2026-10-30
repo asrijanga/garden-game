@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { touch } from '../render/touch';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { createRng, lerp } from '../core/random';
+import { createRng, hashJitter, lerp } from '../core/random';
 import { regrow } from '../core/regrow';
 import { addWind } from '../render/wind';
+import { addMoss, mossAttribute, mossStart } from '../render/moss';
 
 export type FenceStyle = 'picket' | 'rustic' | 'hedge' | 'wall' | EdgeStyle;
 /** Low edgings for flower beds and paths, drawn just like a fence. */
@@ -223,6 +224,9 @@ export class Fences {
     frost = 0,
   ) {
     const wood = new THREE.MeshLambertMaterial({ vertexColors: true });
+    // Wall and edging stones gather moss on their tops over a few minutes, as boulders do.
+    const stone = new THREE.MeshLambertMaterial({ vertexColors: true });
+    addMoss(stone, { time: 240, amount: 0.75, trodden: false });
     const hedge = new THREE.MeshLambertMaterial({ vertexColors: true });
     // Leafy, clipped-box texture: small-leaf speckle and darker hollows, from world position, so
     // neighbouring sections blend into one hedge. A barely-there sway in the wind.
@@ -258,7 +262,9 @@ export class Fences {
     (Object.keys(BUILD) as PartShape[]).forEach((shape, si) => {
       const list: THREE.InstancedMesh[] = [];
       for (let k = 0; k < VARIANTS[shape]; k++) {
-        const mesh = new THREE.InstancedMesh(BUILD[shape](900 + si * 40 + k * 7), shape === 'hedge' ? hedge : wood, CAPACITY[shape]);
+        const geo = BUILD[shape](900 + si * 40 + k * 7);
+        if (shape === 'wallStone') mossAttribute(geo, CAPACITY[shape]);
+        const mesh = new THREE.InstancedMesh(geo, shape === 'hedge' ? hedge : shape === 'wallStone' ? stone : wood, CAPACITY[shape]);
         mesh.count = 0;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -302,6 +308,7 @@ export class Fences {
       list.push(part);
     }
     this.moving.add(part);
+    if (shape === 'wallStone') mossStart(mesh, index, delay, hashJitter(pos.x, pos.z) * 30);
     this.write(part, 0.0001, 0);
     return part;
   }
