@@ -31,6 +31,7 @@ import type { PlantAmount } from './game/flowerBrush';
 import type { WeatherKind } from './world/weather';
 import { Link, proxied, type Port } from './engine/link';
 import type { SurfaceEvent, World, WorldInit } from './engine/world';
+import type { Look } from './render/storybook';
 
 /*
  * The page: buttons, menus, sound and saving. The garden itself (the 3D world, everything in it,
@@ -58,6 +59,22 @@ const palette = PALETTES[season];
 document.documentElement.dataset.season = season;
 const params = new URLSearchParams(location.search);
 const debug = params.has('debug');
+// The look: `?look=storybook` (or `?look=painted`) switches it, and it's remembered.
+const LOOK_KEY = 'garden-look';
+if (params.get('look') === 'storybook' || params.get('look') === 'painted') {
+  try {
+    localStorage.setItem(LOOK_KEY, params.get('look')!);
+  } catch {
+    // Not remembered (private mode): this visit only.
+  }
+}
+const look: Look = (params.get('look') ?? (() => {
+  try {
+    return localStorage.getItem(LOOK_KEY);
+  } catch {
+    return null;
+  }
+})()) === 'storybook' ? 'storybook' : 'painted';
 
 // --- The world, and the line to it ----------------------------------------------------------
 /**
@@ -621,6 +638,7 @@ const init = (): WorldInit => ({
   keepMown,
   meadowGrown: Number(stored(MEADOW_KEY)) || 0,
   time: dayTime,
+  look,
 });
 /** Where the worker can't draw: the world runs on this page instead (same messages). */
 async function runHere() {

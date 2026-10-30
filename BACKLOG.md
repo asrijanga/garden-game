@@ -10,7 +10,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current stories:** Milestone 7 (bouquets) is built: 7.1–7.7 are all live and 👀 awaiting the player's review on iPhone (tap a bed → tap flowers to cut → Tie a bouquet → Sell; ✿ points at the top open the collection). Earlier 👀 stories still wait for review too.
+**Current stories:** Milestone 8 (the storybook / Ghibli look, from the player's reference paintings) is under way: 8.1 (light, colour and ink) is live behind ?look=storybook and 👀 awaiting the player's review (stills shared); 8.2–8.5 wait for that feedback. Milestone 7 and earlier 👀 stories still wait for review too.
 **Preview URL:** https://asrijanga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
@@ -76,12 +76,14 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 7.5 Prune | 👀 Awaiting feedback | Close to a bed, tap a flower to cut it: a snip of secateurs, the stem lifts away, and the plant grows back from the ground a few seconds later. Cut stems gather in your hand: a glass tray along the bottom shows a dab of each one's colour (two-tone flowers with their edge colour as a rim), each landing with a hop; **✕** puts them down. A fingertip that misses every petal still takes the nearest flowerhead within reach; a plant in front is cut before one behind it. Up to 24 stems; the bunch is kept if you leave and come back. |
 | 7.6 Hand-tied bouquets | 👀 Awaiting feedback | With 3 or more stems in hand, **Tie a bouquet**: each stem is grown again in full (without its low leaves) and laid in a spiral round the tie, as a florist builds one: every stem leaning the same way round so the heads open into a dome, taller stems standing above shorter ones. A few turns of jute twine, a knot and two loose ends (no wrapping); the stems cut level below. It's shown on its own on a linen backdrop in soft daylight, turning slowly (drag to spin it), with a suggested name from its colours and flowers ("Blush & Honey Posy", "Snow Dahlia Bunch"). **Untie** puts the stems back in your hand. |
 | 7.7 My bouquet collection, and points | 👀 Awaiting feedback | Sell a tied bouquet for points (✿). Its worth comes from its stems (roses and out-of-season flowers are worth more, two-tone ones a bit more), more for variety and for colours that sit well together (one family, neighbours, or opposites), and for a generous bunch. Each new kind of bouquet (its mix of flowers and colours) joins your book with a picture of the first one, and raises every later price by ×1.15 for good; every sale adds a little renown (×1.02); the same kind again sells for less each time. Points grow without limit and are written 950, 12.4K, 3.10M, 7.25B, 1.00T, then aa, ab … zz, aaa … The ✿ pill at the top opens **Your bouquets** (points, the current multiplier and every kind sold). Points and the book go into the garden backup. |
+| 8.1 Light and colour, in watercolour and ink | 👀 Awaiting feedback | Try it with **?look=storybook** on the address (remembered; **?look=painted** goes back). Every surface is painted mostly-in-light or mostly-in-shade with a short soft blend; shade is coloured (cool lavender-blue from the sky, warmer bounce from the ground), with a warm catch-light on edges turned to the sun. Fine ink lines where one thing stands in front of another, in a deep sepia shade of the colour beneath, fading into the distance and never on flat ground: worked out from depth only, so they're as steady as the shapes (no boiling or sliding). A warm, fresh watercolour grade (yellow-green in sun, blue-teal in shade, no black) on a still paper grain. The bouquet view gets it too. Sky, watercolour petals and a painterly lawn follow in 8.2–8.4. |
 
 Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · ✅ Done
 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **Storybook look (Milestone 8):** *Feedback:* shared four reference paintings (climbing roses on a brick wall by a window, a meadow of purple asters, one of orange calendulas, a field of tulips under big clouds): "This is what I was imagining when I said Studio Ghibli art style. Can we recreate our game in this style? As sampled for climbing rose and other flowers." *Changes:* new Milestone 8 (8.1–8.5, below). Following the lesson from the reverted sketch filter, the style goes into the scene's own shading (steady lines, nothing that swims or boils), built one story at a time behind a switch (`?look=storybook`, remembered; `?look=painted` goes back) and shown as stills first.
 - **Bouquets (Milestone 7):** *Feedback:* "I want hyper realistic representation of flowers, so introduce some randomness and imperfections, I want to go close up when I select a flower bed and be able to prune and make flower bouquet (no cover just a thread) and that's the game … we will be able to create unique flower bouquet collection and sell them for points … points keep growing to infinity … create stories and execute until all of them are done. Do this for every flower in our flower book, aim for maximum accuracy to life when close up and approx when in the map mode. The pond base is triangles but there should be randomness and more finer to make it look realistic." *Changes:* new Milestone 7 with stories 7.1–7.7 (below), built in order.
 - **Finish the backlog:** *Feedback:* "Implement the rest of stories one by one, PR for each and merge, use recommendations and don't ask me until everything is done." *Changes:* each remaining story built on its own branch, merged through a PR and deployed, in the order 6.6, 6.3, 6.7, 6.8 (with 6.4), 6.5, 4.1d, 4.1e, 3.8, 3.9.
 - **Worker:** *Feedback:* "Use a web worker or workers to render away from main thread", then (after I suggested measuring on the phone first) "You want to tell me fps? Can you measure it yourself and move to web worker? Main thread should always be free for drawing." *Changes:* the garden moved into a worker (see the story row and the Threads decision). I can't read the iPhone's frame rate from the cloud; measured the page thread headless instead.
@@ -717,6 +719,30 @@ The core loop becomes: **grow → go close to a bed → prune stems → tie a bo
 - The collection and points are saved, and included in garden backups.
 
 ---
+
+## Milestone 8 — The storybook look *(requested by the player)*
+
+> "This is what I was imagining when I said Studio Ghibli art style. Can we recreate our game in this style? As sampled for climbing rose and other flowers." (with four reference paintings: climbing roses on a sunny brick wall, meadows of asters and calendulas, a tulip field under towering clouds)
+
+What the references share: warm, high-key daylight; shade that is coloured (lavender, blue-green), never grey; soft but definite light and shadow shapes; fine sepia and dark-green ink lines round flowers and leaves; flat watercolour washes with lighter petal edges and pigment pooling; skies of soft blue with huge, billowy, sunlit clouds; distance melting into blue-green haze; lush, brush-stroked grass with flowers standing up out of it. The rule from the reverted sketch filter holds: **draw it into the scene** (steady lines, no boiling, nothing sliding over surfaces), switchable, stills first.
+
+### Story 8.1 — Light and colour, in watercolour and ink (M)
+- Every lit surface painted: mostly in light or in shade with a short soft blend, cool lavender-blue shade from the sky and warmer bounce from the ground, a warm catch-light on edges turned to the sun.
+- Steady ink lines where one thing stands in front of another, in a deeper shade of the colour beneath (sepia, dark green), fading into the distance; never on flat ground.
+- A high-key watercolour grade (no black: the darkest shade is a soft lavender), warm lights, a still paper grain.
+- Behind a switch (`?look=storybook`, remembered) until the player is happy with it.
+
+### Story 8.2 — A painted sky and hazy distance (M)
+- A soft blue sky with big, towering, sunlit cumulus (cream tops, lilac-grey undersides), drifting slowly; the forest and hills melting into blue-green haze with distance.
+
+### Story 8.3 — Watercolour flowers and leaves (M)
+- Petals as flat washes: lighter towards their edges, a deeper tone pooling at the base, a crisp ink edge on the petal outline; leaves in two or three greens with a darker vein; clean, readable flower shapes from map view to close-up.
+
+### Story 8.4 — A painterly lawn and trees (M)
+- Grass as lush brush strokes, taller and wilder at the edges with flowers rising out of it; tree crowns as soft masses of painted leaf clumps with dappled light.
+
+### Story 8.5 — Make it the garden's look (S)
+- Once the player is happy: the storybook look becomes the default (the painted look stays as an option), tuned through the day, the seasons and the weather.
 
 ## Parking lot (ideas to revisit)
 
