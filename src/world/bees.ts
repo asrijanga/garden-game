@@ -3,7 +3,7 @@ import { createRng, lerp } from '../core/random';
 
 /** Storybook scale: real bees would be invisible specks from the garden camera. */
 const BEE_SCALE = 5.5;
-const MAX_BEES = 8;
+const MAX_BEES = 3;
 
 interface BeeKind {
   name: string;
@@ -145,7 +145,7 @@ export class Bees {
     this.time += dt;
     const blooms = this.openBlooms();
     // About one bee per 25 open blooms, up to eight.
-    const want = blooms.length ? Math.floor(Math.min(MAX_BEES, 1 + Math.floor(blooms.length / 25)) * this.activity + 0.3) : 0;
+    const want = blooms.length ? Math.floor(Math.min(MAX_BEES, 1 + Math.floor(blooms.length / 80)) * this.activity + 0.3) : 0;
     this.spawnIn -= dt;
     if (this.bees.length < want && this.spawnIn <= 0) {
       this.spawn(blooms);

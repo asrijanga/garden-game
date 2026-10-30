@@ -150,7 +150,9 @@ void main() {
     float t = dot(c, vec3(0.299, 0.587, 0.114));
     // Greens lean warm and fresh (yellow-green in the sun), shade leans blue-teal.
     float green = smoothstep(0.0, 0.12, c.g - max(c.r, c.b));
-    c = mix(c, c * vec3(1.08, 1.03, 0.84), green * t * 0.9);
+    // (Gently: under soft light the lawn should sit back as a calm sage, so the flowers lead.)
+    c = mix(c, c * vec3(1.04, 1.01, 0.9), green * t * 0.9);
+    c = mix(c, vec3(dot(c, vec3(0.299, 0.587, 0.114))), green * 0.22);
     // (Not on strong colours: a crimson rose's shaded heart deepens to crimson, not lavender-grey.)
     float chroma = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
     c = mix(c, c * vec3(0.86, 0.98, 1.14), (1.0 - smoothstep(0.08, 0.45, t)) * 0.7 * (1.0 - smoothstep(0.12, 0.4, chroma)));
@@ -161,7 +163,7 @@ void main() {
     c = mix(vec3(t), c, 1.0 + 0.15 * (1.0 - smoothstep(0.3, 0.7, vivid)));
     c = max(c, 0.0);
     c = mix(c, 0.8 + (c - 0.8) / (1.0 + (c - 0.8) * 3.0), step(0.8, c));
-    c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * 0.9;
+    c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * 0.96;
     c = max(c, vec3(0.13, 0.12, 0.2) * (1.0 - t) + c * 0.0);
     vec2 px = gl_FragCoord.xy;
     float paper = paperNoise(px * 0.5) * 0.5 + paperNoise(px * 0.13) * 0.35 + paperNoise(px * 0.031) * 0.15;

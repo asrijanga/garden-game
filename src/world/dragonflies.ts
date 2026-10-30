@@ -138,8 +138,8 @@ export class Dragonflies {
   update(dt: number) {
     this.time += dt;
     const bodies = this.enabled ? this.ponds.bodies() : [];
-    // One per pond (two on a second visit), up to four.
-    const want = this.activity > 0.4 ? Math.min(4, bodies.length * (this.time > 60 ? 2 : 1)) : 0;
+    // One per pond, two at most.
+    const want = this.activity > 0.4 ? Math.min(2, bodies.length) : 0;
     this.spawnIn -= dt;
     if (this.flies.filter((f) => !f.leaving).length < want && this.spawnIn <= 0) {
       this.spawnIn = lerp(4, 10, this.rng());
