@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Cottage, DEFAULT_STYLE, decodeStyle, type CottageStyle } from '../world/cottage';
 import { SPECIES } from '../world/flowerSpecies';
-import { useStorybookLight } from '../render/storybook';
+import { useSoftLight } from '../render/softLight';
 import { Bouquet, forBouquet } from '../world/bouquet';
 import { PALETTES, type Season } from '../world/season';
 import { Quality, TIERS, fpsCounter } from '../render/quality';
@@ -155,8 +155,8 @@ export type World = ReturnType<typeof createWorld>;
  */
 export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: Link, init: WorldInit) {
   const surface = new Surface();
-  // (Before anything is compiled: the storybook look changes how every material is lit.)
-  useStorybookLight();
+  // (Before anything is compiled: soft light changes how every material is lit.)
+  useSoftLight();
   // --- Renderer ---------------------------------------------------------------------------
   const renderer = new THREE.WebGLRenderer({ canvas: canvas as HTMLCanvasElement, antialias: false, powerPreference: 'high-performance' });
   // Neutral keeps the hand-picked palette's hues intact (ACES pushes everything orange-grey).
@@ -930,7 +930,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   };
 
   // --- Post-processing ----------------------------------------------------------------------
-  const post = new PostFX(renderer, scene, camera, true);
+  const post = new PostFX(renderer, scene, camera);
   if (debug) Object.assign(globalThis, { post });
 
   let started = false;
