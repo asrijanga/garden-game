@@ -1702,6 +1702,9 @@ export class Flowers {
             '#include <color_vertex>',
             /* glsl */ `#include <color_vertex>
             vColor.rgb = mix(vColor.rgb, vColor.rgb * mix(aPetalColor, aEdgeColor, aEdge), aIsPetal);
+            // Light catching the rims: a little paler towards each petal's edge (so even a pure
+            // red rose runs from deep crimson in the cup to a lighter rim, not one flat red).
+            vColor.rgb = mix(vColor.rgb, vColor.rgb + (1.0 - vColor.rgb) * 0.15, aEdge * aEdge * aIsPetal);
             {
               // No two alike: each petal a shade lighter or deeper, warmer or cooler; and now and
               // then a bloom past its best, its colour fading and its edges browning.
