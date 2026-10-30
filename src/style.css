@@ -920,3 +920,24 @@ body.admiring > *:not(#world):not(#loader):not(#fps) {
   font: 600 15px/1 system-ui, sans-serif;
   box-shadow: 0 6px 20px rgba(40, 30, 10, 0.25);
 }
+
+/* Close to a flower bed: only what's needed there stays on screen. */
+.bed-back {
+  left: calc(env(safe-area-inset-left, 0px) + 14px);
+  right: auto;
+  display: none;
+  width: auto;
+  padding: 0 14px 0 8px;
+  gap: 4px;
+  font: 600 14px/1 system-ui, sans-serif;
+}
+.bed-back svg { width: 20px; height: 20px; }
+body.in-bed .bed-back { display: flex; align-items: center; }
+body.in-bed .toolbar,
+body.in-bed .flower-picker,
+body.in-bed .undo-toggle,
+body.in-bed .redo-toggle,
+body.in-bed .admire-toggle {
+  opacity: 0;
+  pointer-events: none;
+}

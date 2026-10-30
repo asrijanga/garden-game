@@ -25,6 +25,38 @@ export class CameraRig {
   /** Set by the toolbar later: when false, one finger is free for building. */
   oneFingerPans = true;
 
+  /**
+   * Close to a flower bed: the camera orbits it at eye level (one finger walks round it, a pinch
+   * leans in or back). The view glides between the garden and the bed.
+   */
+  private bed: { centre: THREE.Vector3; distance: number; pitch: number; azimuth: number } | null = null;
+  private bedWanted = false;
+  /** 0 the garden view … 1 close to the bed (eased in update). */
+  closeness = 0;
+  private readonly gardenPos = new THREE.Vector3();
+  private readonly gardenAim = new THREE.Vector3();
+  private readonly bedPos = new THREE.Vector3();
+  private readonly bedAim = new THREE.Vector3();
+
+  /** Go close to a bed centred at `centre`, about `radius` across. */
+  enterBed(centre: THREE.Vector3, radius: number) {
+    this.bed = { centre: centre.clone(), distance: clamp(radius * 1.6 + 0.8, 1.4, 3.2), pitch: 0.32, azimuth: this.azimuth };
+    this.bedWanted = true;
+    this.velPan.set(0, 0);
+    this.velZoom = 0;
+    this.velRot = 0;
+  }
+
+  /** Back to the garden view. */
+  leaveBed() {
+    this.bedWanted = false;
+    this.velRot = 0;
+  }
+
+  get inBed(): boolean {
+    return this.bedWanted;
+  }
+
   constructor(private readonly camera: THREE.PerspectiveCamera, private readonly el: HTMLElement) {
     el.addEventListener('pointerdown', this.onDown);
     el.addEventListener('pointermove', this.onMove);
@@ -70,6 +102,10 @@ export class CameraRig {
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const pts = [...this.pointers.values()];
 
+    if (this.bedWanted && this.bed) {
+      this.moveInBed(pts);
+      return;
+    }
     if (pts.length >= 2) {
       const [a, b] = pts;
       const span = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
@@ -99,8 +135,37 @@ export class CameraRig {
     }
   };
 
+  /** Close to a bed: one finger walks round it (and up and down), two lean in and out. */
+  private moveInBed(pts: { x: number; y: number }[]) {
+    const bed = this.bed!;
+    if (pts.length >= 2) {
+      const [a, b] = pts;
+      const span = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
+      bed.distance = clamp(bed.distance * (this.lastSpan / span), 0.8, 4);
+      this.lastSpan = span;
+      const angle = Math.atan2(b.y - a.y, b.x - a.x);
+      let rot = angle - this.lastAngle;
+      rot = Math.atan2(Math.sin(rot), Math.cos(rot));
+      bed.azimuth -= rot;
+      this.lastAngle = angle;
+      return;
+    }
+    if (pts.length === 1 && this.oneFingerPans) {
+      const dx = pts[0].x - this.lastMid.x;
+      const dy = pts[0].y - this.lastMid.y;
+      bed.azimuth -= dx * 0.008;
+      bed.pitch = clamp(bed.pitch + dy * 0.004, 0.06, 1.0);
+      this.velRot = -dx * 0.008 * 60;
+      this.lastMid.set(pts[0].x, pts[0].y);
+    }
+  }
+
   private onWheel = (e: WheelEvent) => {
     e.preventDefault();
+    if (this.bedWanted && this.bed) {
+      this.bed.distance = clamp(this.bed.distance * Math.exp(e.deltaY * 0.0015), 0.8, 4);
+      return;
+    }
     this.zoomBy(e.deltaY * 0.0015);
   };
 
@@ -129,6 +194,16 @@ export class CameraRig {
   }
 
   update(dt: number) {
+    // Gliding to or from a bed: slow to leave, slow to arrive.
+    this.closeness = this.bedWanted ? Math.min(1, this.closeness + dt / 1.4) : Math.max(0, this.closeness - dt / 1.2);
+    if (this.bed && this.pointers.size === 0 && Math.abs(this.velRot) > 1e-4) {
+      this.bed.azimuth += this.velRot * dt;
+      this.velRot *= Math.exp(-dt * 5);
+    }
+    if (this.bedWanted) {
+      this.placeInBed();
+      return;
+    }
     if (this.pointers.size === 0) {
       // Inertia: keep gliding after the fingers lift, easing to rest.
       const decay = Math.exp(-dt * 5);
@@ -149,12 +224,33 @@ export class CameraRig {
       this.target.z = off.y - 1.2;
     }
 
+    this.placeInBed();
+  }
+
+  /** The camera: the garden view, the bed view, or somewhere between the two. */
+  private placeInBed() {
     const pitch = this.pitch();
-    this.camera.position.set(
+    this.gardenPos.set(
       this.target.x + Math.sin(this.azimuth) * Math.cos(pitch) * this.distance,
       this.target.y + Math.sin(pitch) * this.distance,
       this.target.z + Math.cos(this.azimuth) * Math.cos(pitch) * this.distance,
     );
-    this.camera.lookAt(this.target);
+    this.gardenAim.copy(this.target);
+    const k = smoothstep(0, 1, this.closeness);
+    if (!this.bed || k <= 0) {
+      if (!this.bedWanted) this.bed = null;
+      this.camera.position.copy(this.gardenPos);
+      this.camera.lookAt(this.gardenAim);
+      return;
+    }
+    const b = this.bed;
+    this.bedAim.copy(b.centre).add(new THREE.Vector3(0, 0.3, 0));
+    this.bedPos.set(
+      this.bedAim.x + Math.sin(b.azimuth) * Math.cos(b.pitch) * b.distance,
+      this.bedAim.y + Math.sin(b.pitch) * b.distance,
+      this.bedAim.z + Math.cos(b.azimuth) * Math.cos(b.pitch) * b.distance,
+    );
+    this.camera.position.lerpVectors(this.gardenPos, this.bedPos, k);
+    this.camera.lookAt(this.gardenAim.lerp(this.bedAim, k));
   }
 }
