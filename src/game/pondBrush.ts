@@ -223,7 +223,8 @@ export class PondBrush {
       const v = body.cells[Math.floor(this.rng() * body.cells.length)];
       const c = this.ponds.cellPosition(v, new THREE.Vector2());
       if (this.ponds.waterDepth(c.x, c.y) < 0.22) continue;
-      const count = 3 + Math.floor(this.rng() * 5);
+      // (In winter only a few dark pads are left on the water.)
+      const count = this.season === 'winter' ? 1 + Math.floor(this.rng() * 2) : 3 + Math.floor(this.rng() * 5);
       let got = 0;
       for (let n = 0; n < count * 3 && got < count; n++) {
         const a = this.rng() * Math.PI * 2;

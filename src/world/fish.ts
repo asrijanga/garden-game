@@ -122,6 +122,8 @@ export class Fish {
     private readonly ponds: Ponds,
     private readonly splash: Splash,
     private readonly onSplash: (size: number) => void,
+    /** Floating leaves and water flowers to glide in under (their spots on the water). */
+    private readonly shelter: () => THREE.Vector2[] = () => [],
   ) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     mat.customProgramCacheKey = () => 'fish';
@@ -208,6 +210,13 @@ export class Fish {
     this.nextJump = Math.min(this.nextJump, delay + lerp(4, 7, this.rng()));
   }
 
+  private shade(body: PondBody): THREE.Vector2 | null {
+    const spots = this.shelter().filter((p) => this.ponds.bodyAt(p.x, p.y) === body && this.ponds.waterDepth(p.x, p.y) > 0.22);
+    if (!spots.length) return null;
+    const p = spots[Math.floor(this.rng() * spots.length)];
+    return new THREE.Vector2(p.x + (this.rng() - 0.5) * 0.3, p.y + (this.rng() - 0.5) * 0.3);
+  }
+
   private deepSpot(body: PondBody, minDepth = 0.3): THREE.Vector2 | null {
     for (let tries = 0; tries < 20; tries++) {
       const v = body.cells[Math.floor(this.rng() * body.cells.length)];
@@ -251,7 +260,8 @@ export class Fish {
         const az = f.z + Math.sin(f.heading) * 0.35;
         const ahead = this.ponds.waterDepth(ax, az);
         if (Math.hypot(f.tx - f.x, f.tz - f.z) < 0.25 || ahead < 0.18) {
-          const t = this.deepSpot(body, 0.26);
+          // Often, somewhere in the shade under a pad or a lotus; otherwise anywhere deep.
+          const t = (this.rng() < 0.4 ? this.shade(body) : null) ?? this.deepSpot(body, 0.26);
           if (t) {
             f.tx = t.x;
             f.tz = t.y;

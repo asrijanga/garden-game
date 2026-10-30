@@ -13,12 +13,16 @@ interface Petal {
   /** Lying on the ground: seconds left before it fades. */
   rest: number;
   landed: boolean;
+  /** Landed on a pond: it floats, drifting slowly on the breeze. */
+  floating: boolean;
   size: number;
 }
 
 /**
  * Now and then a petal lets go of an open rose and drifts down on the breeze, tumbling, to lie
- * on the soil or the grass a while before it fades. A handful at most, so it stays a quiet detail.
+ * on the soil or the grass a while before it fades; one that falls on a pond (from a rose by the
+ * water, or a lotus or water lily) floats, drifting across the water. A handful at most, so it
+ * stays a quiet detail.
  */
 export class FallingPetals {
   readonly mesh: THREE.InstancedMesh;
@@ -33,6 +37,8 @@ export class FallingPetals {
     private readonly roses: () => { pos: THREE.Vector3; species: string; color: THREE.Color }[],
     private readonly heightAt: (x: number, z: number) => number,
     private readonly wind: () => THREE.Vector2,
+    /** The water level at (x, z), or null on dry land. */
+    private readonly waterAt: (x: number, z: number) => number | null = () => null,
   ) {
     // A small cupped petal: a curved, rounded quad.
     const g = new THREE.CircleGeometry(0.5, 8);
@@ -53,7 +59,7 @@ export class FallingPetals {
     this.next -= dt;
     if (this.next <= 0) {
       this.next = lerp(1.5, 5, this.rng());
-      const roses = this.roses().filter((h) => h.species.startsWith('rose'));
+      const roses = this.roses().filter((h) => h.species.startsWith('rose') || h.species === 'lotus' || h.species === 'waterlily');
       const slot = this.petals.indexOf(null);
       if (roses.length && slot >= 0) {
         const r = roses[Math.floor(this.rng() * roses.length)];
@@ -65,6 +71,7 @@ export class FallingPetals {
           t: 0,
           rest: lerp(8, 15, this.rng()),
           landed: false,
+          floating: false,
           size: lerp(0.8, 1.2, this.rng()),
         };
         this.mesh.setColorAt(slot, r.color.clone().multiplyScalar(lerp(0.9, 1.05, this.rng())));
@@ -85,11 +92,34 @@ export class FallingPetals {
         p.rot.x += p.spin.x * dt;
         p.rot.y += p.spin.y * dt;
         p.rot.z += p.spin.z * dt;
-        const ground = this.heightAt(p.pos.x, p.pos.z) + 0.01;
+        const water = this.waterAt(p.pos.x, p.pos.z);
+        // (Over a pond, the water is the surface: the lawn's height there is the old ground.)
+        const ground = (water ?? this.heightAt(p.pos.x, p.pos.z)) + 0.01;
         if (p.pos.y <= ground) {
           p.pos.y = ground;
           p.landed = true;
+          p.floating = water !== null;
+          if (p.floating) p.rest *= 1.6; // a petal on the water lasts a while longer
           p.rot.set(-Math.PI / 2 + (this.rng() - 0.5) * 0.4, this.rng() * 6, 0);
+        }
+      } else if (p.floating) {
+        // Drifting across the pond on the breeze, turning slowly, riding the ripples.
+        p.rest -= dt;
+        const nx = p.pos.x + (w.x * 0.08 + Math.sin(p.t * 0.7 + i) * 0.02) * dt;
+        const nz = p.pos.z + (w.y * 0.08 + Math.cos(p.t * 0.6 + i) * 0.02) * dt;
+        const level = this.waterAt(nx, nz);
+        if (level !== null) {
+          p.pos.x = nx;
+          p.pos.z = nz;
+          p.pos.y = level + 0.008 + Math.sin(p.t * 1.6 + i) * 0.003;
+        }
+        p.rot.y += dt * 0.15;
+        if (p.rest < 2) k *= Math.max(0, p.rest / 2);
+        if (p.rest <= 0) {
+          this.petals[i] = null;
+          this.mesh.setMatrixAt(i, this.m.makeScale(0, 0, 0));
+          touch(this.mesh.instanceMatrix, i);
+          continue;
         }
       } else {
         p.rest -= dt;
