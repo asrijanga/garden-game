@@ -1907,6 +1907,14 @@ export class Flowers {
     mesh.instanceMatrix.needsUpdate = true;
   }
 
+  /** Cut back to the ground: the plant starts growing again `delay` seconds from now. */
+  regrowFrom(mesh: THREE.InstancedMesh, index: number, delay: number) {
+    const a = mesh.geometry.attributes.aLife as THREE.InstancedBufferAttribute;
+    a.setX(index, this.time + delay);
+    a.addUpdateRange(index * 2, 2);
+    a.needsUpdate = true;
+  }
+
   /** The time on the flowers' own clock (planting times are on it). */
   get clock(): number {
     return this.time;

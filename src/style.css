@@ -941,3 +941,61 @@ body.in-bed .admire-toggle {
   opacity: 0;
   pointer-events: none;
 }
+
+/* The bunch in your hand (close to a bed): a glass tray along the bottom. */
+.bunch {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  display: none;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 14px;
+  border: 1px solid rgba(255, 248, 235, 0.55);
+  border-radius: 28px;
+  background: rgba(255, 246, 230, 0.32);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow: 0 4px 14px rgba(60, 40, 20, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  color: #fff8ec;
+  font: 600 14px/1 system-ui, sans-serif;
+  transform: translateX(-50%);
+  touch-action: manipulation;
+}
+body.in-bed .bunch.has-stems { display: flex; }
+.bunch-stems { display: flex; align-items: center; min-height: 30px; }
+.bunch-stems i {
+  width: 20px;
+  height: 20px;
+  margin-left: -6px;
+  border-radius: 46% 54% 50% 50% / 52% 48% 52% 48%;
+  border: 1.5px solid rgba(255, 252, 244, 0.85);
+  box-sizing: border-box;
+}
+.bunch-stems i:first-child { margin-left: 0; }
+.bunch-stems i.landed { animation: bunch-land 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes bunch-land {
+  from { transform: translateY(-26px) scale(0.4); opacity: 0; }
+}
+.bunch-count:empty { display: none; }
+.bunch button {
+  height: 34px;
+  border: none;
+  border-radius: 17px;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.bunch-drop {
+  width: 34px;
+  background: rgba(255, 252, 244, 0.25);
+  color: inherit;
+}
+.bunch-tie {
+  padding: 0 14px;
+  background: #fff6e6;
+  color: #5a4630;
+}
+.bunch-tie:disabled { opacity: 0.6; }
+.bunch-tie[hidden] { display: none; }

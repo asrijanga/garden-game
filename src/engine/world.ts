@@ -812,6 +812,10 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     surface.addEventListener('pointerup', (e) => {
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10 || e.timeStamp - down.t > 450) return;
       ray.setFromCamera(new THREE.Vector2((e.clientX / screen.width) * 2 - 1, -(e.clientY / screen.height) * 2 + 1), camera);
+      if (rig.inBed) {
+        tryCut(e.clientX, e.clientY);
+        return;
+      }
       const onCottage = ray.intersectObject(cottage.group, true).length > 0;
       // A tap on a flower bed (looking round the garden) goes close to it.
       if (!onCottage && toolbar.tool === 'move' && !rig.inBed && !admiring) {
@@ -888,6 +892,14 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
         return bed.plants.length;
       },
       heroCount: () => heroes.filter((h) => h.hero).length,
+      /** Where the nearest uncut close-up's flowers are on screen (for tapping it from tests). */
+      heroOnScreen: () => {
+        const h = heroes.find((h) => h.hero && !h.cut);
+        if (!h) return null;
+        sphere.copy(h.hero!.geometry.boundingSphere!).applyMatrix4(h.matrix);
+        onScreen.copy(sphere.center).setY(sphere.center.y + sphere.radius * 0.5).project(camera);
+        return { x: ((onScreen.x + 1) / 2) * screen.width, y: ((1 - onScreen.y) / 2) * screen.height };
+      },
     });
   }
   /** Undone: rebuild without the last stroke, with a puff where it was. */
@@ -1028,8 +1040,13 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   const heroGroup = new THREE.Group();
   scene.add(heroGroup);
   let heroBed = 0;
-  let heroes: { mesh: THREE.InstancedMesh; index: number; matrix: THREE.Matrix4; info: NonNullable<ReturnType<typeof flowers.heroInfo>>; hero: THREE.InstancedMesh | null }[] = [];
+  let heroes: { mesh: THREE.InstancedMesh; index: number; matrix: THREE.Matrix4; info: NonNullable<ReturnType<typeof flowers.heroInfo>>; seed: number; hero: THREE.InstancedMesh | null; cut?: boolean }[] = [];
   const clearHeroes = () => {
+    for (const f of cuts) {
+      heroGroup.remove(f.mesh);
+      f.mesh.geometry.dispose();
+    }
+    cuts.length = 0;
     for (const h of heroes) {
       if (!h.hero) continue;
       heroGroup.remove(h.hero);
@@ -1046,14 +1063,14 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       .filter((x) => x.info)
       .sort((a, b) => a.p.pos.distanceTo(bed.centre) - b.p.pos.distanceTo(bed.centre))
       .slice(0, 40);
-    heroes = plants.map(({ p, info }) => ({ mesh: p.mesh, index: p.index, matrix: info!.matrix, info: info!, hero: null }));
     const seedOf = (v: THREE.Vector3) => Math.abs(Math.round(v.x * 1000) * 73856093 ^ Math.round(v.z * 1000) * 19349663) % 1000003;
-    shapes?.postMessage({ season, hero: heroes.map((h, i) => ({ key: `${heroBed}:${i}`, species: h.info.species, variant: h.info.variant, seed: seedOf(plants[i].p.pos) })) });
+    heroes = plants.map(({ p, info }) => ({ mesh: p.mesh, index: p.index, matrix: info!.matrix, info: info!, seed: seedOf(p.pos), hero: null }));
+    shapes?.postMessage({ season, hero: heroes.map((h, i) => ({ key: `${heroBed}:${i}`, species: h.info.species, variant: h.info.variant, seed: h.seed })) });
   };
   const heroArrived = (key: string, geo: THREE.BufferGeometry) => {
     const [bed, i] = key.split(':').map(Number);
     const h = heroes[i];
-    if (bed !== heroBed || !h || h.hero) {
+    if (bed !== heroBed || !h || h.hero || h.cut) {
       geo.dispose();
       return;
     }
@@ -1063,11 +1080,94 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     geo.setAttribute('aEdgeColor', new THREE.InstancedBufferAttribute(new Float32Array(h.info.edge), 3));
     const mesh = new THREE.InstancedMesh(geo, h.mesh.material, 1);
     mesh.setMatrixAt(0, h.matrix);
+    geo.computeBoundingSphere();
     mesh.frustumCulled = false;
     mesh.receiveShadow = true;
     heroGroup.add(mesh);
     h.hero = mesh;
     flowers.setHidden(h.mesh, h.index, null);
+  };
+
+  // --- Cutting: close to a bed, a tap on a plant cuts it for the bunch in your hand -------------
+  // The cut stem lifts away (up, out of the bed, shrinking as it goes) and the plant it came from
+  // grows again from the ground a little later, as a cut-and-come-again flower does.
+  const cuts: { mesh: THREE.InstancedMesh; from: THREE.Matrix4; t: number; spin: number }[] = [];
+  let handFull = false;
+  const cutRay = new THREE.Raycaster();
+  const sphere = new THREE.Sphere();
+  const onScreen = new THREE.Vector3();
+  const stemKind = (species: string, sp: (typeof SPECIES)[number] | undefined) =>
+    species.startsWith('leaf:') ? 'foliage' : species.startsWith('rose') ? 'rose' : sp?.zone ? 'aquatic' : 'flower';
+  const tryCut = (x: number, y: number): boolean => {
+    const shown = heroes.filter((h) => h.hero && !h.cut);
+    if (!shown.length) return false;
+    cutRay.setFromCamera(new THREE.Vector2((x / screen.width) * 2 - 1, -(y / screen.height) * 2 + 1), camera);
+    const hit = cutRay.intersectObjects(shown.map((h) => h.hero!), false)[0];
+    let pick = hit ? shown.find((h) => h.hero === hit.object) : undefined;
+    // A fingertip is wide: missing every petal, the nearest flowerhead within reach still counts.
+    if (!pick) {
+      let best = 44;
+      for (const h of shown) {
+        const g = h.hero!.geometry;
+        sphere.copy(g.boundingSphere!).applyMatrix4(h.matrix);
+        onScreen.copy(sphere.center).setY(sphere.center.y + sphere.radius * 0.5).project(camera);
+        const d = Math.hypot(((onScreen.x + 1) / 2) * screen.width - x, ((1 - onScreen.y) / 2) * screen.height - y);
+        if (onScreen.z < 1 && d < best) {
+          best = d;
+          pick = h;
+        }
+      }
+    }
+    if (!pick) return false;
+    if (handFull) {
+      link.call('label', 'Your hands are full: tie a bouquet first', 2000);
+      return true;
+    }
+    const h = pick;
+    const sp = SPECIES.find((s) => s.id === h.info.species);
+    const hex = (c: number[]) => `#${new THREE.Color(c[0], c[1], c[2]).getHexString()}`;
+    const stem = {
+      species: h.info.species,
+      color: hex(h.info.petal),
+      edge: hex(h.info.edge),
+      kind: stemKind(h.info.species, sp),
+      inSeason: !sp || sp.seasons.includes(season),
+      variant: h.info.variant,
+      seed: h.seed,
+    };
+    h.cut = true;
+    cuts.push({ mesh: h.hero!, from: h.matrix.clone(), t: 0, spin: (Math.random() - 0.5) * 2 });
+    h.hero = null;
+    // The plant grows back from the ground after a short rest.
+    flowers.regrowFrom(h.mesh, h.index, 5 + Math.random() * 4);
+    flowers.setHidden(h.mesh, h.index, h.matrix);
+    ambience.snip();
+    const at = new THREE.Vector3().setFromMatrixPosition(h.matrix);
+    dust.puff(at, 2, 0.25);
+    link.call('cut', stem);
+    return true;
+  };
+  const m4 = new THREE.Matrix4();
+  const lift = new THREE.Matrix4();
+  const updateCuts = (dt: number) => {
+    for (let i = cuts.length - 1; i >= 0; i--) {
+      const c = cuts[i];
+      c.t += dt / 0.7;
+      const k = Math.min(1, c.t);
+      const e = k * k * (3 - 2 * k);
+      // Up and out of the bed, turning a little in the hand, shrinking away towards the tray.
+      const s = 1 - e * 0.85;
+      lift.makeRotationY(c.spin * e).premultiply(new THREE.Matrix4().makeScale(s, s, s));
+      m4.copy(c.from).multiply(lift);
+      m4.elements[13] += e * 0.9;
+      c.mesh.setMatrixAt(0, m4);
+      c.mesh.instanceMatrix.needsUpdate = true;
+      if (k >= 1) {
+        heroGroup.remove(c.mesh);
+        c.mesh.geometry.dispose();
+        cuts.splice(i, 1);
+      }
+    }
   };
 
   // --- Loading: the saved garden is rebuilt while shaders compile -------------------------------
@@ -1125,6 +1225,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       props.update(dt);
       edgePlants.update(dt);
       flowers.update(dt);
+      if (cuts.length) updateCuts(dt);
       bees.update(dt);
       ponds.update(dt);
       fish.update(dt);
@@ -1286,6 +1387,10 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     leaveBed: () => {
       rig.leaveBed();
       clearHeroes();
+    },
+    /** The page's bunch is full (or has room again): taps stop cutting. */
+    handFull: (full: boolean) => {
+      handFull = full;
     },
     shot,
     load,

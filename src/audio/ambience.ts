@@ -604,6 +604,19 @@ export class Ambience {
     this.hiss(ctx, t + 0.01, 'bandpass', 2400, 1600, 0.8, 0.025 * (0.5 + size), 0.01, 0.18);
   }
 
+  /** Secateurs through a stem: a crisp double click (the blades), a green crunch, a tiny ring. */
+  snip() {
+    const ctx = this.live();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const k = 0.9 + Math.random() * 0.2;
+    const pan = (Math.random() - 0.5) * 0.3;
+    this.hiss(ctx, t, 'highpass', 5200 * k, 4000, 1.2, 0.07, 0.001, 0.02, pan);
+    this.hiss(ctx, t + 0.012, 'bandpass', 1900 * k, 1200, 1.6, 0.06, 0.002, 0.05, pan);
+    this.hiss(ctx, t + 0.055, 'highpass', 4400 * k, 3600, 1.2, 0.05, 0.001, 0.018, pan);
+    this.blip(ctx, t + 0.004, 3100 * k, 2900 * k, 0.012, 0.12, 'triangle');
+  }
+
   /** Picking something up to place it: a soft, happy pop. */
   pop() {
     const ctx = this.live();

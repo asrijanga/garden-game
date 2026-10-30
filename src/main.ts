@@ -22,6 +22,8 @@ import { keepStorage, makeBackup, readBackup } from './game/backup';
 import { confirmCard } from './ui/confirm';
 import { mountShotButton } from './ui/shotButton';
 import { mountUndoButtons } from './ui/undoButtons';
+import { mountBunch } from './ui/bunch';
+import { loadBunch, saveBunch, MAX_STEMS, type CutStem } from './game/bunch';
 import type { PlantAmount } from './game/flowerBrush';
 import type { WeatherKind } from './world/weather';
 import { Link, proxied, type Port } from './engine/link';
@@ -407,7 +409,27 @@ handlers.bed = ((count: number) => {
   picker.setVisible(false);
   cottagePanel.setVisible(false);
   bedView.show(true);
-  toolbar.showLabel(count > 1 ? 'Drag to walk round the bed · pinch to lean in' : 'Drag to walk round it · pinch to lean in', 2600);
+  toolbar.showLabel(count > 1 ? 'Tap a flower to cut it · drag to walk round · pinch to lean in' : 'Tap it to cut it · drag to walk round · pinch to lean in', 3000);
+}) as (...a: never[]) => unknown;
+// Cutting: close to a bed, a tap on a plant cuts it into the bunch in your hand.
+let bunch: CutStem[] = loadBunch();
+const bunchTray = mountBunch(null, () => {
+  ambience.rustle(0.6);
+  bunch = [];
+  saveBunch(bunch);
+  bunchTray.set(bunch);
+  world.handFull(false);
+});
+bunchTray.set(bunch);
+world.handFull(bunch.length >= MAX_STEMS);
+let cutHints = 0;
+handlers.cut = ((stem: CutStem) => {
+  bunch.push(stem);
+  saveBunch(bunch);
+  bunchTray.set(bunch, true);
+  world.handFull(bunch.length >= MAX_STEMS);
+  if (bunch.length === 1 && cutHints++ < 2) toolbar.showLabel('Cut · it will grow back · tap more to gather a bunch', 2400);
+  else if (bunch.length >= MAX_STEMS) toolbar.showLabel('An armful: that’s all you can hold', 2200);
 }) as (...a: never[]) => unknown;
 // Admire mode: no buttons, just a slow drift round the garden.
 mountAdmire(
