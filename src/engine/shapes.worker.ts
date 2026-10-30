@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { buildShape, setPlantSeason, shapeKey, type ShapeRecipe } from '../world/flowers';
+import { buildShape, heroGeometry, setPlantSeason, shapeKey, type LeafKind, type ShapeRecipe } from '../world/flowers';
 import type { Season } from '../world/season';
 import { SPECIES } from '../world/flowerSpecies';
 import type * as THREE from 'three';
@@ -24,9 +24,37 @@ const pack = (g: THREE.BufferGeometry, transfer: Transferable[]): PackedShape =>
   return { attributes, userData: g.userData };
 };
 
-self.addEventListener('message', (e: MessageEvent<{ season: Season; recipes: ShapeRecipe[] }>) => {
+/** A request for close-up plants: each its species, garden variant and own seed. */
+export interface HeroRequest {
+  key: string;
+  species: string;
+  variant: number;
+  seed: number;
+}
+
+// Close-ups come first (someone is looking at that bed), one per task.
+let heroQueue: HeroRequest[] = [];
+const nextHero = () => {
+  const r = heroQueue.shift();
+  if (!r) return;
+  const sp = r.species.startsWith('leaf:') ? (r.species.slice(5) as LeafKind) : SPECIES.find((s) => s.id === r.species);
+  if (sp) {
+    const transfer: Transferable[] = [];
+    self.postMessage({ key: r.key, hero: pack(heroGeometry(sp, r.variant, r.seed), transfer) }, transfer);
+  }
+  setTimeout(nextHero, 0);
+};
+
+self.addEventListener('message', (e: MessageEvent<{ season: Season; recipes?: ShapeRecipe[]; hero?: HeroRequest[] }>) => {
   setPlantSeason(e.data.season);
-  const queue = [...e.data.recipes];
+  if (e.data.hero) {
+    // A new bed: what was asked for the last one is no longer needed.
+    const idle = heroQueue.length === 0;
+    heroQueue = [...e.data.hero];
+    if (idle) nextHero();
+    return;
+  }
+  const queue = [...(e.data.recipes ?? [])];
   // One shape per task, so a newer, more urgent list could get in between.
   const next = () => {
     const r = queue.shift();
