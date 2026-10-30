@@ -617,7 +617,8 @@ export class Ambience {
   private lastRustle = 0;
 
   /** Leaves rustling as a hedge grows. */
-  rustle() {
+  /** A soft leafy rustle (`volume` 0 … 1: a bunny in the flowers is quieter than a hedge). */
+  rustle(volume = 1) {
     const ctx = this.ctx;
     if (!ctx || !this.master || this.muted || this.quiet || ctx.state !== 'running') return;
     const t = ctx.currentTime;
@@ -631,7 +632,7 @@ export class Ambience {
     hp.Q.value = 0.7;
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, t);
-    env.gain.linearRampToValueAtTime(0.035, t + 0.06);
+    env.gain.linearRampToValueAtTime(0.035 * volume, t + 0.06);
     env.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
     src.connect(hp).connect(env).connect(this.master);
     src.start(t, Math.random());

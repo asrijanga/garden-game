@@ -130,6 +130,8 @@ export interface BunnyWorld {
   wander(rng: Rng): THREE.Vector2 | null;
   /** Is this out among the trees (where the family can slip away)? */
   inWoods(x: number, z: number): boolean;
+  /** A hop has just landed here (for a rustle, if it's among the flowers). */
+  hopped?(x: number, z: number): void;
 }
 
 /**
@@ -270,6 +272,7 @@ export class Bunnies {
       this.pose(b, h.t);
       if (h.t >= 1) {
         b.pos.copy(h.to);
+        this.world.hopped?.(b.pos.x, b.pos.y);
         b.yaw = h.yaw1;
         b.hop = null;
         b.hopsLeft--;

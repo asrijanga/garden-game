@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { addWet } from '../render/wet';
+import { addMoss, mossAttribute, mossStart } from '../render/moss';
 import { touch } from '../render/touch';
 import { regrow } from '../core/regrow';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { createRng, lerp } from '../core/random';
+import { createRng, hashJitter, lerp } from '../core/random';
 
 export type StoneKind = 'step' | 'shore';
 const SHAPES: Record<StoneKind, number> = { step: 8, shore: 7 };
@@ -154,13 +155,21 @@ export class Stones {
   private readonly p = new THREE.Vector3();
 
   constructor(private readonly onLand: (p: THREE.Vector3, size: number, kind: StoneKind) => void) {
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
-    addWet(mat);
+    // Moss creeps in over a few minutes: round the rims of stepping stones (their tops are walked
+    // on), and over the tops of the rocks by the water.
+    const material = (trodden: boolean) => {
+      const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      addMoss(mat, { time: 240, amount: trodden ? 0.85 : 0.8, trodden });
+      addWet(mat);
+      return mat;
+    };
+    const mats: Record<StoneKind, THREE.MeshLambertMaterial> = { step: material(true), shore: material(false) };
     (Object.keys(SHAPES) as StoneKind[]).forEach((kind) => {
       const list: THREE.InstancedMesh[] = [];
       for (let k = 0; k < SHAPES[kind]; k++) {
         const geo = kind === 'shore' ? shoreGeometry(900 + k * 23) : stepGeometry(550 + k * 13); // (the seeds they've always had)
-        const mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
+        mossAttribute(geo, CAPACITY);
+        const mesh = new THREE.InstancedMesh(geo, mats[kind], CAPACITY);
         mesh.count = 0;
         mesh.visible = false; // drawn only once something of this shape is laid
         mesh.castShadow = true;
@@ -259,6 +268,7 @@ export class Stones {
     if (!this.grid.has(k)) this.grid.set(k, []);
     this.grid.get(k)!.push(stone);
     this.falling.push({ stone, delay: delay + regrow.offset, t: 0, landed: false });
+    mossStart(mesh, index, delay, hashJitter(x, z) * 30);
     this.write(stone, 0, 0.0001);
   }
 

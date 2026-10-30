@@ -16,3 +16,9 @@ export const smoothstep = (e0: number, e1: number, x: number) => {
   const t = clamp((x - e0) / (e1 - e0), 0, 1);
   return t * t * (3 - 2 * t);
 };
+
+/** A steady 0 … 1 value for a place (the same every time, unlike drawing from an rng). */
+export function hashJitter(x: number, z: number): number {
+  const h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+  return h - Math.floor(h);
+}
