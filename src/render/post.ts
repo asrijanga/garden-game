@@ -79,12 +79,7 @@ float viewZ(vec2 uv) {
   float d = texture2D(tDepth, uv).x;
   return uNear * uFar / (uFar - d * (uFar - uNear));
 }
-float grain(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
-float paperNoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(grain(i), grain(i + vec2(1, 0)), f.x), mix(grain(i + vec2(0, 1)), grain(i + vec2(1, 1)), f.x), f.y);
-}
+uniform sampler2D tPaper;
 #endif
 vec3 neutral(vec3 color) {
   const float startCompression = 0.8 - 0.04;
@@ -113,7 +108,15 @@ void main() {
   vec3 w = texture2D(tScene, vUv - vec2(uTexel.x, 0.0)).rgb;
   vec3 lo = min(c, min(min(n, s), min(e, w)));
   vec3 hi = max(c, max(max(n, s), max(e, w)));
+#ifdef STORYBOOK
+  // Drawn without multisampling (its depth is read for the ink, and on phones resolving a
+  // multisampled depth buffer every frame is ruinously slow): soften stair-stepped edges instead,
+  // blending a pixel towards its neighbours where it differs sharply from them.
+  float edge = dot(hi - lo, vec3(0.3, 0.5, 0.2));
+  c = mix(c, (c * 2.0 + n + s + e + w) / 6.0, smoothstep(0.06, 0.25, edge) * 0.7);
+#else
   c = clamp(c + (c - (n + s + e + w) * 0.25) * uSharpen, lo, hi);
+#endif
   c += texture2D(tBloom, vUv).rgb * uBloom;
 #ifdef STORYBOOK
   {
@@ -165,8 +168,9 @@ void main() {
     c = mix(c, 0.8 + (c - 0.8) / (1.0 + (c - 0.8) * 3.0), step(0.8, c));
     c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * 0.96;
     c = max(c, vec3(0.13, 0.12, 0.2) * (1.0 - t) + c * 0.0);
+    // (A small tile made once, fine grain and a broader mottle from two scales of it.)
     vec2 px = gl_FragCoord.xy;
-    float paper = paperNoise(px * 0.5) * 0.5 + paperNoise(px * 0.13) * 0.35 + paperNoise(px * 0.031) * 0.15;
+    float paper = texture2D(tPaper, px / 128.0).r * 0.6 + texture2D(tPaper, px / 701.0).r * 0.4;
     c *= 0.975 + paper * 0.05;
   }
 #endif
@@ -177,6 +181,30 @@ void main() {
 }`;
 
 const LEVELS = 3; // bloom chain: 1/4, 1/8, 1/16 of full resolution
+
+/** The paper's grain: a small tile of soft noise, made once (cheaper than noise per pixel). */
+function paperTexture(): THREE.DataTexture {
+  const N = 128;
+  const raw = new Float32Array(N * N);
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < raw.length; i++) raw[i] = rnd();
+  const data = new Uint8Array(N * N * 4);
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      // A little blur, so it's grain rather than static (and wrapping, so it tiles).
+      let v = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) v += raw[((y + dy + N) % N) * N + ((x + dx + N) % N)] * (dx || dy ? 1 : 2);
+      const b = Math.round((v / 10) * 255);
+      data.set([b, b, b, 255], (y * N + x) * 4);
+    }
+  }
+  const t = new THREE.DataTexture(data, N, N);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = t.minFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
+  return t;
+}
 
 function target(w: number, h: number, samples = 0, depth = false) {
   const rt = new THREE.WebGLRenderTarget(Math.max(1, w), Math.max(1, h), {
@@ -227,10 +255,11 @@ export class PostFX {
     /** The storybook look: ink lines (from the depth), paper and a watercolour grade. */
     private readonly storybook = false,
   ) {
+    if (storybook) this.samples = 0;
     this.sceneRT = target(1, 1, this.samples, storybook);
     if (storybook) {
       this.final.defines.STORYBOOK = '';
-      Object.assign(this.final.uniforms, { tDepth: { value: null }, uNear: { value: 0.1 }, uFar: { value: 100 } });
+      Object.assign(this.final.uniforms, { tDepth: { value: null }, uNear: { value: 0.1 }, uFar: { value: 100 }, tPaper: { value: paperTexture() } });
     }
     for (let i = 0; i < LEVELS; i++) {
       this.bloomRTs.push(target(1, 1));
@@ -249,6 +278,8 @@ export class PostFX {
 
   /** MSAA sample count for the scene (0 turns antialiasing off). */
   setSamples(samples: number) {
+    // (The storybook look always draws without: see the final pass.)
+    if (this.storybook) samples = 0;
     if (samples === this.samples) return;
     this.samples = samples;
     const { width, height } = this.sceneRT;
