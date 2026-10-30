@@ -142,6 +142,10 @@ interface PetalStyle {
   notch?: boolean;
   pointed?: boolean;
   blotch?: number;
+  /** A rose's petal: broad and rounded, almost as wide as it is long. */
+  round?: boolean;
+  /** How far the tip and edges roll back on themselves (a rose's outer petals): 0 … 1. */
+  reflex?: number;
 }
 
 function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, len: number, width: number, cupIn: number, closeTo: number, rng: () => number, style: PetalStyle = {}) {
@@ -154,7 +158,17 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
   const curl = lerp(0.06, 0.2, rng()); // each petal curls a little differently
   const twist = (rng() - 0.5) * 0.25;
   // Smooth, rounded outline: narrow at the base, fullest past the middle, softly rounded tip.
-  const rows: [number, number][] = style.pointed
+  const rows: [number, number][] = style.round
+    ? [
+        [0, 0.3],
+        [0.2, 0.74],
+        [0.45, 0.98],
+        [0.7, 1.02],
+        [0.87, 0.9],
+        [0.96, 0.62],
+        [1, 0.32],
+      ]
+    : style.pointed
     ? [
         [0, 0.2],
         [0.2, 0.62],
@@ -185,9 +199,12 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
         ];
   // Notched petals dip in the middle of the tip (a cosmos's little serrations).
   const centreT = (t: number) => (style.notch && t > 0.95 ? t - 0.1 : t);
+  const reflex = style.reflex ?? 0;
   const at = (t: number, w: number) =>
     hinge
       .clone()
+      // Rolled back: past halfway the petal turns over on itself, its edges most of all.
+      .addScaledVector(crease, -reflex * Math.max(0, t - 0.5) ** 2 * len * 1.4 * (0.55 + 0.9 * Math.abs(w)))
       .addScaledVector(v, t * len)
       .addScaledVector(s, w * width * 0.5 + twist * t * t * len * 0.3)
       .addScaledVector(UP, t * t * len * curl) // the tip curls up
@@ -200,7 +217,8 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
   const blotch = style.blotch ?? 0;
   const shadeAt = (t: number, edge: number) => {
     const face = blotch > 0 ? lerp(1 - blotch, 1, Math.min(1, Math.max(0, (t - 0.12) / 0.38))) : 1;
-    return lerp(0.74, 0.98, Math.pow(t, 0.7)) * (1 - edge * 0.06) * face;
+    // (A rose's petals are deep at the base, inside the cup, and light at their rolled rims.)
+    return (style.round ? lerp(0.68, 1.02, Math.pow(t, 0.8)) : lerp(0.74, 0.98, Math.pow(t, 0.7))) * (1 - edge * 0.06) * face;
   };
   if (detail === 'hero') {
     heroPetal(m, at, rows, centreT, width, crease, edgeAt, shadeAt, { color: WHITE, petal: true, hinge, axis, close: Math.max(0, open - closeTo) }, rng);
@@ -781,19 +799,32 @@ function roseBloom(m: FlowerMesh, top: THREE.Vector3, size: number, petals: numb
     }
     return;
   }
+  // Three whorls, as a real rose is built: a tight spiral cone of wrapped petals at the heart,
+  // a ring of cupped petals round it, and broad outer petals opening out, their tips and edges
+  // rolled back (that rolled point is what makes a rose read as a rose).
   const off = rng() * Math.PI * 2;
-  for (let i = petals - 1; i >= 0; i--) {
-    const k = i / (petals - 1); // 0 = the heart … 1 = the outermost
-    const az = off + i * 2.39996 + (rng() - 0.5) * 0.2;
-    // Inner petals stand tight and upright; outer ones open (more so on an open bloom) and curl back.
-    const reach = k * (0.35 + opened * 0.65);
-    const open = lerp(0.12, 0.35, k) + reach * 1.35;
-    const len = size * lerp(0.42, 1.0, Math.sqrt(k)) * lerp(0.92, 1.08, rng());
-    const width = len * lerp(0.95, 1.15, rng());
-    const ring = size * 0.18 * k;
-    const hinge = top.clone().add(new THREE.Vector3(Math.cos(az) * ring, size * 0.12 * (1 - k), Math.sin(az) * ring));
-    const cup = lerp(0.45, 0.05, k) * (1 - opened * 0.4);
-    petal(m, hinge, az, open, len, width, cup, 0.06, rng);
+  const heart = Math.max(4, Math.round(petals * 0.24));
+  const middle = Math.max(4, Math.round(petals * 0.38));
+  const outer = Math.max(4, petals - heart - middle);
+  const jitter = () => (rng() - 0.5) * 0.18;
+  for (let i = 0; i < outer; i++) {
+    const az = off + (i / outer) * Math.PI * 2 + jitter();
+    const len = size * lerp(0.92, 1.08, rng());
+    const hinge = top.clone().add(new THREE.Vector3(Math.cos(az) * size * 0.16, size * 0.02, Math.sin(az) * size * 0.16));
+    petal(m, hinge, az, lerp(0.4, 1.1, opened) + jitter(), len, len * lerp(1.1, 1.3, rng()), 0.18, 0.06, rng, { round: true, reflex: lerp(0.2, 0.85, opened) * lerp(0.7, 1.2, rng()) });
+  }
+  for (let i = 0; i < middle; i++) {
+    const az = off + ((i + 0.5) / middle) * Math.PI * 2 + jitter();
+    const len = size * lerp(0.72, 0.84, rng());
+    const hinge = top.clone().add(new THREE.Vector3(Math.cos(az) * size * 0.11, size * 0.08, Math.sin(az) * size * 0.11));
+    petal(m, hinge, az, lerp(0.25, 0.6, opened) + jitter(), len, len * lerp(1.15, 1.35, rng()), 0.4, 0.06, rng, { round: true, reflex: 0.3 * opened });
+  }
+  for (let i = 0; i < heart; i++) {
+    const k = i / heart;
+    const az = off + i * 2.39996 + jitter();
+    const len = size * lerp(0.42, 0.6, k);
+    const hinge = top.clone().add(new THREE.Vector3(Math.cos(az) * size * 0.05 * k, size * 0.16, Math.sin(az) * size * 0.05 * k));
+    petal(m, hinge, az, lerp(0.04, 0.3, k) * (0.6 + opened * 0.6), len, len * 1.35, 0.6, 0.04, rng, { round: true });
   }
 }
 
@@ -822,7 +853,7 @@ function roseBush(m: FlowerMesh, type: 'tea' | 'floribunda' | 'cabbage' | 'climb
     const winter = plantSeason === 'winter';
     cane(m, pts, type === 'mini' ? 0.0035 : 0.005, rng, winter ? ROSE_CANE_WINTER : ROSE_STEM);
     // Leaves all along (climbers more), each a spray of five; in winter only the odd one hangs on.
-    const leaves = type === 'climber' ? 5 : type === 'mini' ? 2 : 3;
+    const leaves = type === 'climber' ? 7 : type === 'mini' ? 3 : 5;
     for (let l = 0; l < leaves; l++) {
       if (winter && l > 0) break;
       const t = lerp(0.2, 0.85, (l + rng() * 0.6) / leaves);
