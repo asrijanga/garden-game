@@ -585,7 +585,7 @@ export class Butterflies {
   private wanted(): number {
     if (!this.kinds.length) return 0;
     const blooms = this.world.beds().length + this.world.meadowCount() * 0.3;
-    return blooms ? Math.min(MAX - 2, 1 + Math.floor(blooms / 45)) : 0;
+    return blooms ? Math.min(3, 1 + Math.floor(blooms / 120)) : 0;
   }
 
   /** Somewhere to go next: a (preferably favourite) bloom, a warm stone, or the pond's edge. */

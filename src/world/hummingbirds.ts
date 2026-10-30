@@ -6,7 +6,7 @@ import type { Perch } from './perchingBirds';
 
 /** Storybook scale, like the other creatures. */
 const SCALE = 3.0;
-const MAX = 3;
+const MAX = 1;
 
 const KINDS = [
   { name: 'ruby-throated', back: '#3f8a4a', belly: '#e8e6dc', throat: '#e0203a', spec: '#ff6a7a' },

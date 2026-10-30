@@ -887,7 +887,7 @@ function roseBush(m: FlowerMesh, type: 'tea' | 'floribunda' | 'cabbage' | 'climb
       }
       // Hips where blooms were: all of them in winter, and on wild roses in autumn (they've
       // flowered); some among the last blooms of the rest.
-      if (plantSeason === 'winter' || (plantSeason === 'autumn' && (type === 'wild' || rng() < 0.35))) {
+      if (plantSeason === 'winter' || (plantSeason === 'autumn' && (type === 'wild' || rng() < 0.12))) {
         hips(m, at, size, rng);
         if (at.y > top.y) top = at.clone();
         continue;

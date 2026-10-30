@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Cottage, DEFAULT_STYLE, decodeStyle, type CottageStyle } from '../world/cottage';
 import { SPECIES } from '../world/flowerSpecies';
-import { useStorybookLight, type Look } from '../render/storybook';
+import { useStorybookLight } from '../render/storybook';
 import { Bouquet, forBouquet } from '../world/bouquet';
 import { PALETTES, type Season } from '../world/season';
 import { Quality, TIERS, fpsCounter } from '../render/quality';
@@ -87,8 +87,6 @@ export interface WorldInit {
   meadowGrown: number;
   /** The time of day to open at (0 … 1). */
   time: number;
-  /** How the garden is drawn: the painted look, or the storybook (watercolour and ink) one. */
-  look: Look;
 }
 
 /** A touch (or mouse) on the garden, as the page saw it (relative to the canvas's corner). */
@@ -158,7 +156,7 @@ export type World = ReturnType<typeof createWorld>;
 export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: Link, init: WorldInit) {
   const surface = new Surface();
   // (Before anything is compiled: the storybook look changes how every material is lit.)
-  if (init.look === 'storybook') useStorybookLight();
+  useStorybookLight();
   // --- Renderer ---------------------------------------------------------------------------
   const renderer = new THREE.WebGLRenderer({ canvas: canvas as HTMLCanvasElement, antialias: false, powerPreference: 'high-performance' });
   // Neutral keeps the hand-picked palette's hues intact (ACES pushes everything orange-grey).
@@ -230,7 +228,8 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   const flyingBirds = new FlyingBirds((x, z) => ground.heightAt(x, z), 60, debug ? 2 : 15);
   scene.add(flyingBirds.mesh);
 
-  const motes = createMotes(140, WORLD_SEED + 12);
+  // (A few: a crowd of drifting specks read as insects.)
+  const motes = createMotes(30, WORLD_SEED + 12);
   scene.add(motes);
 
   // --- Camera: a diorama you hold in your hand ----------------------------------------------
@@ -720,12 +719,17 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   const weatherWind = new THREE.Vector2();
   const lastSun = new THREE.Vector3(Infinity, 0, 0);
   let sunMoved = false;
+  const SOFT_SKY = new THREE.Color('#f2eee6');
+  const SOFT_GROUND = new THREE.Color('#9a8e72');
   const applyTime = (p: number) => {
     dayTime = p;
     const l = timeOfDay.light(p);
     weather.shade(l);
     sun.color.copy(l.sun);
-    sun.intensity = l.sunIntensity;
+    // Soft light, as on a bright cloudy day or by a window: the sun only a gentle direction, the
+    // sky's broad light doing most of the work (by night the moon stays as it was).
+    const soft = 1 - l.night;
+    sun.intensity = l.sunIntensity * THREE.MathUtils.lerp(1, 0.38, soft);
     sun.position.copy(l.sunDir).multiplyScalar(60);
     // The shadow map only holds depth: it needs redrawing when the sun moves, not when the light
     // merely changes colour (weather sweeping in, dusk tints).
@@ -733,9 +737,9 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       lastSun.copy(sun.position);
       sunMoved = true;
     }
-    hemi.color.copy(l.sky);
-    hemi.groundColor.copy(l.ground);
-    hemi.intensity = l.skyIntensity;
+    hemi.color.copy(l.sky).lerp(SOFT_SKY, 0.55 * soft);
+    hemi.groundColor.copy(l.ground).lerp(SOFT_GROUND, 0.6 * soft);
+    hemi.intensity = l.skyIntensity * THREE.MathUtils.lerp(1, 1.75, soft);
     haze.copy(l.haze);
     mist = l.mist;
     if (scene.fog instanceof THREE.Fog) {
@@ -926,7 +930,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   };
 
   // --- Post-processing ----------------------------------------------------------------------
-  const post = new PostFX(renderer, scene, camera, init.look === 'storybook');
+  const post = new PostFX(renderer, scene, camera, true);
   if (debug) Object.assign(globalThis, { post });
 
   let started = false;
