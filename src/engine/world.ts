@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Cottage, DEFAULT_STYLE, decodeStyle, type CottageStyle } from '../world/cottage';
 import { SPECIES } from '../world/flowerSpecies';
+import { useStorybookLight, type Look } from '../render/storybook';
 import { Bouquet, forBouquet } from '../world/bouquet';
 import { PALETTES, type Season } from '../world/season';
 import { Quality, TIERS, fpsCounter } from '../render/quality';
@@ -86,6 +87,8 @@ export interface WorldInit {
   meadowGrown: number;
   /** The time of day to open at (0 … 1). */
   time: number;
+  /** How the garden is drawn: the painted look, or the storybook (watercolour and ink) one. */
+  look: Look;
 }
 
 /** A touch (or mouse) on the garden, as the page saw it (relative to the canvas's corner). */
@@ -154,6 +157,8 @@ export type World = ReturnType<typeof createWorld>;
  */
 export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: Link, init: WorldInit) {
   const surface = new Surface();
+  // (Before anything is compiled: the storybook look changes how every material is lit.)
+  if (init.look === 'storybook') useStorybookLight();
   // --- Renderer ---------------------------------------------------------------------------
   const renderer = new THREE.WebGLRenderer({ canvas: canvas as HTMLCanvasElement, antialias: false, powerPreference: 'high-performance' });
   // Neutral keeps the hand-picked palette's hues intact (ACES pushes everything orange-grey).
@@ -921,7 +926,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   };
 
   // --- Post-processing ----------------------------------------------------------------------
-  const post = new PostFX(renderer, scene, camera);
+  const post = new PostFX(renderer, scene, camera, init.look === 'storybook');
   if (debug) Object.assign(globalThis, { post });
 
   let started = false;
