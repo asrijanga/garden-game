@@ -1671,6 +1671,39 @@ export class Flowers {
     return true;
   }
 
+  /**
+   * The bed (or clump) round (x, z): every plant reachable from there in short steps, up to a
+   * few metres away. Empty if there's no plant near the spot.
+   */
+  bedAround(x: number, z: number, reach = 3): { centre: THREE.Vector3; radius: number; plants: { mesh: THREE.InstancedMesh; index: number; pos: THREE.Vector3; yaw: number; scale: number }[] } {
+    const near = (px: number, pz: number, r: number) => {
+      const out: Placed[] = [];
+      for (let i = Math.floor(px - r); i <= Math.floor(px + r); i++) {
+        for (let j = Math.floor(pz - r); j <= Math.floor(pz + r); j++) {
+          for (const p of this.placed.get(`${i},${j}`) ?? []) if (Math.hypot(p.pos.x - px, p.pos.z - pz) < r) out.push(p);
+        }
+      }
+      return out;
+    };
+    const found = new Set<Placed>(near(x, z, 0.6));
+    const queue = [...found];
+    while (queue.length) {
+      const p = queue.pop()!;
+      for (const q of near(p.pos.x, p.pos.z, 0.55)) {
+        if (found.has(q) || Math.hypot(q.pos.x - x, q.pos.z - z) > reach) continue;
+        found.add(q);
+        queue.push(q);
+      }
+    }
+    const plants = [...found];
+    const centre = new THREE.Vector3();
+    for (const p of plants) centre.add(p.pos);
+    if (plants.length) centre.divideScalar(plants.length);
+    let radius = 0;
+    for (const p of plants) radius = Math.max(radius, Math.hypot(p.pos.x - centre.x, p.pos.z - centre.z));
+    return { centre, radius, plants };
+  }
+
   /** Is there a plant within `r` of (x, z)? */
   isCrowded(x: number, z: number, r: number): boolean {
     const cx = Math.floor(x);

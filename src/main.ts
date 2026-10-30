@@ -5,6 +5,7 @@ import { mountWeatherPicker } from './ui/weatherPicker';
 import { clearAddress, linkFor, packGarden, sharedInAddress, unpackGarden } from './game/share';
 import { mountVisitBanner } from './ui/visitBanner';
 import { mountAdmire } from './ui/admire';
+import { mountBedView } from './ui/bedView';
 import { mountTimeDial } from './ui/timeDial';
 import { MIX_ID, SPECIES, WATER_MIX_ID, type FlowerSpecies } from './world/flowerSpecies';
 import { FlowerBook } from './ui/flowerBook';
@@ -395,6 +396,19 @@ dayTime = mountTimeDial(
   shared?.time ?? 0.55,
   shared?.time != null,
 );
+// Close to a bed: tapping one (looking round the garden) takes you there; back returns.
+const bedView = mountBedView(() => {
+  ambience.tap(0.95);
+  world.leaveBed();
+  bedView.show(false);
+});
+handlers.bed = ((count: number) => {
+  ambience.tap(1.15);
+  picker.setVisible(false);
+  cottagePanel.setVisible(false);
+  bedView.show(true);
+  toolbar.showLabel(count > 1 ? 'Drag to walk round the bed · pinch to lean in' : 'Drag to walk round it · pinch to lean in', 2600);
+}) as (...a: never[]) => unknown;
 // Admire mode: no buttons, just a slow drift round the garden.
 mountAdmire(
   () => {

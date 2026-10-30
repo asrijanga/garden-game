@@ -812,9 +812,22 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     surface.addEventListener('pointerup', (e) => {
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10 || e.timeStamp - down.t > 450) return;
       ray.setFromCamera(new THREE.Vector2((e.clientX / screen.width) * 2 - 1, -(e.clientY / screen.height) * 2 + 1), camera);
-      link.call('cottageTap', ray.intersectObject(cottage.group, true).length > 0);
+      const onCottage = ray.intersectObject(cottage.group, true).length > 0;
+      // A tap on a flower bed (looking round the garden) goes close to it.
+      if (!onCottage && toolbar.tool === 'move' && !rig.inBed && !admiring) {
+        const at = bedPicker.pick(e.clientX, e.clientY);
+        const bed = at ? flowers.bedAround(at.x, at.z) : null;
+        if (bed && bed.plants.length) {
+          intro = null;
+          rig.enterBed(bed.centre, bed.radius);
+          link.call('bed', bed.plants.length);
+          return;
+        }
+      }
+      link.call('cottageTap', onCottage);
     });
   }
+  const bedPicker = new GroundPicker(camera, surface, (x, z) => ground.heightAt(x, z));
   const setCottageStyle = (style: CottageStyle) => {
     cottage.setStyle(style);
     // Anything growing where the cottage now reaches (a shed, a porch) steps aside.
@@ -1110,6 +1123,12 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       rig.target.z += (-1.2 + Math.sin(admireTime * 0.033) * 2.5 - rig.target.z) * k;
     }
     rig.update(dt);
+    // Close to a bed the camera is right among the flowers: let it see things a hand's width away.
+    const near = THREE.MathUtils.lerp(0.5, 0.04, rig.closeness);
+    if (Math.abs(camera.near - near) > 1e-4) {
+      camera.near = near;
+      camera.updateProjectionMatrix();
+    }
     ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));
     const buzz = bees.buzzNear(camera.position);
     const hum = hummingbirds.humNear(camera.position);
@@ -1199,6 +1218,8 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       admireTime = 0;
     },
     restorePaint: () => paint.restore(),
+    /** Back from a bed to the garden. */
+    leaveBed: () => rig.leaveBed(),
     shot,
     load,
     /** The page has shown its loading sprout long enough: the garden's clock starts. */
