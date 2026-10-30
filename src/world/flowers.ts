@@ -600,11 +600,12 @@ function boxGeometry(seed: number): THREE.BufferGeometry {
     const a = bump(new THREE.Vector3().fromBufferAttribute(pos, i));
     const b = bump(new THREE.Vector3().fromBufferAttribute(pos, i + 1));
     const c = bump(new THREE.Vector3().fromBufferAttribute(pos, i + 2));
-    // Lighter on top where the sun gets in, darker underneath, speckled with leaf.
-    const h = (v: THREE.Vector3) => lerp(0.62, 1.1, Math.min(1, v.y / 0.3)) * (0.86 + 0.2 * (0.5 + 0.5 * Math.sin(v.x * 140 + v.z * 120 + v.y * 90)));
+    // Lighter on top where the sun gets in, a little darker underneath, with only a faint leafy
+    // flicker (a strong speckle read as dirt).
+    const h = (v: THREE.Vector3) => lerp(0.78, 1.1, Math.min(1, v.y / 0.3)) * (0.96 + 0.07 * (0.5 + 0.5 * Math.sin(v.x * 140 + v.z * 120 + v.y * 90)));
     const n = new THREE.Vector3().addVectors(a, b).add(c).sub(new THREE.Vector3(0, 0.45, 0)).normalize();
-    // Up close it's smoothly rounded (a normal at each corner), not faceted.
-    const ns = detail === 'hero' ? ([a, b, c].map((v) => v.clone().sub(new THREE.Vector3(0, 0.15, 0)).normalize()) as [THREE.Vector3, THREE.Vector3, THREE.Vector3]) : undefined;
+    // Smoothly rounded (a normal at each corner), not faceted: facets read as dirty patches.
+    const ns = [a, b, c].map((v) => v.clone().sub(new THREE.Vector3(0, 0.15, 0)).normalize()) as [THREE.Vector3, THREE.Vector3, THREE.Vector3];
     m.tri(a, b, c, { ...leafOpts(h(a), h(b), h(c), base), n, ns });
   }
   return m.build();
