@@ -1,4 +1,5 @@
 import type { Season } from './season';
+import type { HeroHints } from './heroParts';
 
 /**
  * The flower collection. Flowers only: no vegetables or utility plants. Each species is a
@@ -80,6 +81,8 @@ export interface FlowerSpecies {
   spacing: number;
   /** Water plants: deep-water floaters, shallow-water marginals, or the damp bank. */
   zone?: 'deep' | 'shallow' | 'bank';
+  /** What it looks like close up, beyond its garden shape (botany: discs, florets, leaves…). */
+  hero?: HeroHints;
 }
 
 /**
@@ -892,3 +895,81 @@ export const SPECIES: FlowerSpecies[] = [
 export const MIX_ID = 'mix';
 /** "Water mix": water flowers suited to each spot of a pond. */
 export const WATER_MIX_ID = 'water-mix';
+
+/**
+ * How each flower looks close up (its botany, beyond its garden shape): the middle of daisy-like
+ * flowers, the form of each floret, leaf shapes and arrangement, how ruffled and veined the
+ * petals are, stamens, speckles, hairiness.
+ */
+const HERO: Record<string, HeroHints> = {
+  aster: { disc: 'florets', discColors: ['#f2c94c', '#c9902c'], ruffle: 0.05, veins: 3, leaf: 'lance', leaves: 7 },
+  chrysanthemum: { ruffle: 0.15, veins: 4, leaf: 'toothed', leaves: 5, green: '#4a7a3a' },
+  dahlia: { ruffle: 0.1, veins: 6, leaf: 'pinnate', leaves: 3, opposite: true, green: '#3f6f34' },
+  cosmos: { disc: 'florets', discColors: ['#f6c93c', '#d89a20'], ruffle: 0.12, veins: 9, leaf: 'feathery', leaves: 5 },
+  rudbeckia: { disc: 'cone', discColors: ['#4a2a14', '#24140a'], ruffle: 0.08, veins: 7, leaf: 'lance', leaves: 4, hairy: true, green: '#4a7a32' },
+  anemone: { disc: 'boss', stamens: { color: '#f2c230', count: 60, length: 0.32 }, ruffle: 0.2, veins: 10, leaf: 'toothed', leaves: 2, basal: true },
+  sedum: { floret: 'star', floretPetals: 5, leaf: 'oval', leaves: 8, opposite: true, green: '#6a9a74' },
+  salvia: { floret: 'lipped', leaf: 'oval', leaves: 4, opposite: true, green: '#4a7a42', hairy: true },
+  pansy: { disc: 'eye', ruffle: 0.3, veins: 14, leaf: 'oval', leaves: 2, basal: true },
+  tulip: { ruffle: 0.06, veins: 5, leaf: 'strap', leaves: 0, basal: true, green: '#6a8a6a' },
+  daisy: { disc: 'florets', discColors: ['#f2c230', '#c88a1c'], ruffle: 0.04, veins: 2, leaf: 'oval', leaves: 0, basal: true },
+  poppy: { disc: 'eye', stamens: { color: '#2b2228', count: 70, length: 0.24 }, ruffle: 0.9, veins: 16, leaf: 'pinnate', leaves: 3, hairy: true, green: '#5a7a4a' },
+  lavender: { floret: 'tube', leaf: 'needle', leaves: 12, opposite: true, green: '#7f9a86' },
+  foxglove: { floret: 'bell', speckles: '#5a1a3a', leaf: 'oval', leaves: 4, basal: true, hairy: true },
+  daffodil: { ruffle: 0.1, veins: 6, leaf: 'strap', leaves: 0, basal: true, green: '#5f8a5f' },
+  crocus: { ruffle: 0.04, veins: 7, leaf: 'strap', leaves: 0, basal: true, stamens: { color: '#f2a020', count: 3, length: 0.55 } },
+  hyacinth: { floret: 'funnel', floretPetals: 6, leaf: 'strap', leaves: 0, basal: true },
+  bluebell: { floret: 'bell', leaf: 'strap', leaves: 0, basal: true },
+  snowdrop: { floret: 'bell', leaf: 'strap', leaves: 0, basal: true, green: '#6a8a7a' },
+  primrose: { disc: 'eye', ruffle: 0.15, veins: 8, leaf: 'oval', leaves: 0, basal: true },
+  forgetmenot: { floret: 'star', floretPetals: 5, leaf: 'lance', leaves: 5, hairy: true },
+  lilyofthevalley: { floret: 'bell', leaf: 'oval', leaves: 0, basal: true, green: '#3f7a3a' },
+  iris: { ruffle: 0.35, veins: 12, leaf: 'strap', leaves: 0, basal: true, green: '#5f7f6a' },
+  peony: { ruffle: 0.45, veins: 10, leaf: 'pinnate', leaves: 4, green: '#3f6f34' },
+  muscari: { floret: 'bell', leaf: 'strap', leaves: 0, basal: true },
+  ranunculus: { ruffle: 0.08, veins: 4, leaf: 'toothed', leaves: 3 },
+  hellebore: { disc: 'boss', stamens: { color: '#f2d04a', count: 50, length: 0.3 }, ruffle: 0.1, veins: 10, leaf: 'palmate', leaves: 1, basal: true, green: '#355f34' },
+  sweetpea: { ruffle: 0.6, veins: 10, leaf: 'oval', leaves: 4, opposite: true },
+  sunflower: { disc: 'florets', discColors: ['#6a3a14', '#2a1608'], ruffle: 0.15, veins: 9, leaf: 'heart', leaves: 6, hairy: true },
+  zinnia: { ruffle: 0.08, veins: 5, leaf: 'oval', leaves: 4, opposite: true },
+  marigold: { ruffle: 0.5, veins: 6, leaf: 'pinnate', leaves: 4, green: '#3f6a34' },
+  petunia: { disc: 'eye', ruffle: 0.35, veins: 14, leaf: 'oval', leaves: 5, hairy: true },
+  snapdragon: { floret: 'lipped', leaf: 'lance', leaves: 6 },
+  delphinium: { floret: 'spurred', floretPetals: 5, leaf: 'palmate', leaves: 4 },
+  hollyhock: { floret: 'funnel', floretPetals: 5, leaf: 'round', leaves: 5, hairy: true },
+  lupin: { floret: 'pea', leaf: 'palmate', leaves: 4, basal: true },
+  echinacea: { disc: 'spiky', discColors: ['#e07a1c', '#8a3a14'], ruffle: 0.05, veins: 7, leaf: 'lance', leaves: 4, hairy: true },
+  shasta: { disc: 'florets', discColors: ['#f2c230', '#c88a1c'], ruffle: 0.06, veins: 4, leaf: 'toothed', leaves: 4 },
+  cornflower: { disc: 'florets', discColors: ['#3a3a7a', '#24245a'], ruffle: 0.7, veins: 6, leaf: 'needle', leaves: 6, green: '#6f8f7f' },
+  geranium: { floret: 'star', floretPetals: 5, leaf: 'round', leaves: 4 },
+  hydrangea: { floret: 'cross', leaf: 'toothed', leaves: 4, opposite: true },
+  allium: { floret: 'star', floretPetals: 6, leaf: 'strap', leaves: 0, basal: true, green: '#5f8a6a' },
+  yarrow: { floret: 'star', floretPetals: 5, leaf: 'feathery', leaves: 6 },
+  phlox: { floret: 'star', floretPetals: 5, leaf: 'lance', leaves: 5, opposite: true },
+  verbena: { floret: 'star', floretPetals: 5, leaf: 'toothed', leaves: 3, opposite: true },
+  lily: { ruffle: 0.25, veins: 6, leaf: 'lance', leaves: 10 },
+  daylily: { ruffle: 0.3, veins: 8, stamens: { color: '#d8a020', count: 6, length: 0.6 }, leaf: 'strap', leaves: 0, basal: true },
+  gladiolus: { floret: 'funnel', floretPetals: 6, leaf: 'strap', leaves: 0, basal: true, green: '#5a7f5a' },
+  calendula: { disc: 'florets', discColors: ['#a8501c', '#6a3014'], ruffle: 0.06, veins: 5, leaf: 'oval', leaves: 4, hairy: true },
+  nasturtium: { disc: 'eye', ruffle: 0.3, veins: 8, leaf: 'round', leaves: 4, green: '#5a8a4a' },
+  sweetwilliam: { floret: 'star', floretPetals: 5, leaf: 'lance', leaves: 4, opposite: true },
+  gaillardia: { disc: 'florets', discColors: ['#7a2a1a', '#4a1a10'], ruffle: 0.1, veins: 6, leaf: 'lance', leaves: 4, hairy: true },
+  helenium: { disc: 'cone', discColors: ['#5a3a1c', '#3a2410'], ruffle: 0.06, veins: 6, leaf: 'lance', leaves: 5 },
+  goldenrod: { floret: 'star', floretPetals: 5, leaf: 'lance', leaves: 8 },
+  cyclamen: { ruffle: 0.1, veins: 5, leaf: 'heart', leaves: 0, basal: true, green: '#4a6a4a' },
+  heather: { floret: 'bell', leaf: 'needle', leaves: 12, green: '#4a6a3a' },
+  aconite: { ruffle: 0.06, veins: 5, stamens: { color: '#f2c030', count: 20, length: 0.35 }, leaf: 'palmate', leaves: 1 },
+  'rose-tea': { ruffle: 0.22, veins: 6 },
+  'rose-floribunda': { ruffle: 0.22, veins: 6 },
+  'rose-cabbage': { ruffle: 0.28, veins: 6 },
+  'rose-climber': { ruffle: 0.2, veins: 6 },
+  'rose-wild': { ruffle: 0.15, veins: 8 },
+  'rose-mini': { ruffle: 0.2, veins: 5 },
+  'bleeding-heart': { leaf: 'pinnate' },
+  'solomons-seal': { floret: 'bell' },
+  fuchsia: { floret: 'funnel' },
+  'babys-breath': { floret: 'star', floretPetals: 5 },
+  'ladys-mantle': { floret: 'cross' },
+  scabious: { ruffle: 0.5, veins: 8 },
+};
+for (const sp of SPECIES) sp.hero = HERO[sp.id];

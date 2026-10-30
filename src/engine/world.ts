@@ -819,7 +819,8 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
         const bed = at ? flowers.bedAround(at.x, at.z) : null;
         if (bed && bed.plants.length) {
           intro = null;
-          rig.enterBed(bed.centre, bed.radius);
+          rig.enterBed(bed.centre, bed.radius, bed.bloomHeight);
+          showHeroes(bed);
           link.call('bed', bed.plants.length);
           return;
         }
@@ -876,6 +877,19 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   }
   let actions: Action[] = [];
   if (debug) Object.assign(globalThis, { rebuildInstantly: () => rebuildInstantly(actions), cottageStyle: () => cottage.style });
+  // (For looking at plants close up from tests: go close to the bed at (x, z).)
+  if (debug) {
+    Object.assign(globalThis, {
+      enterBedAt: (x: number, z: number) => {
+        const bed = flowers.bedAround(x, z, 1);
+        if (!bed.plants.length) return 0;
+        rig.enterBed(bed.centre, bed.radius, bed.bloomHeight);
+        showHeroes(bed);
+        return bed.plants.length;
+      },
+      heroCount: () => heroes.filter((h) => h.hero).length,
+    });
+  }
   /** Undone: rebuild without the last stroke, with a puff where it was. */
   const undo = (remaining: Action[], last: Action) => {
     actions = remaining;
@@ -988,22 +1002,72 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   // --- Plant shapes, built ahead of time in a worker of their own -------------------------------
   // (So the first bed of a kind doesn't hitch while its shapes are made. Without the worker, they
   // are simply made when first planted, as before.)
+  let shapes: Worker | null = null;
   const prepareShapes = () => {
     try {
-      const shapes = new Worker(new URL('./shapes.worker.ts', import.meta.url), { type: 'module' });
+      shapes = new Worker(new URL('./shapes.worker.ts', import.meta.url), { type: 'module' });
       const unpack = (p: PackedShape) => {
         const g = new THREE.BufferGeometry();
         for (const [name, a] of Object.entries(p.attributes)) g.setAttribute(name, new THREE.BufferAttribute(a.array, a.itemSize));
         g.userData = p.userData;
         return g;
       };
-      shapes.addEventListener('message', (e: MessageEvent<{ key: string; near: PackedShape; far: PackedShape }>) => {
-        flowers.adopt(e.data.key, unpack(e.data.near), unpack(e.data.far));
+      shapes.addEventListener('message', (e: MessageEvent<{ key: string; near?: PackedShape; far?: PackedShape; hero?: PackedShape }>) => {
+        if (e.data.hero) heroArrived(e.data.key, unpack(e.data.hero));
+        else if (e.data.near && e.data.far) flowers.adopt(e.data.key, unpack(e.data.near), unpack(e.data.far));
       });
       shapes.postMessage({ season, recipes: Flowers.wanted(season) });
     } catch {
       // No workers from here: shapes are made when first planted.
     }
+  };
+
+  // --- Close-ups: the plants of the bed you're looking at, in full detail ------------------------
+  // Built in the shape worker (nearest first, up to 40); each stands in for its garden plant
+  // once it arrives, and the garden plants come back when you leave.
+  const heroGroup = new THREE.Group();
+  scene.add(heroGroup);
+  let heroBed = 0;
+  let heroes: { mesh: THREE.InstancedMesh; index: number; matrix: THREE.Matrix4; info: NonNullable<ReturnType<typeof flowers.heroInfo>>; hero: THREE.InstancedMesh | null }[] = [];
+  const clearHeroes = () => {
+    for (const h of heroes) {
+      if (!h.hero) continue;
+      heroGroup.remove(h.hero);
+      h.hero.geometry.dispose();
+      flowers.setHidden(h.mesh, h.index, h.matrix);
+    }
+    heroes = [];
+    heroBed++;
+  };
+  const showHeroes = (bed: ReturnType<typeof flowers.bedAround>) => {
+    clearHeroes();
+    const plants = bed.plants
+      .map((p) => ({ p, info: flowers.heroInfo(p.mesh, p.index) }))
+      .filter((x) => x.info)
+      .sort((a, b) => a.p.pos.distanceTo(bed.centre) - b.p.pos.distanceTo(bed.centre))
+      .slice(0, 40);
+    heroes = plants.map(({ p, info }) => ({ mesh: p.mesh, index: p.index, matrix: info!.matrix, info: info!, hero: null }));
+    const seedOf = (v: THREE.Vector3) => Math.abs(Math.round(v.x * 1000) * 73856093 ^ Math.round(v.z * 1000) * 19349663) % 1000003;
+    shapes?.postMessage({ season, hero: heroes.map((h, i) => ({ key: `${heroBed}:${i}`, species: h.info.species, variant: h.info.variant, seed: seedOf(plants[i].p.pos) })) });
+  };
+  const heroArrived = (key: string, geo: THREE.BufferGeometry) => {
+    const [bed, i] = key.split(':').map(Number);
+    const h = heroes[i];
+    if (bed !== heroBed || !h || h.hero) {
+      geo.dispose();
+      return;
+    }
+    // The plant's own growth time and colours, so it looks and moves just as it did.
+    geo.setAttribute('aLife', new THREE.InstancedBufferAttribute(new Float32Array(h.info.life), 2));
+    geo.setAttribute('aPetalColor', new THREE.InstancedBufferAttribute(new Float32Array(h.info.petal), 3));
+    geo.setAttribute('aEdgeColor', new THREE.InstancedBufferAttribute(new Float32Array(h.info.edge), 3));
+    const mesh = new THREE.InstancedMesh(geo, h.mesh.material, 1);
+    mesh.setMatrixAt(0, h.matrix);
+    mesh.frustumCulled = false;
+    mesh.receiveShadow = true;
+    heroGroup.add(mesh);
+    h.hero = mesh;
+    flowers.setHidden(h.mesh, h.index, null);
   };
 
   // --- Loading: the saved garden is rebuilt while shaders compile -------------------------------
@@ -1219,7 +1283,10 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     },
     restorePaint: () => paint.restore(),
     /** Back from a bed to the garden. */
-    leaveBed: () => rig.leaveBed(),
+    leaveBed: () => {
+      rig.leaveBed();
+      clearHeroes();
+    },
     shot,
     load,
     /** The page has shown its loading sprout long enough: the garden's clock starts. */

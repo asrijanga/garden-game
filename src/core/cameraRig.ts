@@ -29,7 +29,7 @@ export class CameraRig {
    * Close to a flower bed: the camera orbits it at eye level (one finger walks round it, a pinch
    * leans in or back). The view glides between the garden and the bed.
    */
-  private bed: { centre: THREE.Vector3; distance: number; pitch: number; azimuth: number } | null = null;
+  private bed: { centre: THREE.Vector3; distance: number; pitch: number; azimuth: number; aim: number } | null = null;
   private bedWanted = false;
   /** 0 the garden view … 1 close to the bed (eased in update). */
   closeness = 0;
@@ -38,9 +38,9 @@ export class CameraRig {
   private readonly bedPos = new THREE.Vector3();
   private readonly bedAim = new THREE.Vector3();
 
-  /** Go close to a bed centred at `centre`, about `radius` across. */
-  enterBed(centre: THREE.Vector3, radius: number) {
-    this.bed = { centre: centre.clone(), distance: clamp(radius * 1.6 + 0.8, 1.4, 3.2), pitch: 0.32, azimuth: this.azimuth };
+  /** Go close to a bed centred at `centre`, about `radius` across, its blooms `bloomHeight` up. */
+  enterBed(centre: THREE.Vector3, radius: number, bloomHeight = 0.3) {
+    this.bed = { centre: centre.clone(), distance: clamp(radius * 1.6 + 0.9 + bloomHeight * 0.7, 1.4, 3.6), pitch: 0.42, azimuth: this.azimuth, aim: Math.max(0.15, bloomHeight * 0.92) };
     this.bedWanted = true;
     this.velPan.set(0, 0);
     this.velZoom = 0;
@@ -244,7 +244,7 @@ export class CameraRig {
       return;
     }
     const b = this.bed;
-    this.bedAim.copy(b.centre).add(new THREE.Vector3(0, 0.3, 0));
+    this.bedAim.copy(b.centre).add(new THREE.Vector3(0, b.aim, 0));
     this.bedPos.set(
       this.bedAim.x + Math.sin(b.azimuth) * Math.cos(b.pitch) * b.distance,
       this.bedAim.y + Math.sin(b.pitch) * b.distance,
