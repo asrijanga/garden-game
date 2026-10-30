@@ -111,29 +111,61 @@ float lawnNoise(vec2 p) {
 }
 `;
 
-/** Rounded pebbles of mixed size and tone, half sunk in silt (Voronoi cells ~15 cm across). */
+/**
+ * A natural pond floor: rounded, slightly oval pebbles in two sizes (and a scatter of fine
+ * gravel), each of its own tone, half sunk in silt with a soft shadowed rim; no two alike and no
+ * tiled look. Built from jittered cells, but each pebble is drawn as a round stone, not a cell.
+ */
 const pebblesGLSL = /* glsl */ `
-vec3 pebbles(vec2 p) {
-  p = vec2(p.x * 0.8 - p.y * 0.6, p.x * 0.6 + p.y * 0.8) * 6.5;
+// One layer of pebbles: returns how much of p is covered (0 silt … 1 stone), and its shade.
+vec2 pebbleLayer(vec2 p, float scale, float fill, float seed, out float tone) {
+  p *= scale;
   vec2 i = floor(p), f = fract(p);
-  float d1 = 8.0, d2 = 8.0;
-  vec2 id = vec2(0.0);
+  float cover = 0.0, shade = 0.0;
+  tone = 0.0;
   for (int y = -1; y <= 1; y++) {
     for (int x = -1; x <= 1; x++) {
       vec2 g = vec2(float(x), float(y));
-      vec2 o = vec2(lawnHash(i + g), lawnHash(i + g + 17.3)) * 0.9 + 0.05;
-      float d = length(g + o - f);
-      if (d < d1) { d2 = d1; d1 = d; id = i + g; } else if (d < d2) { d2 = d; }
+      vec2 id = i + g + seed;
+      if (lawnHash(id + 5.9) > fill) continue; // not every cell has a pebble
+      vec2 o = vec2(lawnHash(id), lawnHash(id + 17.3)) * 0.6 + 0.2;
+      float r = 0.28 + 0.2 * lawnHash(id + 2.3);
+      // Oval, turned any which way.
+      float a = lawnHash(id + 8.1) * 6.2832;
+      vec2 d = g + o - f;
+      d = vec2(d.x * cos(a) - d.y * sin(a), d.x * sin(a) + d.y * cos(a)) * vec2(1.0, 1.15 + 0.35 * lawnHash(id + 4.4));
+      float k = length(d) / r;
+      float c = 1.0 - smoothstep(0.86, 1.0, k);
+      if (c > cover) {
+        cover = c;
+        shade = sqrt(max(0.0, 1.0 - k * k)); // domed
+        tone = lawnHash(id + 3.1);
+      }
     }
   }
-  float tone = lawnHash(id + 3.1);
-  vec3 silt = vec3(0.3, 0.27, 0.19);
-  vec3 col = mix(vec3(0.38, 0.36, 0.31), vec3(0.56, 0.51, 0.43), tone);
-  col = mix(col, vec3(0.42, 0.35, 0.26), step(0.72, lawnHash(id + 9.7)));
-  col *= 0.85 + 0.2 * (1.0 - d1); // domed
-  // Some cells are just silt, so the pebbles lie scattered rather than paved.
-  col = mix(silt, col, step(0.35, lawnHash(id + 5.9)));
-  return mix(silt * 0.7, col, smoothstep(0.0, 0.14, d2 - d1));
+  return vec2(cover, shade);
+}
+
+vec3 pebbles(vec2 p) {
+  // Silt and fine gravel, mottled.
+  float n = lawnHash(floor(p * 40.0)) * 0.5 + lawnHash(floor(p * 9.0)) * 0.5;
+  vec3 silt = mix(vec3(0.27, 0.25, 0.18), vec3(0.34, 0.31, 0.23), n);
+  silt *= 0.9 + 0.2 * step(0.78, lawnHash(floor(p * 55.0))); // grit
+  float tBig, tSmall;
+  vec2 big = pebbleLayer(p, 5.5, 0.55, 0.0, tBig);
+  vec2 small = pebbleLayer(p + 3.7, 13.0, 0.6, 31.0, tSmall);
+  vec3 col = silt;
+  // Small pebbles first, big ones lying over them.
+  vec3 sCol = mix(vec3(0.36, 0.34, 0.3), vec3(0.55, 0.5, 0.42), tSmall);
+  sCol = mix(sCol, vec3(0.45, 0.37, 0.27), step(0.7, fract(tSmall * 7.3)));
+  col = mix(col * (1.0 - 0.25 * small.x), sCol * (0.75 + 0.3 * small.y), small.x);
+  vec3 bCol = mix(vec3(0.34, 0.33, 0.3), vec3(0.58, 0.53, 0.45), tBig);
+  bCol = mix(bCol, vec3(0.47, 0.39, 0.28), step(0.72, fract(tBig * 5.1)));
+  bCol = mix(bCol, vec3(0.3, 0.33, 0.27), step(0.85, fract(tBig * 11.7))); // a greenish one
+  // A soft dark rim where each sits in the silt.
+  col *= 1.0 - 0.3 * smoothstep(0.0, 0.5, big.x) * (1.0 - big.x);
+  col = mix(col, bCol * (0.72 + 0.35 * big.y), big.x);
+  return col;
 }
 `;
 
