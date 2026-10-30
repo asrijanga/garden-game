@@ -61,7 +61,7 @@ const LEAF_TINTS: Record<LeafKind, string[]> = {
   fern: ['#5f9a3e', '#6aa548', '#579238'],
   hosta: ['#5a8a5a', '#7aa860', '#4f7f6e', '#8fb45e'],
   silver: ['#b9c2b3', '#aab4a6', '#c4cabe'],
-  box: ['#3f6a32', '#4a7638', '#456f36'],
+  box: ['#4f7f38', '#5a8a40', '#55843c'],
 };
 
 /** How much each touch plants: a drift (a bed along the stroke), a little clump, or one flower. */
@@ -423,8 +423,9 @@ export class FlowerBrush {
         low: pick(from.filter(low), 2, pool.filter(low).length ? pool.filter(low) : mids),
       };
     }
-    const tallLeaves: LeafKind[] = ['grass', 'fern', 'hosta', 'box', 'clump'];
-    const lowLeaves: LeafKind[] = ['silver', 'hosta', 'clump', 'box', 'fern'];
+    // (Not box balls: clipped topiary dotted through a loose cottage mix looks out of place.)
+    const tallLeaves: LeafKind[] = ['grass', 'fern', 'hosta', 'clump'];
+    const lowLeaves: LeafKind[] = ['silver', 'hosta', 'clump', 'fern'];
     const a = tallLeaves[Math.floor(this.rng() * tallLeaves.length)];
     let b = lowLeaves[Math.floor(this.rng() * lowLeaves.length)];
     if (b === a) b = 'clump';
