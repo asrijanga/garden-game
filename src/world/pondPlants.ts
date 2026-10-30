@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Season } from './season';
 import { regrow } from '../core/regrow';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
@@ -19,7 +20,7 @@ function colorize(g: THREE.BufferGeometry, color: (x: number, y: number, z: numb
 }
 
 /** A lily pad of unit radius: a round, slightly cupped leaf with its V-shaped notch. */
-function padGeometry(seed: number): THREE.BufferGeometry {
+function padGeometry(seed: number, season: Season): THREE.BufferGeometry {
   const rng = createRng(seed);
   const notch = lerp(0.35, 0.6, rng());
   const wob = rng() * 6.28;
@@ -40,8 +41,10 @@ function padGeometry(seed: number): THREE.BufferGeometry {
     pos.setY(i, r * r * 0.07); // the rim curls up a touch
   }
   g.computeVertexNormals();
-  const inner = new THREE.Color('#79a64a');
-  const outer = new THREE.Color('#4c7a33');
+  // Fresh green; bronzed in autumn; dark and spent in winter.
+  const [ci, co] = season === 'autumn' ? ['#8f8a48', '#6a5a30'] : season === 'winter' ? ['#4c5a38', '#34402a'] : ['#79a64a', '#4c7a33'];
+  const inner = new THREE.Color(ci);
+  const outer = new THREE.Color(co);
   return colorize(g, (x, _y, z) => {
     const r = Math.hypot(x, z);
     const vein = 0.95 + 0.05 * Math.cos(Math.atan2(z, x) * 11);
@@ -143,9 +146,9 @@ export class PondPlants {
   private readonly e = new THREE.Euler();
   private readonly s = new THREE.Vector3();
 
-  constructor() {
+  constructor(season: Season = 'summer') {
     const padMat = new THREE.MeshLambertMaterial({ vertexColors: true });
-    for (let k = 0; k < 3; k++) this.pads.push(this.mesh(padGeometry(11 + k * 5), padMat, false));
+    for (let k = 0; k < 3; k++) this.pads.push(this.mesh(padGeometry(11 + k * 5, season), padMat, false));
     this.lilies = this.mesh(lilyGeometry(), new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), false);
     const reedMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     addWind(reedMat, 'clamp(position.y, 0.0, 1.0)', undefined, 0.45);

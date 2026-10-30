@@ -64,6 +64,10 @@ import { regrow } from '../core/regrow';
 
 const WORLD_SEED = 20261025;
 
+/** Water flowers a dragonfly will land on, and those that float (shade for the fish). */
+const WATER_PERCHES = new Set(['lotus', 'waterflag', 'pickerelweed', 'arrowhead', 'marshmarigold']);
+const WATER_SHADE = new Set(['lotus', 'waterlily', 'waterhyacinth']);
+
 /** What the world needs to start: the screen, the season and settings from the page. */
 export interface WorldInit {
   width: number;
@@ -247,11 +251,16 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   // Ponds come first: paths and beds steer round them.
   const ponds = new Ponds(ground, pondTexture, palette, () => ambience.fill());
   scene.add(ponds.group);
-  const pondPlants = new PondPlants();
+  const pondPlants = new PondPlants(season);
   scene.add(pondPlants.group);
   const splash = new Splash();
   scene.add(splash.points);
-  const fish = new Fish(ponds, splash, (size) => ambience.splash(size));
+  // Fish like the shade under floating leaves and water flowers.
+  const fish = new Fish(ponds, splash, (size) => ambience.splash(size), () =>
+    openHeads()
+      .filter((h) => WATER_SHADE.has(h.species))
+      .map((h) => new THREE.Vector2(h.pos.x, h.pos.z)),
+  );
   scene.add(fish.group);
   const stones = new Stones((p, r, kind) => {
     if (kind === 'step') dust.puff(p, 4, r * 1.2);
@@ -541,6 +550,11 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       return null;
     },
     ripple: (x, z, k) => ponds.addRipple(x, z, k),
+    // Irises, lotus and the other water flowers make landing places.
+    perch: (rng) => {
+      const tops = openHeads().filter((h) => WATER_PERCHES.has(h.species));
+      return tops.length ? tops[Math.floor(rng() * tops.length)].pos.clone() : null;
+    },
   });
   scene.add(dragonflies.group);
 
@@ -595,11 +609,12 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       const v2 = new THREE.Vector2();
       for (let k = 0; k < 12; k++) {
         ponds.cellPosition(body.cells[Math.floor(rng() * body.cells.length)], v2);
-        if (ponds.waterDepth(v2.x, v2.y) > 0.22 && !pondPlants.padNear(v2.x, v2.y, 0.35)) return v2.clone();
+        if (ponds.waterDepth(v2.x, v2.y) > 0.22 && !pondPlants.padNear(v2.x, v2.y, 0.35) && !flowers.isCrowded(v2.x, v2.y, 0.35)) return v2.clone();
       }
       return null;
     },
-    swimmable: (x, z) => ponds.waterDepth(x, z) > 0.12 && !pondPlants.padNear(x, z, 0.22),
+      // (Round lily pads and water flowers alike.)
+    swimmable: (x, z) => ponds.waterDepth(x, z) > 0.12 && !pondPlants.padNear(x, z, 0.22) && !flowers.isCrowded(x, z, 0.28),
     pondAt: (x, z) => ponds.bodyAt(x, z)?.id ?? null,
     level: (x, z) => ponds.levelAt(x, z),
     heightAt: (x, z) => ground.heightAt(x, z),
@@ -647,7 +662,12 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   scene.add(hummingbirds.group);
 
   // Rose petals now and then drifting down on the breeze.
-  const petals = new FallingPetals(openHeads, (x, z) => ground.heightAt(x, z), () => new THREE.Vector2(wind.direction.x, wind.direction.y).multiplyScalar(0.2 + wind.sample(0, 0) * 0.5));
+  const petals = new FallingPetals(
+    openHeads,
+    (x, z) => ground.heightAt(x, z),
+    () => new THREE.Vector2(wind.direction.x, wind.direction.y).multiplyScalar(0.2 + wind.sample(0, 0) * 0.5),
+    (x, z) => ponds.levelAt(x, z),
+  );
   scene.add(petals.mesh);
 
   // The air of the season: blossom petals, floating seeds, falling leaves, or snow.

@@ -73,6 +73,8 @@ interface Dragonfly {
   yaw: number;
   /** Dipping to touch the water at the end of this dart. */
   dip: boolean;
+  /** Landing on a flower at the end of this dart (and resting there, wings still). */
+  perched: boolean;
   leaving: boolean;
   phase: number;
 }
@@ -84,6 +86,8 @@ export interface PondAir {
   /** A random point on the water of `body` (y = the water level), or null if it's gone. */
   pointOn(body: number, rng: () => number): THREE.Vector3 | null;
   ripple(x: number, z: number, strength: number): void;
+  /** Somewhere to land: the top of an open iris, lotus or other water flower (null: none). */
+  perch?(rng: () => number): THREE.Vector3 | null;
 }
 
 /**
@@ -117,6 +121,10 @@ export class Dragonflies {
     } else {
       f.dip = this.rng() < 0.25;
       f.to.copy(p).setY(p.y + (f.dip ? 0.02 : lerp(0.3, 0.75, this.rng())));
+      // Now and then, a rest on a flower instead.
+      const rest = !f.dip && this.rng() < 0.3 ? this.ponds.perch?.(this.rng) : null;
+      f.perched = !!rest;
+      if (rest) f.to.copy(rest).setY(rest.y + 0.025);
     }
     f.from.copy(f.pos);
     const d = f.from.distanceTo(f.to);
@@ -144,7 +152,7 @@ export class Dragonflies {
         const pos = at.clone().add(new THREE.Vector3(Math.cos(a) * 6, 3, Math.sin(a) * 6));
         group.position.copy(pos);
         this.group.add(group);
-        const f: Dragonfly = { group, wings, body, pos, from: new THREE.Vector3(), to: new THREE.Vector3(), t: 0, dur: 1, hover: 0, yaw: 0, dip: false, leaving: false, phase: this.rng() * 50 };
+        const f: Dragonfly = { group, wings, body, pos, from: new THREE.Vector3(), to: new THREE.Vector3(), t: 0, dur: 1, hover: 0, yaw: 0, dip: false, perched: false, leaving: false, phase: this.rng() * 50 };
         this.aim(f);
         f.dur = Math.max(f.dur, 1.2); // a calmer arrival
         this.flies.push(f);
@@ -156,10 +164,12 @@ export class Dragonflies {
       const t = this.time + f.phase;
       if (f.hover > 0) {
         f.hover -= dt;
-        // Hanging in the air, with the tiniest drift.
-        f.group.position.set(f.to.x + Math.sin(t * 1.7) * 0.02, f.to.y + Math.sin(t * 2.3) * 0.015, f.to.z + Math.cos(t * 1.3) * 0.02);
+        // Hanging in the air, with the tiniest drift (or sitting quite still on a flower).
+        if (f.perched) f.group.position.copy(f.to);
+        else f.group.position.set(f.to.x + Math.sin(t * 1.7) * 0.02, f.to.y + Math.sin(t * 2.3) * 0.015, f.to.z + Math.cos(t * 1.3) * 0.02);
         f.pos.copy(f.group.position);
         if (f.hover <= 0) {
+          f.perched = false;
           if (!f.leaving && (!bodies.includes(f.body) || this.rng() < 0.04 || this.flies.length > want + 1)) f.leaving = true;
           if (f.leaving) f.to.copy(f.pos).add(new THREE.Vector3((this.rng() - 0.5) * 16, 5, (this.rng() - 0.5) * 16));
           if (f.leaving) {
@@ -188,7 +198,7 @@ export class Dragonflies {
             f.from.copy(f.pos);
             f.dur = 0.25;
             f.t = 0;
-          } else f.hover = lerp(0.6, 3, this.rng());
+          } else f.hover = f.perched ? lerp(3, 8, this.rng()) : lerp(0.6, 3, this.rng());
         }
       }
       // Turn quickly to face the way it's going; nose down a touch when darting.
@@ -199,7 +209,8 @@ export class Dragonflies {
       // Wings blur: fast, small beats, the two pairs out of step.
       for (let w = 0; w < 4; w++) {
         const side = w % 2 ? 1 : -1;
-        const beat = Math.sin(this.time * 60 + (w < 2 ? 0 : 1.6)) * 0.45;
+        // (Resting on a flower: wings held still, flat out.)
+        const beat = f.perched && f.hover > 0 ? 0.04 : Math.sin(this.time * 60 + (w < 2 ? 0 : 1.6)) * 0.45;
         f.wings[w].rotation.z = side * beat;
       }
     }

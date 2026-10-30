@@ -98,6 +98,15 @@ class FlowerMesh {
     }
   }
 
+  /** Recolour everything that isn't petal (leaves, pads, stems), e.g. for the season. */
+  tintLeaves(to: THREE.Color, amount: number, dim = 1) {
+    const rgb = [to.r, to.g, to.b];
+    for (let i = 0; i < this.petal.length; i++) {
+      if (this.petal[i]) continue;
+      for (let c = 0; c < 3; c++) this.col[i * 3 + c] = THREE.MathUtils.lerp(this.col[i * 3 + c], rgb[c], amount) * dim;
+    }
+  }
+
   build(): THREE.BufferGeometry {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
@@ -846,7 +855,38 @@ function simpleBloom(m: FlowerMesh, top: THREE.Vector3, n: number, len: number, 
  * lilies, water hyacinth), and marginals standing up out of the shallows (iris, marsh
  * marigold, pickerelweed, arrowhead). Returns where the main bloom sits.
  */
+/** Autumn water leaves turn bronze; in winter what's left is dark and spent. */
+const WATER_BRONZE = new THREE.Color('#9a6a32');
+const WATER_WINTER = new THREE.Color('#3c4630');
+
 function aquatic(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'flag' | 'marigold' | 'pickerel' | 'arrowhead', height: number, size: number, rng: () => number): THREE.Vector3 {
+  const top = plantSeason === 'winter' ? aquaticWinter(m, type, height, rng) : aquaticGrowing(m, type, height, size, rng);
+  if (plantSeason === 'autumn') m.tintLeaves(WATER_BRONZE, 0.6);
+  if (plantSeason === 'winter') m.tintLeaves(WATER_WINTER, 0.65, 0.85);
+  return top;
+}
+
+/** Winter: only a few dark pads on the water, or a few spent leaves standing at the edge. */
+function aquaticWinter(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'flag' | 'marigold' | 'pickerel' | 'arrowhead', height: number, rng: () => number): THREE.Vector3 {
+  const O = new THREE.Vector3(0, 0, 0);
+  if (type === 'lily' || type === 'lotus' || type === 'hyacinth') {
+    const n = 1 + Math.floor(rng() * 2);
+    for (let i = 0; i < n; i++) {
+      const a = rng() * Math.PI * 2;
+      const r = i === 0 ? 0 : lerp(0.1, 0.18, rng());
+      pad(m, Math.cos(a) * r, Math.sin(a) * r, lerp(0.07, type === 'lotus' ? 0.14 : 0.1, rng()), 0.004, type === 'lily', 0, rng);
+    }
+    return new THREE.Vector3(0, 0.01, 0);
+  }
+  if (type === 'flag') {
+    for (let i = 0; i < 3; i++) sword(m, new THREE.Vector3((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.04), height * lerp(0.3, 0.45, rng()), rng() * Math.PI * 2, rng);
+    return new THREE.Vector3(0, height * 0.4, 0);
+  }
+  for (let i = 0; i < 2; i++) standingLeaf(m, O.clone(), height * lerp(0.2, 0.35, rng()), lerp(0.05, 0.08, rng()), rng() * Math.PI * 2, type === 'arrowhead', rng);
+  return new THREE.Vector3(0, height * 0.35, 0);
+}
+
+function aquaticGrowing(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'flag' | 'marigold' | 'pickerel' | 'arrowhead', height: number, size: number, rng: () => number): THREE.Vector3 {
   const O = new THREE.Vector3(0, 0, 0);
   switch (type) {
     case 'lily': {
@@ -877,6 +917,20 @@ function aquatic(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'flag' | '
         pad(m, x, z, lerp(0.12, 0.16, rng()), h, false, 0.18, rng);
       }
       const top = stem(m, height, new THREE.Vector3((rng() - 0.5) * 0.06, 0, (rng() - 0.5) * 0.06), rng, false);
+      if (plantSeason === 'autumn') {
+        // Gone to seed: the pod alone, browned, its head nodding over on the stem.
+        const podR = size * 0.36;
+        const nod = new THREE.Euler(lerp(0.5, 0.8, rng()), rng() * Math.PI * 2, 0, 'YXZ');
+        const turn = new THREE.Matrix4().makeRotationFromEuler(nod);
+        const place = (g: THREE.BufferGeometry) => g.applyMatrix4(turn).translate(top.x, top.y, top.z);
+        m.addGeometry(place(new THREE.CylinderGeometry(podR, podR * 0.55, podR * 0.9, 12).translate(0, podR * 0.45, 0)), new THREE.Color('#8a7a3a'), false, top);
+        for (let i = 0; i < 7; i++) {
+          const a = (i / 7) * Math.PI * 2;
+          const r = i === 0 ? 0 : podR * 0.55;
+          m.addGeometry(place(new THREE.IcosahedronGeometry(podR * 0.15, 0).translate(Math.cos(a) * r, podR * 0.92, Math.sin(a) * r)), new THREE.Color('#3f3a22'), false, top);
+        }
+        return top;
+      }
       sepals(m, top, size * 0.5, rng);
       // Two rings of broad, cupped, pointed petals.
       simpleBloom(m, top, 8, size * 1.1, size * 0.7, 0.85, 0.3, null, rng, { pointed: true });
@@ -1362,6 +1416,7 @@ export class Flowers {
   private readonly q = new THREE.Quaternion();
 
   private readonly material: THREE.MeshLambertMaterial;
+  private readonly waterMaterial: THREE.MeshLambertMaterial;
   private readonly lodMeshes: THREE.InstancedMesh[] = [];
 
   /**
@@ -1386,6 +1441,15 @@ export class Flowers {
     private readonly species: FlowerSpecies[],
     private readonly onBloom: (p: THREE.Vector3) => void,
   ) {
+    this.material = this.makeMaterial(false);
+    // Water flowers float: the same material, but they ride the ripples.
+    this.waterMaterial = this.makeMaterial(true);
+    for (let v = 0; v < FOLIAGE_VARIANTS; v++) {
+      this.foliage.push(this.makeMesh(withFar(() => foliageGeometry(500 + v * 31)), this.material, FOLIAGE_CAPACITY));
+    }
+  }
+
+  private makeMaterial(aquatic: boolean): THREE.MeshLambertMaterial {
     const material = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     addWind(
       material,
@@ -1432,8 +1496,21 @@ export class Flowers {
                 transformed = aHinge + rel;
               }
               transformed *= max(sprout, 0.0001);
-            }`,
+            }
+            #ifdef AQUATIC
+            {
+              // Floating on the ripples: rising and falling, rocking a touch, more in a gust.
+              vec3 root = instanceMatrix[3].xyz;
+              float w = windAt(root.xz, 0.0);
+              float ph = root.x * 1.3 + root.z * 1.9;
+              float scale = max(length(instanceMatrix[1].xyz), 0.001);
+              float bob = (sin(uWindTime * 1.4 + ph) * 0.6 + sin(uWindTime * 2.3 + ph * 1.7) * 0.4) * (0.004 + 0.008 * w);
+              transformed.y += bob / scale;
+              transformed.y += (transformed.x * sin(uWindTime * 1.1 + ph) + transformed.z * cos(uWindTime * 0.9 + ph)) * 0.035 * (0.3 + w);
+            }
+            #endif`,
           );
+        if (aquatic) shader.vertexShader = '#define AQUATIC\n' + shader.vertexShader;
         shader.fragmentShader = shader.fragmentShader
           .replace('#include <common>', '#include <common>\nvarying float vGlow;')
           .replace(
@@ -1449,12 +1526,9 @@ export class Flowers {
       },
       0.17, // flowers sway very gently
     );
-
-    for (let v = 0; v < FOLIAGE_VARIANTS; v++) {
-      this.foliage.push(this.makeMesh(withFar(() => foliageGeometry(500 + v * 31)), material, FOLIAGE_CAPACITY));
-    }
-
-    this.material = material;
+    const key = material.customProgramCacheKey.bind(material);
+    material.customProgramCacheKey = () => `${key()}|${aquatic ? 'water' : 'land'}`;
+    return material;
   }
 
   /**
@@ -1465,7 +1539,8 @@ export class Flowers {
     let list = this.meshes.get(sp.id);
     if (!list) {
       list = [];
-      for (let v = 0; v < VARIANTS; v++) list.push(this.makeMesh(this.shape({ kind: 'flower', species: sp.id, variant: v }), this.material, CAPACITY));
+      const material = sp.form.kind === 'aquatic' ? this.waterMaterial : this.material;
+      for (let v = 0; v < VARIANTS; v++) list.push(this.makeMesh(this.shape({ kind: 'flower', species: sp.id, variant: v }), material, CAPACITY));
       this.meshes.set(sp.id, list);
     }
     return list;
