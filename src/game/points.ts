@@ -21,6 +21,12 @@ export class Big {
     return Number.isFinite(m) && Number.isFinite(e) ? new Big(m, e).norm() : new Big(0, 0);
   }
 
+  /** 10 to the power `l` (for numbers too big to hold as one: a multiplier after thousands of kinds). */
+  static pow10(l: number): Big {
+    const e = Math.floor(l);
+    return new Big(10 ** (l - e), e);
+  }
+
   toString(): string {
     return `${this.m}e${this.e}`;
   }

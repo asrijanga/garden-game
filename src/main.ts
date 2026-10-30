@@ -25,6 +25,8 @@ import { mountUndoButtons } from './ui/undoButtons';
 import { mountBunch } from './ui/bunch';
 import { bouquetName, loadBunch, saveBunch, MAX_STEMS, type CutStem } from './game/bunch';
 import { mountBouquetView } from './ui/bouquetView';
+import { Collection } from './game/collection';
+import { mountCollection } from './ui/collectionBook';
 import type { PlantAmount } from './game/flowerBrush';
 import type { WeatherKind } from './world/weather';
 import { Link, proxied, type Port } from './engine/link';
@@ -278,7 +280,7 @@ const tidyPicker = new TidyPicker(
 keepStorage();
 /** A small file with the whole garden: to the share sheet (Save to Files) or a download. */
 function saveBackup() {
-  const file = makeBackup(store.actions, Number(stored(MEADOW_KEY)) || 0, keepMown);
+  const file = makeBackup(store.actions, Number(stored(MEADOW_KEY)) || 0, keepMown, collection.toJSON());
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
   if (nav.share && nav.canShare?.({ files: [file] })) {
     nav.share({ files: [file] }).catch(() => {});
@@ -316,6 +318,7 @@ pickBackup.addEventListener('change', async () => {
   store.replace(backup.actions);
   if (backup.meadow !== undefined) remember(MEADOW_KEY, String(backup.meadow));
   if (backup.keepMown !== undefined) remember(MOWN_KEY, backup.keepMown ? '1' : '0');
+  if (backup.bouquets) collection.restore(backup.bouquets);
   clearAddress();
   location.reload();
 });
@@ -420,32 +423,63 @@ const emptyHand = () => {
   bunchTray.set(bunch);
   world.handFull(false);
 };
-// Tied: the bunch becomes a bouquet, shown on its own until it's untied or given away.
+// Tied: the bunch becomes a bouquet, shown on its own until it's untied or sold.
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? 'Leaf';
-const bouquetView = mountBouquetView(
-  {
-    untie() {
-      ambience.rustle(0.5);
-      world.untie();
-      bouquetView.hide();
-    },
-    done() {
-      ambience.bloom();
-      world.untie();
-      bouquetView.hide();
-      emptyHand();
-      toolbar.showLabel('Given away, with love', 2200);
-    },
+const collection = Collection.load();
+const pointsHud = mountCollection(collection, speciesName);
+pointsHud.refresh();
+let bouquetTitle = '';
+/** A small picture of the bouquet for the book (its middle, 3:4), as a JPEG. */
+const thumbnail = async (): Promise<string | undefined> => {
+  try {
+    const { blob } = await link.ask<{ blob: Blob; info: string }>('w.shot');
+    const img = await createImageBitmap(blob);
+    const c = document.createElement('canvas');
+    c.width = 180;
+    c.height = 240;
+    const w = Math.min(img.width, (img.height * 3) / 4);
+    const h = (w * 4) / 3;
+    c.getContext('2d')!.drawImage(img, (img.width - w) / 2, (img.height - h) * 0.4, w, h, 0, 0, 180, 240);
+    img.close();
+    return c.toDataURL('image/jpeg', 0.72);
+  } catch {
+    return undefined;
+  }
+};
+const bouquetView = mountBouquetView({
+  untie() {
+    ambience.rustle(0.5);
+    world.untie();
+    bouquetView.hide();
   },
-  'Give away',
-);
+  async done() {
+    const stems = bunch;
+    bouquetView.busy();
+    const thumb = collection.price(stems).isNew ? await thumbnail() : undefined;
+    const { value, isNew } = collection.sell(stems, bouquetTitle, thumb);
+    ambience.bloom();
+    world.untie();
+    bouquetView.hide();
+    emptyHand();
+    pointsHud.refresh(value);
+    toolbar.showLabel(isNew ? `Sold for ✿ ${value.format()} · new kind: prices ×1.15` : `Sold for ✿ ${value.format()}`, 2600);
+  },
+});
 handlers.bouquetReady = (() => bouquetView.ready()) as (...a: never[]) => unknown;
 const bunchTray = mountBunch(
   () => {
     if (bunch.length < 3) return;
     ambience.rustle(0.8);
     const kinds = new Set(bunch.map((s) => s.species)).size;
-    bouquetView.show(bouquetName(bunch, speciesName), `${bunch.length} stems · ${kinds === 1 ? 'one kind' : `${kinds} kinds`} · tied by hand`);
+    bouquetTitle = bouquetName(bunch, speciesName);
+    const { value, isNew, repeat } = collection.price(bunch);
+    bouquetView.show(
+      bouquetTitle,
+      `${bunch.length} stems · ${kinds === 1 ? 'one kind' : `${kinds} kinds`} · tied by hand`,
+      `Worth ✿ ${value.format()}${repeat ? ` · sold ${repeat}× before` : ''}`,
+      isNew,
+      `Sell · ${value.format()}`,
+    );
     world.tie(bunch);
   },
   () => {
