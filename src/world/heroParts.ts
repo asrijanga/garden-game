@@ -21,7 +21,7 @@ export interface HeroHints {
   /** Disc colours: outer ring (pollen) and the heart. */
   discColors?: [string, string];
   /** The single florets of a spike or cluster. */
-  floret?: 'bell' | 'pea' | 'tube' | 'lipped' | 'star' | 'funnel' | 'cross' | 'spurred';
+  floret?: 'bell' | 'pea' | 'tube' | 'lipped' | 'snap' | 'saucer' | 'star' | 'funnel' | 'cross' | 'spurred';
   /** Petals of each floret (star, funnel). */
   floretPetals?: number;
   /** Leaves: their shape, how many up the stem, opposite pairs, a basal rosette. */
@@ -35,6 +35,8 @@ export interface HeroHints {
   stamens?: { color: string; count: number; length: number };
   /** A speckled throat (foxglove) or a blotch at each petal base (poppy). */
   speckles?: string;
+  /** An iris: three falls hanging down (bearded), three standards upright, style arms between. */
+  iris?: boolean;
   /** Fine hairs on stems and leaves (a softer, silvery look). */
   hairy?: boolean;
 }
@@ -262,18 +264,22 @@ export function leaf(m: FlowerMesh, base: THREE.Vector3, dir: THREE.Vector3, len
 export function disc(m: FlowerMesh, top: THREE.Vector3, radius: number, kind: NonNullable<HeroHints['disc']>, colors: [string, string], height: number, rng: Rng) {
   const outer = new THREE.Color(colors[0]);
   const inner = new THREE.Color(colors[1]);
-  const n = Math.round(lerp(60, 160, Math.min(1, radius / 0.03)));
-  // The base it sits on.
-  blob(m, top.clone().add(new THREE.Vector3(0, height * 0.2, 0)), new THREE.Vector3(radius, Math.max(height * 0.4, radius * 0.25), radius), inner.clone().multiplyScalar(0.7), {}, 10);
+  const coned = kind === 'cone' || kind === 'spiky';
+  // A cone is a rounded dome (a black-eyed Susan's is about as tall as it is wide), never a spike.
+  if (coned) height = Math.min(height, radius * 0.95);
+  const n = Math.round(lerp(60, 160, Math.min(1, radius / 0.03)) * (coned ? 1.4 : 1));
+  // The base it sits on (for a cone, filling it, so the florets sit on a solid dome).
+  if (coned) blob(m, top.clone().add(new THREE.Vector3(0, radius * 0.1, 0)), new THREE.Vector3(radius * 0.98, height * 0.98, radius * 0.98), inner.clone().multiplyScalar(0.7), {}, 12);
+  else blob(m, top.clone().add(new THREE.Vector3(0, height * 0.2, 0)), new THREE.Vector3(radius, Math.max(height * 0.4, radius * 0.25), radius), inner.clone().multiplyScalar(0.7), {}, 10);
   for (let i = 0; i < n; i++) {
     const k = Math.sqrt((i + 0.5) / n);
     const a = i * 2.39996;
     const r = k * radius;
     let y = (1 - k * k) * height;
-    if (kind === 'cone' || kind === 'spiky') y = (1 - k) * height + radius * 0.1;
+    if (coned) y = Math.sqrt(Math.max(0, 1 - k * k)) * height;
     const p = top.clone().add(new THREE.Vector3(Math.cos(a) * r, y + radius * 0.1, Math.sin(a) * r));
     const c = inner.clone().lerp(outer, Math.pow(k, 1.5)).multiplyScalar(lerp(0.88, 1.08, rng()));
-    const s = radius * (kind === 'spiky' ? 0.07 : 0.055) * lerp(0.8, 1.2, rng());
+    const s = radius * (kind === 'spiky' ? 0.07 : kind === 'cone' ? 0.075 : 0.055) * lerp(0.8, 1.2, rng());
     if (kind === 'spiky') {
       // Echinacea: stiff orange spines.
       const d = new THREE.Vector3(Math.cos(a) * k, 0.8, Math.sin(a) * k).normalize();
@@ -339,6 +345,17 @@ export function floret(m: FlowerMesh, kind: NonNullable<HeroHints['floret']>, at
       } else for (let i = 0; i < 4; i++) petalBlade(m, mouth, f.a.clone().applyAxisAngle(f.a, 0).addScaledVector(f.side.clone().applyAxisAngle(f.a, (i / 4) * Math.PI * 2), 0.9).normalize(), size * 0.38, size * 0.3, 0.1, look, rng);
       return;
     }
+    case 'snap': {
+      // Snapdragon: a plump pouch, closed by a swollen lower lip (the "jaw", with a golden
+      // palate) under a two-lobed upper lip, held close to the spike.
+      const L = size * 0.95;
+      lathe(m, at, dir, [[size * 0.14, 0], [size * 0.3, L * 0.35], [size * 0.38, L * 0.7], [size * 0.3, L]], 9, (k) => W.clone().multiplyScalar(0.78 + 0.22 * k), look, (_k, a) => 1 + 0.12 * Math.max(0, -Math.sin(a)));
+      const mouth = at.clone().addScaledVector(f.a, L * 0.92);
+      blob(m, mouth.clone().addScaledVector(f.out, -size * 0.14), new THREE.Vector3(size * 0.3, size * 0.2, size * 0.24), W.clone().multiplyScalar(0.95), look, 7);
+      blob(m, mouth.clone().addScaledVector(f.out, -size * 0.05).addScaledVector(f.a, size * 0.12), new THREE.Vector3(size * 0.12, size * 0.07, size * 0.1), new THREE.Color('#f2c230'), {}, 5);
+      for (const sgn of [-1, 1]) petalBlade(m, mouth.clone().addScaledVector(f.out, size * 0.12), f.a.clone().addScaledVector(f.out, 0.7).addScaledVector(f.side, sgn * 0.35).normalize(), size * 0.42, size * 0.36, -0.3, look, rng);
+      return;
+    }
     case 'pea': {
       // Lupin, sweet pea: a broad upright banner, two wings, and a curved keel between them.
       const banner = f.a.clone().addScaledVector(UP, 0.8).normalize();
@@ -346,6 +363,23 @@ export function floret(m: FlowerMesh, kind: NonNullable<HeroHints['floret']>, at
       for (const sgn of [-1, 1]) petalBlade(m, at, f.a.clone().addScaledVector(f.side, sgn * 0.5).normalize(), size * 0.85, size * 0.45, 0.25, look, rng);
       const keel = at.clone().addScaledVector(f.a, size * 0.45).addScaledVector(UP, -size * 0.1);
       blob(m, keel, new THREE.Vector3(size * 0.15, size * 0.12, size * 0.3), W.clone().multiplyScalar(0.85), look, 6);
+      return;
+    }
+    case 'saucer': {
+      // Hollyhock, mallow: a shallow cup of five broad petals overlapping into a saucer, their
+      // edges softly frilled, a darker eye and a pale column of stamens in the middle.
+      const L = size * 0.32;
+      lathe(m, at, dir, [[size * 0.08, 0], [size * 0.22, L * 0.6], [size * 0.3, L]], 10, (k) => W.clone().multiplyScalar(0.6 + 0.4 * k), look);
+      const mouth = at.clone().addScaledVector(f.a, L * 0.8);
+      const n = petals || 5;
+      const off = rng() * Math.PI;
+      for (let i = 0; i < n; i++) {
+        const a = off + (i / n) * Math.PI * 2 + (rng() - 0.5) * 0.15;
+        const d = f.a.clone().multiplyScalar(0.32).addScaledVector(f.side.clone().applyAxisAngle(f.a, a), 1).normalize();
+        petalBlade(m, mouth, d, size * 0.62, size * 0.68, 0.12, look, rng);
+      }
+      tube(m, [mouth, mouth.clone().addScaledVector(f.a, size * 0.22)], size * 0.05, size * 0.04, new THREE.Color('#f4ecc8'), 5);
+      blob(m, mouth.clone().addScaledVector(f.a, size * 0.24), new THREE.Vector3(size * 0.07, size * 0.07, size * 0.07), new THREE.Color('#f2dc8a'), {}, 5);
       return;
     }
     case 'funnel': {

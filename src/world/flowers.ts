@@ -1403,6 +1403,28 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       const az = rng() * Math.PI * 2;
       m.setTilt(top, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(Math.cos(az), 0, Math.sin(az)), f.tilt * lerp(0.85, 1.1, rng())));
     }
+    if (detail === 'hero' && hints.iris) {
+      // Iris: three broad falls arching out and down, each with a golden beard; three
+      // standards between them, upright and cupped inwards; a narrow style arm over each fall.
+      const off = rng() * Math.PI * 2;
+      for (let i = 0; i < 3; i++) {
+        const az = off + (i / 3) * Math.PI * 2 + (rng() - 0.5) * 0.12;
+        const d = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
+        const hinge = top.clone().addScaledVector(d, f.centerSize * 0.6);
+        petal(m, hinge, az, 2.25 + (rng() - 0.5) * 0.15, f.length * 1.2 * lerp(0.92, 1.08, rng()), f.width * 1.35, -0.12, 0.2, rng, { blotch: f.blotch });
+        for (let b = 0; b < 7; b++) {
+          const t = 0.08 + b * 0.045;
+          const p = hinge.clone().addScaledVector(d, f.length * t * 1.1).add(new THREE.Vector3(0, f.length * (0.04 - t * t * 0.9), 0));
+          blob(m, p, new THREE.Vector3(f.width * 0.09, f.width * 0.07, f.width * 0.12), new THREE.Color('#f2b630'), {}, 4);
+        }
+        petal(m, hinge.clone().add(new THREE.Vector3(0, f.length * 0.05, 0)), az, 1.15, f.length * 0.55, f.width * 0.42, 0.25, 0.1, rng);
+        const sd = az + Math.PI / 3;
+        petal(m, top.clone().add(new THREE.Vector3(Math.cos(sd), 0, Math.sin(sd)).multiplyScalar(f.centerSize * 0.4)), sd, 0.38 + (rng() - 0.5) * 0.1, f.length * 1.05, f.width * 1.15, 0.35, 0.15, rng);
+      }
+      const geo = m.build();
+      geo.userData.headY = top.y;
+      return geo;
+    }
     const n = Math.round(lerp(f.petals[0], f.petals[1], rng()));
     const layers = Math.max(1, f.layers + (f.layers > 1 ? Math.round((rng() - 0.5) * 2) : 0));
     const style = { notch: f.notch, pointed: f.pointed, blotch: f.blotch };
@@ -1521,8 +1543,11 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       const attach = new THREE.Vector3(top.x * (y / top.y), y, top.z * (y / top.y));
       if (detail === 'hero') {
         // Open florets below, opening ones above, and tight buds at the very tip.
-        const dir = d.clone().multiplyScalar(f.bell ? 0.75 : 0.9).addScaledVector(UP, f.bell ? -0.55 : 0.25).normalize();
-        const p = attach.clone().addScaledVector(d, size * 0.35);
+        // (Snapdragons, though bell-like in the garden, face out and a little up, held close.)
+        const snap = hints.floret === 'snap' || hints.floret === 'saucer';
+        const hang = f.bell && !snap;
+        const dir = d.clone().multiplyScalar(hang ? 0.75 : 0.9).addScaledVector(UP, hang ? -0.55 : snap ? 0.35 : 0.25).normalize();
+        const p = attach.clone().addScaledVector(d, size * (snap ? 0.18 : 0.35));
         tube(m, [attach, p], size * 0.06, size * 0.05, STEM, 3);
         if (t > 0.82) blob(m, p, new THREE.Vector3(size * 0.3, size * 0.45, size * 0.3), WHITE, { petal: true, hinge: p });
         else floret(m, hints.floret ?? (f.bell ? 'bell' : 'star'), p, dir, size * (t > 0.68 ? 0.75 : 1), hints.floretPetals ?? 5, rng, hints.speckles ? new THREE.Color(hints.speckles) : undefined);
