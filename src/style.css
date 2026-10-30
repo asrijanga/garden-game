@@ -993,9 +993,51 @@ body.in-bed .bunch.has-stems { display: flex; }
   color: inherit;
 }
 .bunch-tie {
+  white-space: nowrap;
   padding: 0 14px;
   background: #fff6e6;
   color: #5a4630;
 }
 .bunch-tie:disabled { opacity: 0.6; }
 .bunch-tie[hidden] { display: none; }
+
+/* A tied bouquet, shown on its own: everything else steps aside for its card. */
+.bouquet-card {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 16px 14px;
+  border-radius: 24px;
+  background: rgba(255, 250, 242, 0.72);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: 0 6px 20px rgba(60, 40, 20, 0.18);
+  color: #4a3826;
+  font: 500 14px/1.3 system-ui, sans-serif;
+  text-align: center;
+}
+body.in-bouquet .bouquet-card { display: flex; animation: bouquet-in 0.5s cubic-bezier(0.3, 1.3, 0.5, 1); }
+@keyframes bouquet-in { from { transform: translateY(30px); opacity: 0; } }
+.bouquet-name { font: 600 21px/1.2 Georgia, 'Times New Roman', serif; letter-spacing: 0.01em; }
+.bouquet-detail { opacity: 0.75; }
+.bouquet-actions { display: flex; gap: 10px; margin-top: 8px; }
+.bouquet-actions button {
+  height: 40px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 20px;
+  font: 600 15px/1 system-ui, sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.bouquet-actions button:disabled { opacity: 0.45; }
+.bouquet-untie { background: rgba(120, 90, 60, 0.12); color: #5a4630; }
+.bouquet-done { background: #6b8a4a; color: #fffaf0; }
+body.in-bouquet .sound-toggle,
+body.in-bouquet .bunch,
+body.in-bouquet .bed-back { display: none !important; }

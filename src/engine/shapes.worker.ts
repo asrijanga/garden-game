@@ -3,6 +3,7 @@ import { buildShape, heroGeometry, setPlantSeason, shapeKey, type LeafKind, type
 import type { Season } from '../world/season';
 import { SPECIES } from '../world/flowerSpecies';
 import type * as THREE from 'three';
+import { forBouquet } from '../world/bouquet';
 
 /**
  * Builds plant shapes ahead of time, off the world's thread: a shape built the moment a species
@@ -32,26 +33,35 @@ export interface HeroRequest {
   seed: number;
 }
 
-// Close-ups come first (someone is looking at that bed), one per task.
+// Bouquet stems first (they're waited on), then close-ups (someone is looking at that bed),
+// one per task.
 let heroQueue: HeroRequest[] = [];
+let stemQueue: HeroRequest[] = [];
+const speciesOf = (id: string) => (id.startsWith('leaf:') ? (id.slice(5) as LeafKind) : SPECIES.find((s) => s.id === id));
+let busy = false;
 const nextHero = () => {
-  const r = heroQueue.shift();
+  busy = false;
+  const stem = stemQueue.shift();
+  const r = stem ?? heroQueue.shift();
   if (!r) return;
-  const sp = r.species.startsWith('leaf:') ? (r.species.slice(5) as LeafKind) : SPECIES.find((s) => s.id === r.species);
+  busy = true;
+  const sp = speciesOf(r.species);
   if (sp) {
     const transfer: Transferable[] = [];
-    self.postMessage({ key: r.key, hero: pack(heroGeometry(sp, r.variant, r.seed), transfer) }, transfer);
+    const g = heroGeometry(sp, r.variant, r.seed);
+    if (stem) self.postMessage({ key: r.key, stem: pack(forBouquet(g), transfer) }, transfer);
+    else self.postMessage({ key: r.key, hero: pack(g, transfer) }, transfer);
   }
   setTimeout(nextHero, 0);
 };
 
-self.addEventListener('message', (e: MessageEvent<{ season: Season; recipes?: ShapeRecipe[]; hero?: HeroRequest[] }>) => {
+self.addEventListener('message', (e: MessageEvent<{ season: Season; recipes?: ShapeRecipe[]; hero?: HeroRequest[]; stems?: HeroRequest[] }>) => {
   setPlantSeason(e.data.season);
-  if (e.data.hero) {
-    // A new bed: what was asked for the last one is no longer needed.
-    const idle = heroQueue.length === 0;
-    heroQueue = [...e.data.hero];
-    if (idle) nextHero();
+  if (e.data.hero || e.data.stems) {
+    // A new bed (or bouquet): what was asked for the last one is no longer needed.
+    if (e.data.hero) heroQueue = [...e.data.hero];
+    if (e.data.stems) stemQueue = [...e.data.stems];
+    if (!busy) nextHero();
     return;
   }
   const queue = [...(e.data.recipes ?? [])];
