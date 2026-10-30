@@ -645,6 +645,20 @@ export class Ponds {
     basinGeo.setIndex(index);
     const waterGeo = new THREE.BufferGeometry();
     waterGeo.setAttribute('position', new THREE.BufferAttribute(pos.slice(), 3));
+    // The basin's vertices are nudged off the grid (the same nudge for a vertex wherever it's
+    // shared between chunks), so the floor never shows straight rows of triangles.
+    for (let b = 0; b < nz; b++) {
+      for (let a = 0; a < nx; a++) {
+        const i = i0 + a;
+        const j = j0 + b;
+        if (i <= 0 || j <= 0 || i >= N - 1 || j >= N - 1) continue;
+        const h = Math.sin(i * 12.9898 + j * 78.233) * 43758.5453;
+        const h2 = Math.sin(i * 39.3468 + j * 11.135) * 24634.6345;
+        const p = (b * nx + a) * 3;
+        pos[p] += (h - Math.floor(h) - 0.5) * CELL * 0.6;
+        pos[p + 2] += (h2 - Math.floor(h2) - 0.5) * CELL * 0.6;
+      }
+    }
     waterGeo.setAttribute('aDepth', new THREE.BufferAttribute(new Float32Array(count), 1));
     waterGeo.setAttribute('aWet', new THREE.BufferAttribute(new Float32Array(count), 1));
     waterGeo.setIndex(index);

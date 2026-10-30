@@ -10,7 +10,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current stories:** **every story in the backlog is now built** (the player: "implement the rest of stories one by one, PR for each and merge, use recommendations and don't ask me until everything is done"). Each went in through its own PR (#1–#9): 6.6, 6.3, 6.7, 6.8 (+6.4), 6.5, 4.1d, 4.1e, 3.8, 3.9. Everything 👀 below is waiting for the player's review, together with the earlier 2.10–2.14, 6.2, perf pass 2 and the worker. Ideas not built are in the Parking lot (e.g. undo checkpoints).
+**Current stories:** Milestone 7 (bouquets, from the player's new request) is being built story by story, each in its own PR: 7.1 → 7.7. Earlier 👀 stories still wait for the player's review.
 **Preview URL:** https://asrijanga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
@@ -69,12 +69,14 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 4.1e Living water flowers | 👀 Awaiting feedback | **Floating:** water flowers ride the ripples: each plant rises and falls and rocks a touch, more in a gust (their own material, so land flowers are untouched). **Autumn:** water leaves turn bronze (the pond's own lily pads too), and lotus blooms give way to browned seed pods nodding over on their stems. **Winter:** only a few dark pads stay on the water (fewer lily pads per raft, dark and spent; water flowers keep one or two dark pads, irises and marginals a few short brown leaves). **Drifting petals:** petals now also fall from lotus and water lilies, and any petal that lands on a pond floats, drifting slowly on the breeze and riding the ripples (before, they stopped in mid-air at lawn height over the water). **Creatures:** dragonflies now and then land on an open lotus, iris, pickerelweed, arrowhead or marsh marigold and rest there, wings held still, for a few seconds; ducks steer round water flowers as they do round lily pads; fish often glide in under lotus, water lilies and water hyacinth. |
 | 3.8 Little living-world details | 👀 Awaiting feedback | **Moss on stones:** moss now gathers slowly (over ~4 minutes after a stone is laid) on stepping stones, keeping to their rims and sides since the tops are walked on, on the rocks round the pond (on their tops), and on stone walls and stone edging (on their tops, as on boulders). It grows in soft patches from each stone's place in the garden, so no two match; stones rebuilt from a save are already mossy. **Bunny rustle:** a faint leafy rustle when a bunny hops through flowers, heard only when the view is close (within ~14 m), softer the further away. **Wind-borne petals and seeds:** already there since 4.2 (spring blossom and summer seeds ride the gusts, more let go in a gust); nothing more needed. |
 | 3.9 Close-up polish pass | 👀 Awaiting feedback | Looked at each from the closest zoom: a butterfly on a bloom, a hummingbird perched on the cottage, a bunny, a duck family, a cabbage rose, a lotus. **Fixed: water flowers were sunk under the water.** Water plants were set at the pond's water level *at the moment they were planted*; when a garden is replayed (every load and undo) the pond has only just started filling, so lotus, water lilies and the rest ended up rooted ~0.6 m deep, showing only a bloom poking out. They're now set at the level the pond fills to: stems rise from the surface, pads float on it (a touch higher than before, so the ripples don't wash over them), raised lotus leaves stand on their stalks. **Ducks' wings** were flat cut-outs that looked like boards whenever open (flapping, flying): now feathered, with a scalloped trailing edge of flight feathers in a darker tone and a gentle curve. Butterflies, hummingbirds, bunnies and the rose read well up close; left as they are. |
+| 7.1 A finer, natural pond floor | 👀 Awaiting feedback | The pond's floor and shallows were drawn as pale crazy-paving: big, even polygon cells with grout lines between them, which read as tiles (triangles). Now it's a natural bed: rounded, slightly oval pebbles in two sizes (big ones lying over smaller ones), each its own tone (greys, warm browns, ochres, the odd greenish one), domed, half sunk in silt with a soft shadowed rim, scattered over mottled silt and fine grit; no lines between them. The basin's mesh vertices are also nudged off the grid, so no straight rows of triangles show in its shading. |
 
 Status legend: ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · ✅ Done
 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **Bouquets (Milestone 7):** *Feedback:* "I want hyper realistic representation of flowers, so introduce some randomness and imperfections, I want to go close up when I select a flower bed and be able to prune and make flower bouquet (no cover just a thread) and that's the game … we will be able to create unique flower bouquet collection and sell them for points … points keep growing to infinity … create stories and execute until all of them are done. Do this for every flower in our flower book, aim for maximum accuracy to life when close up and approx when in the map mode. The pond base is triangles but there should be randomness and more finer to make it look realistic." *Changes:* new Milestone 7 with stories 7.1–7.7 (below), built in order.
 - **Finish the backlog:** *Feedback:* "Implement the rest of stories one by one, PR for each and merge, use recommendations and don't ask me until everything is done." *Changes:* each remaining story built on its own branch, merged through a PR and deployed, in the order 6.6, 6.3, 6.7, 6.8 (with 6.4), 6.5, 4.1d, 4.1e, 3.8, 3.9.
 - **Worker:** *Feedback:* "Use a web worker or workers to render away from main thread", then (after I suggested measuring on the phone first) "You want to tell me fps? Can you measure it yourself and move to web worker? Main thread should always be free for drawing." *Changes:* the garden moved into a worker (see the story row and the Threads decision). I can't read the iPhone's frame rate from the cloud; measured the page thread headless instead.
 - **6.2 review (jank):** *Feedback:* "It's extremely janky, can you add a performance upgrade? Only track the objects that are currently visible in frame, will that help push fps to be 60 consistently? Implement any other lazy performance ideas you may have." *Changes:* perf pass 2 (view culling, far-off flower detail, merged cottage, shadows only when the sun moves). Culling helps most zoomed in; the wide admire views show most of the world, so they gain less (about half the triangles).
@@ -675,6 +677,38 @@ Demo script: dig a pond, choose the water mix, and paint across it. Watch lotus 
 - **Remove first-time hitches:** build flower and creature shapes ahead of time instead of the first time each is planted or appears.
 - **Cheaper forest shadows:** bake the forest's shadows once, as they never change.
 - **Profile what's left:** look at the remaining drawing cost (bloom, edge smoothing).
+
+---
+
+## Milestone 7 — Bouquets: the game *(requested by the player)*
+
+> "I want hyper realistic representation of flowers, so introduce some randomness and imperfections. I want to go close up when I select a flower bed and be able to prune and make a flower bouquet (no cover, just a thread) and that's the game. We will be able to create a unique flower bouquet collection and sell them for points; points keep growing to infinity. Do this for every flower in our flower book, aim for maximum accuracy to life when close up and approximate when in the map mode. The pond base is triangles but there should be randomness and more finer to make it look realistic."
+
+The core loop becomes: **grow → go close to a bed → prune stems → tie a bouquet → keep it in your collection or sell it for points.**
+
+### Story 7.1 — A finer, natural pond floor (S)
+- The pond's floor and banks are built from a coarse, regular triangle grid (and big, even pebble cells). Make it finer and irregular: jittered vertices, smaller pebbles of mixed sizes, silt and gravel, so no straight triangle edges show.
+
+### Story 7.2 — No two flowers alike (M)
+- Every plant in map mode gets lifelike randomness and small imperfections: a slightly different tone per petal, the odd petal drooping, curled, nibbled or missing, heads tilting different ways, stems leaning, a few faded or past-their-best blooms in a bed. Cheap (per-instance and per-petal variation on the GPU), so map mode stays smooth.
+
+### Story 7.3 — Close to a bed (M)
+- Tap a flower bed (Look-around tool) to go close: the camera glides down to eye level beside the bed, and only that bed's plants are shown in full close-up detail. A back button (or pinching out) returns to the garden.
+
+### Story 7.4 — True to life up close: every flower in the flower book (L)
+- A close-up ("hero") version of every flower in the flower book, as accurate to life as we can make it: real petal counts and shapes, ruffles, veins and colour gradients, stamens, pistils, sepals, buds, true leaf shapes and arrangements, thorns and hairs where they belong. Each plant is unique (its own seed), with natural imperfections.
+- Map mode keeps the lighter versions (approximate), so the garden stays smooth; close-up versions are built in a worker only for the bed you're looking at.
+
+### Story 7.5 — Prune (M)
+- In a bed's close-up, tap a flower to cut it (a snip sound; the stem comes away with its leaves). Cut stems gather in your hand (a little bunch shown at the bottom). The plant regrows its bloom after a while.
+
+### Story 7.6 — Hand-tied bouquets (M)
+- Tie the stems in your hand into a bouquet: arranged naturally (tallest in the middle, spiralled stems), trimmed to length, tied with a twist of thread — no wrapping. A close-up turntable view; give it a name (or accept a suggested one).
+
+### Story 7.7 — My bouquet collection, and points (M)
+- Keep bouquets in a collection book (a picture of each, its flowers, its name), or sell one for points. The price grows with variety, rarity (out-of-season or hard-to-grow flowers), colour harmony, freshness and how many stems; a bouquet unlike any you've made before is worth more.
+- Points keep growing without limit: every unique bouquet you've made raises a permanent multiplier, and big numbers are written readably (12.4K, 3.1M, 7.2B … and beyond).
+- The collection and points are saved, and included in garden backups.
 
 ---
 
