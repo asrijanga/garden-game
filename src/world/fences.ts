@@ -58,7 +58,8 @@ function picketPostGeometry(seed: number): THREE.BufferGeometry {
   cap.rotateY(Math.PI / 4);
   cap.translate(0, h + 0.03, 0);
   const tone = weathered('#f1ebdf', rng);
-  return mergeGeometries([colorize(post.toNonIndexed(), tone), colorize(cap.toNonIndexed(), tone)]);
+  const flat = (g: THREE.BufferGeometry) => (g.index ? g.toNonIndexed() : g);
+  return mergeGeometries([colorize(flat(post), tone), colorize(flat(cap), tone)]);
 }
 
 /** A picket board with a pointed top, 1 m tall before scaling. Origin at its foot. */

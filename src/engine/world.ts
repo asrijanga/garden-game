@@ -1055,7 +1055,12 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     }
     heroes = [];
     heroBed++;
+    heroTris = 0;
   };
+  // At most this many triangles of close-ups at once (a bed of fully double roses would be
+  // millions): past it, the further plants keep their garden shapes, which read the same there.
+  const HERO_BUDGET = 900_000;
+  let heroTris = 0;
   const showHeroes = (bed: ReturnType<typeof flowers.bedAround>) => {
     clearHeroes();
     const plants = bed.plants
@@ -1070,10 +1075,12 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   const heroArrived = (key: string, geo: THREE.BufferGeometry) => {
     const [bed, i] = key.split(':').map(Number);
     const h = heroes[i];
-    if (bed !== heroBed || !h || h.hero || h.cut) {
+    const tris = geo.attributes.position.count / 3;
+    if (bed !== heroBed || !h || h.hero || h.cut || heroTris + tris > HERO_BUDGET) {
       geo.dispose();
       return;
     }
+    heroTris += tris;
     // The plant's own growth time and colours, so it looks and moves just as it did.
     geo.setAttribute('aLife', new THREE.InstancedBufferAttribute(new Float32Array(h.info.life), 2));
     geo.setAttribute('aPetalColor', new THREE.InstancedBufferAttribute(new Float32Array(h.info.petal), 3));
