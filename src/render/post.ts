@@ -154,8 +154,13 @@ void main() {
     // (Not on strong colours: a crimson rose's shaded heart deepens to crimson, not lavender-grey.)
     float chroma = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
     c = mix(c, c * vec3(0.86, 0.98, 1.14), (1.0 - smoothstep(0.08, 0.45, t)) * 0.7 * (1.0 - smoothstep(0.12, 0.4, chroma)));
-    // Richer colour, airy values: lifted towards the paper, never to black.
-    c = mix(vec3(t), c, 1.15);
+    // Richer colour, airy values: lifted towards the paper, never to black. Colours already
+    // vivid aren't pushed further (a red rose would clip to one flat red), and the brightest
+    // values ease in under a soft shoulder rather than hitting the ceiling.
+    float vivid = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+    c = mix(vec3(t), c, 1.0 + 0.15 * (1.0 - smoothstep(0.3, 0.7, vivid)));
+    c = max(c, 0.0);
+    c = mix(c, 0.8 + (c - 0.8) / (1.0 + (c - 0.8) * 3.0), step(0.8, c));
     c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * 0.9;
     c = max(c, vec3(0.13, 0.12, 0.2) * (1.0 - t) + c * 0.0);
     vec2 px = gl_FragCoord.xy;
