@@ -29,9 +29,10 @@ void RE_Direct_Lambert( const in IncidentLight directLight, const in vec3 geomet
   float lit = smoothstep( 0.0, 0.16, dotNL );
   float paint = lit * 0.88 + 0.12 * saturate( dotNL );
   vec3 irradiance = paint * directLight.color;
-  // A warm catch-light where the surface turns away from the eye but towards the sun.
-  float rim = pow( 1.0 - saturate( dot( geometryNormal, geometryViewDir ) ), 3.0 ) * lit;
-  irradiance += directLight.color * rim * vec3( 0.22, 0.16, 0.08 );
+  // A faint warm catch-light where the surface turns away from the eye but towards the sun
+  // (only a touch: thin petals are often seen edge-on, and more would make them shine).
+  float rim = pow( 1.0 - abs( dot( geometryNormal, geometryViewDir ) ), 4.0 ) * lit * saturate( dotNL );
+  irradiance += directLight.color * rim * vec3( 0.06, 0.045, 0.02 );
   reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );
 }
 
