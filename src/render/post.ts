@@ -129,7 +129,9 @@ void main() {
     // A plane, even seen at a slant, has no curvature: only real steps in depth draw.
     float bend = max(abs(zn + zs - 2.0 * zc), abs(ze + zw - 2.0 * zc)) / zc;
     float behind = (max(max(zn, zs), max(ze, zw)) - zc) / zc;
-    float ink = smoothstep(0.018, 0.05, bend) * smoothstep(0.012, 0.04, behind);
+    // (Up close the threshold drops, so petals lying over petals get their own outline.)
+    float fine = mix(0.4, 1.0, smoothstep(0.8, 2.2, zc));
+    float ink = smoothstep(0.018 * fine, 0.05 * fine, bend) * smoothstep(0.012 * fine, 0.04 * fine, behind);
     ink *= 1.0 - smoothstep(18.0, 60.0, zc);
     vec3 inkColour = c * vec3(0.3, 0.25, 0.22) + vec3(0.012, 0.008, 0.004);
     c = mix(c, inkColour, ink * 0.92);
@@ -149,7 +151,9 @@ void main() {
     // Greens lean warm and fresh (yellow-green in the sun), shade leans blue-teal.
     float green = smoothstep(0.0, 0.12, c.g - max(c.r, c.b));
     c = mix(c, c * vec3(1.08, 1.03, 0.84), green * t * 0.9);
-    c = mix(c, c * vec3(0.86, 0.98, 1.14), (1.0 - smoothstep(0.08, 0.45, t)) * 0.7);
+    // (Not on strong colours: a crimson rose's shaded heart deepens to crimson, not lavender-grey.)
+    float chroma = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+    c = mix(c, c * vec3(0.86, 0.98, 1.14), (1.0 - smoothstep(0.08, 0.45, t)) * 0.7 * (1.0 - smoothstep(0.12, 0.4, chroma)));
     // Richer colour, airy values: lifted towards the paper, never to black.
     c = mix(vec3(t), c, 1.15);
     c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * 0.9;

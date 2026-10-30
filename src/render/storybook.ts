@@ -41,6 +41,10 @@ void RE_IndirectDiffuse_Lambert( const in vec3 irradiance, const in vec3 geometr
   // (Normals here are in view space: back to the world's, to know which way is up.)
   float up = ( vec4( geometryNormal, 0.0 ) * viewMatrix ).y * 0.5 + 0.5;
   vec3 tint = mix( vec3( 1.06, 1.0, 0.9 ), vec3( 0.86, 0.93, 1.16 ), up );
+  // (Strong colours keep their own hue in the shade, deepened rather than cooled.)
+  vec3 dc = material.diffuseColor;
+  float chroma = max( dc.r, max( dc.g, dc.b ) ) - min( dc.r, min( dc.g, dc.b ) );
+  tint = mix( tint, vec3( 1.0 ), smoothstep( 0.15, 0.5, chroma ) * 0.75 );
   reflectedLight.indirectDiffuse += irradiance * tint * 1.12 * BRDF_Lambert( material.diffuseColor );
 }
 
