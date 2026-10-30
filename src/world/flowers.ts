@@ -874,7 +874,7 @@ function aquaticWinter(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'fla
     for (let i = 0; i < n; i++) {
       const a = rng() * Math.PI * 2;
       const r = i === 0 ? 0 : lerp(0.1, 0.18, rng());
-      pad(m, Math.cos(a) * r, Math.sin(a) * r, lerp(0.07, type === 'lotus' ? 0.14 : 0.1, rng()), 0.004, type === 'lily', 0, rng);
+      pad(m, Math.cos(a) * r, Math.sin(a) * r, lerp(0.07, type === 'lotus' ? 0.14 : 0.1, rng()), 0.016, type === 'lily', 0, rng);
     }
     return new THREE.Vector3(0, 0.01, 0);
   }
@@ -894,9 +894,9 @@ function aquaticGrowing(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'fl
       for (let i = 0; i < 4; i++) {
         const a = i * 1.7 + rng();
         const r = i === 0 ? 0 : lerp(0.12, 0.2, rng());
-        pad(m, Math.cos(a) * r, Math.sin(a) * r, lerp(0.09, 0.13, rng()), 0.004, true, 0, rng);
+        pad(m, Math.cos(a) * r, Math.sin(a) * r, lerp(0.09, 0.13, rng()), 0.016, true, 0, rng);
       }
-      const top = new THREE.Vector3(0.03, 0.02, 0.02);
+      const top = new THREE.Vector3(0.03, 0.032, 0.02);
       simpleBloom(m, top, 9, size, size * 0.42, 1.05, 0.05, new THREE.Color('#f2c230'), rng, { pointed: true });
       simpleBloom(m, top.clone().add(new THREE.Vector3(0, 0.006, 0)), 8, size * 0.8, size * 0.38, 0.65, 0.12, null, rng, { pointed: true });
       return top;
@@ -906,7 +906,7 @@ function aquaticGrowing(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'fl
       // around a golden seed-pod heart.
       for (let i = 0; i < 3; i++) {
         const a = i * 2.1 + rng();
-        pad(m, Math.cos(a) * lerp(0.1, 0.2, rng()), Math.sin(a) * lerp(0.1, 0.2, rng()), lerp(0.13, 0.18, rng()), 0.004, false, 0.04, rng);
+        pad(m, Math.cos(a) * lerp(0.1, 0.2, rng()), Math.sin(a) * lerp(0.1, 0.2, rng()), lerp(0.13, 0.18, rng()), 0.016, false, 0.04, rng);
       }
       for (let i = 0; i < 2; i++) {
         const a = rng() * Math.PI * 2;
@@ -1504,7 +1504,7 @@ export class Flowers {
               float w = windAt(root.xz, 0.0);
               float ph = root.x * 1.3 + root.z * 1.9;
               float scale = max(length(instanceMatrix[1].xyz), 0.001);
-              float bob = (sin(uWindTime * 1.4 + ph) * 0.6 + sin(uWindTime * 2.3 + ph * 1.7) * 0.4) * (0.004 + 0.008 * w);
+              float bob = (sin(uWindTime * 1.4 + ph) * 0.6 + sin(uWindTime * 2.3 + ph * 1.7) * 0.4) * (0.003 + 0.005 * w);
               transformed.y += bob / scale;
               transformed.y += (transformed.x * sin(uWindTime * 1.1 + ph) + transformed.z * cos(uWindTime * 0.9 + ph)) * 0.035 * (0.3 + w);
             }

@@ -309,7 +309,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
         if (d > 0.03) return 'shallow';
         return d === 0 && ponds.contains(x, z, 0.7) && !ponds.contains(x, z, 0.05) ? 'bank' : null;
       },
-      level: (x, z) => ponds.levelAt(x, z),
+      level: (x, z) => ponds.restingLevelAt(x, z),
     },
   );
   // Fences and hedges: posts knocked in with a wooden "tock", hedges rustling up.
