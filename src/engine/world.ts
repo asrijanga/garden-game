@@ -1214,7 +1214,8 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     post.view(bouquet.scene, bouquet.camera);
     // Seen by soft daylight, whatever the hour in the garden.
     bouquetShown = true;
-    post.setGrade(new THREE.Color('#1a120c'), new THREE.Color('#fffaf2'), 1.05, 0.12);
+    // (No lift: the backdrop stays true black.)
+    post.setGrade(new THREE.Color('#000000'), new THREE.Color('#fffaf2'), 1.05, 0.12);
     const asks = stems.map((s, k) => ({ key: `b${bouquetId}:${k}`, species: s.species, variant: s.variant, seed: s.seed }));
     if (shapes) shapes.postMessage({ season, stems: asks });
     else {
