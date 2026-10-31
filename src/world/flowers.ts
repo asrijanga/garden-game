@@ -31,6 +31,13 @@ let detail: 'far' | 'near' | 'hero' = 'near';
 let hints: HeroHints = {};
 /** (Kept for the simplified far-off shapes.) */
 const isFar = () => detail === 'far';
+/**
+ * The plant being built has crowded heads (roses, many-rayed daisies): seen from the garden its
+ * petals are too small to show their shaping, so they take the light six-triangle shape (a bed
+ * of patio roses was over a million triangles otherwise). Close up, the hero shapes have it all.
+ */
+let denseHeads = false;
+const lightPetals = () => isFar() || (denseHeads && detail !== 'hero');
 
 /**
  * One plant's close-up ("hero") shape: its species and garden variant (so it's recognisably the
@@ -224,9 +231,9 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
     heroPetal(m, at, rows, centreT, width, crease, edgeAt, shadeAt, { color: WHITE, petal: true, hinge, axis, close: Math.max(0, open - closeTo) }, rng);
     return;
   }
-  if (isFar()) {
-    // Seen from afar: the same outline in four rows and no crease (6 triangles, not 24), a
-    // touch wider so the bloom covers the same area.
+  if (lightPetals()) {
+    // Seen from afar (or a crowded head): the same outline in four rows and no crease (6
+    // triangles, not 24), a touch wider so the bloom covers the same area.
     const few = [rows[0], rows[2], rows[4], rows[6]];
     for (let i = 0; i < few.length - 1; i++) {
       const t0 = few[i][0];
@@ -242,9 +249,13 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
     }
     return;
   }
-  for (let i = 0; i < rows.length - 1; i++) {
-    const [t0, w0] = rows[i];
-    const [t1, w1] = rows[i + 1];
+  // In the garden, every other row of the outline (12 triangles, not 24): the shaping still reads
+  // from there, and a big garden has hundreds of thousands of petals. (Close-ups have the full
+  // curved surface.)
+  const shown = [rows[0], rows[2], rows[4], rows[6]];
+  for (let i = 0; i < shown.length - 1; i++) {
+    const [t0, w0] = shown[i];
+    const [t1, w1] = shown[i + 1];
     const l0 = at(t0, -w0);
     const c0 = at(centreT(t0), 0);
     const r0 = at(t0, w0);
@@ -833,8 +844,10 @@ function roseBloom(m: FlowerMesh, top: THREE.Vector3, size: number, petals: numb
  * every stage from bud to full bloom. Returns where the highest bloom sits.
  */
 function roseBush(m: FlowerMesh, type: 'tea' | 'floribunda' | 'cabbage' | 'climber' | 'wild' | 'mini', height: number, size: number, rng: () => number): THREE.Vector3 {
-  const petals = type === 'cabbage' ? 42 : type === 'tea' ? 26 : type === 'mini' ? 16 : type === 'floribunda' ? 20 : 22;
-  const canes = type === 'tea' ? 2 : type === 'cabbage' ? 3 : type === 'floribunda' ? 3 : type === 'climber' ? 3 : type === 'wild' ? 4 : 4;
+  const full = type === 'cabbage' ? 42 : type === 'tea' ? 26 : type === 'mini' ? 16 : type === 'floribunda' ? 20 : 22;
+  // (From the garden the inner petals of a rose can't be told apart: fewer of them there.)
+  const petals = detail === 'hero' ? full : Math.round(full * 0.6);
+  const canes = type === 'tea' ? 2 : type === 'cabbage' ? 3 : type === 'floribunda' ? 3 : type === 'climber' ? 3 : type === 'wild' ? 4 : 3;
   let top = new THREE.Vector3(0, 0, 0);
   for (let c = 0; c < canes; c++) {
     const az = (c / canes) * Math.PI * 2 + rng() * 1.2;
@@ -866,7 +879,7 @@ function roseBush(m: FlowerMesh, type: 'tea' | 'floribunda' | 'cabbage' | 'climb
     const tip = pts[segs];
     const blooms: THREE.Vector3[] = [];
     if (type === 'floribunda' || type === 'mini') {
-      const n = type === 'mini' ? 3 + Math.floor(rng() * 3) : 3 + Math.floor(rng() * 3);
+      const n = type === 'mini' ? 2 + Math.floor(rng() * 2) : 3 + Math.floor(rng() * 3);
       for (let b = 0; b < n; b++) {
         const a = (b / n) * Math.PI * 2 + rng();
         const r = b === 0 ? 0 : size * lerp(1.4, 2.0, rng());
@@ -1385,6 +1398,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
   const rng = () => (own && draws++ > 0 ? (shared() + own()) % 1 : shared());
   const m = new FlowerMesh();
   const height = lerp(sp.height[0], sp.height[1], rng());
+  denseHeads = sp.form.kind === 'rose' || (sp.form.kind === 'radial' && sp.form.petals[1] * Math.max(1, sp.form.layers) > 14);
   if (sp.form.kind === 'aquatic') {
     const top = aquatic(m, sp.form.type, height, sp.form.size * HEAD, rng);
     const geo = m.build();
@@ -1457,7 +1471,8 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       geo.userData.headY = top.y;
       return geo;
     }
-    const n = Math.round(lerp(f.petals[0], f.petals[1], rng()));
+    // (Crowded heads carry fewer petals in the garden, where the inner ones are hidden anyway.)
+    const n = Math.round(lerp(f.petals[0], f.petals[1], rng()) * (denseHeads && detail !== 'hero' ? 0.7 : 1));
     const layers = Math.max(1, f.layers + (f.layers > 1 ? Math.round((rng() - 0.5) * 2) : 0));
     const style = { notch: f.notch, pointed: f.pointed, blotch: f.blotch };
     for (let layer = 0; layer < layers; layer++) {

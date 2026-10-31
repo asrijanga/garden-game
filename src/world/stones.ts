@@ -22,7 +22,9 @@ function stepGeometry(seed: number): THREE.BufferGeometry {
   const cornerRound = [0, 1, 2, 3].map(() => lerp(3.8, 6.0, rng())); // lower = rounder corner
   const wobble = [0, 1, 2].map(() => rng() * Math.PI * 2);
   const shape = new THREE.Shape();
-  const N = 40;
+  // (24 points: as smooth as 40 at garden distance, for half the triangles; a long path is
+  // hundreds of stones.)
+  const N = 24;
   for (let i = 0; i < N; i++) {
     const a = (i / N) * Math.PI * 2;
     const c = Math.cos(a);
@@ -43,7 +45,7 @@ function stepGeometry(seed: number): THREE.BufferGeometry {
     bevelEnabled: true,
     bevelThickness: 0.02,
     bevelSize: 0.022,
-    bevelSegments: 3,
+    bevelSegments: 2,
     curveSegments: 1,
   });
   g.rotateX(Math.PI / 2); // extrude downward: the shape's y becomes world z
