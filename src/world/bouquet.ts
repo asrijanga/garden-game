@@ -11,7 +11,7 @@ const TALL = 0.5;
  * florist builds one, so every stem leans the same way round and the heads open into a dome.
  * Tied with a few turns of twine and a knot, nothing else; the stems cut level below.
  *
- * It's a scene of its own (a soft linen backdrop and gentle light), drawn instead of the garden
+ * It's a scene of its own (a black backdrop and gentle light), drawn instead of the garden
  * while it's shown. Drag to turn it; it turns slowly on its own.
  */
 export class Bouquet {
@@ -31,18 +31,9 @@ export class Bouquet {
   private readonly twineMat = new THREE.MeshLambertMaterial({ vertexColors: true });
 
   constructor() {
-    // A warm linen backdrop, lighter above: like a bunch laid on the kitchen table to admire.
-    const g = new Uint8Array(64 * 4);
-    for (let i = 0; i < 64; i++) {
-      const k = i / 63;
-      const c = new THREE.Color('#e2d4bc').lerp(new THREE.Color('#f7f1e6'), k * k * (3 - 2 * k));
-      g.set([c.r * 255, c.g * 255, c.b * 255, 255], i * 4);
-    }
-    const bg = new THREE.DataTexture(g, 1, 64);
-    bg.colorSpace = THREE.SRGBColorSpace;
-    bg.magFilter = THREE.LinearFilter;
-    bg.needsUpdate = true;
-    this.scene.background = bg;
+    // A plain black backdrop: the flower colours stand out cleanly against it (a light one let
+    // similar petal tones blend together).
+    this.scene.background = new THREE.Color('#000000');
     this.scene.add(new THREE.HemisphereLight('#f4f0ea', '#8a7a5a', 1.05));
     const sun = new THREE.DirectionalLight('#fff1dc', 1.7);
     sun.position.set(-1.2, 2.2, 1.6);
