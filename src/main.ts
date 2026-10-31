@@ -428,6 +428,8 @@ const collection = Collection.load();
 const pointsHud = mountCollection(collection, speciesName);
 pointsHud.refresh();
 let bouquetTitle = '';
+/** The flower stems in the bouquet on show (what gets sold). */
+let tiedStems: CutStem[] = [];
 /** A small picture of the bouquet for the book (its middle, 3:4), as a JPEG. */
 const thumbnail = async (): Promise<string | undefined> => {
   try {
@@ -452,7 +454,7 @@ const bouquetView = mountBouquetView({
     bouquetView.hide();
   },
   async done() {
-    const stems = bunch;
+    const stems = tiedStems;
     bouquetView.busy();
     const thumb = collection.price(stems).isNew ? await thumbnail() : undefined;
     const { value, isNew } = collection.sell(stems, bouquetTitle, thumb);
@@ -467,19 +469,26 @@ const bouquetView = mountBouquetView({
 handlers.bouquetReady = (() => bouquetView.ready()) as (...a: never[]) => unknown;
 const bunchTray = mountBunch(
   () => {
-    if (bunch.length < 3) return;
+    // Only flowers are tied: cut greenery (leaves, ferns) stays in the hand, as it would in a
+    // florist's, since a leaf standing in for a stem reads as a big green plate.
+    const flowers = bunch.filter((s) => s.kind !== 'foliage');
+    if (flowers.length < 3) {
+      toolbar.showLabel('Three flowers make a bouquet (greenery stays in your hand)', 2400);
+      return;
+    }
     ambience.rustle(0.8);
-    const kinds = new Set(bunch.map((s) => s.species)).size;
-    bouquetTitle = bouquetName(bunch, speciesName);
-    const { value, isNew, repeat } = collection.price(bunch);
+    tiedStems = flowers;
+    const kinds = new Set(flowers.map((s) => s.species)).size;
+    bouquetTitle = bouquetName(flowers, speciesName);
+    const { value, isNew, repeat } = collection.price(flowers);
     bouquetView.show(
       bouquetTitle,
-      `${bunch.length} stems · ${kinds === 1 ? 'one kind' : `${kinds} kinds`} · tied by hand`,
+      `${flowers.length} stems · ${kinds === 1 ? 'one kind' : `${kinds} kinds`} · tied by hand`,
       `Worth ✿ ${value.format()}${repeat ? ` · sold ${repeat}× before` : ''}`,
       isNew,
       `Sell · ${value.format()}`,
     );
-    world.tie(bunch);
+    world.tie(flowers);
   },
   () => {
     ambience.rustle(0.6);
